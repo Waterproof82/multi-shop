@@ -1,4 +1,4 @@
-import { Product, Result, ImageFit } from "../entities/types";
+import { Product, Result, ImageFit, ProductoTabla } from "../entities/types";
 
 export interface CreateProductData {
   empresaId: string;
@@ -14,6 +14,7 @@ export interface CreateProductData {
   descripcion_de?: string | null;
   precio: number;
   foto_url?: string | null;
+  foto_url_2?: string | null;
   foto_object_fit?: ImageFit | null;
   categoria_id?: string | null;
   es_especial?: boolean;
@@ -21,6 +22,7 @@ export interface CreateProductData {
   tipo_producto?: 'comida' | 'bebida';
   porcentaje_impuesto_override?: number | null;
   alergenos?: string[];
+  tabla_info?: ProductoTabla | null;
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> {

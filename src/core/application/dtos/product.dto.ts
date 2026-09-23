@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { tablaInfoShapeSchema } from "./tabla-info.dto";
 
 const imageFitValues = ['contain', 'cover', 'fill', 'none', 'scale-down'] as const;
+
+const tablaInfoSchema = tablaInfoShapeSchema.nullable().optional();
 
 // Schema for API validation (with i18n fields)
 export const createProductSchema = z.object({
@@ -25,6 +28,10 @@ export const createProductSchema = z.object({
     (url) => url.startsWith('https://'),
     { message: 'foto_url must use HTTPS' }
   ).nullable().optional(),
+  foto_url_2: z.url().refine(
+    (url) => url.startsWith('https://'),
+    { message: 'foto_url_2 must use HTTPS' }
+  ).nullable().optional(),
   foto_object_fit: z.enum(imageFitValues).nullable().optional(),
   categoria_id: z.uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
@@ -38,6 +45,7 @@ export const createProductSchema = z.object({
       'sesame', 'sulphites', 'lupin', 'molluscs',
     ])
   ).optional().default([]),
+  tabla_info: tablaInfoSchema,
 });
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;

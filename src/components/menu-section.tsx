@@ -19,6 +19,7 @@ import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/applicatio
 import { subcategoriasConProductos } from "@/lib/menu/subcategorias"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 import { AllergenBadges, AllergenList } from "@/components/allergen-icons"
+import { ImageZoomDialog } from "@/components/image-zoom-dialog"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
@@ -449,23 +450,12 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         )}
       </div>
       {item.image && !item.image.endsWith(".mp4") && (
-        <Dialog open={isImageZoomOpen} onOpenChange={setIsImageZoomOpen}>
-          <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl p-0 overflow-hidden border-none bg-transparent shadow-none">
-            <DialogHeader className="sr-only">
-              <DialogTitle>{displayName}</DialogTitle>
-              <DialogDescription>{displayName}</DialogDescription>
-            </DialogHeader>
-            <div className="relative aspect-square w-full sm:aspect-[4/3]">
-              <Image
-                src={item.image}
-                alt={displayName}
-                fill
-                className="object-contain"
-                sizes="(max-width: 768px) 100vw, 700px"
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ImageZoomDialog
+          open={isImageZoomOpen}
+          onOpenChange={setIsImageZoomOpen}
+          images={item.image2 ? [item.image, item.image2] : [item.image]}
+          alt={displayName}
+        />
       )}
     </div>
   );

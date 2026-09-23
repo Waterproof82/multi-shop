@@ -35,7 +35,11 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
 
 // Response helpers
 export function successResponse<T>(data: T, status = 200): NextResponse {
-  return NextResponse.json(data, { status });
+  // `data` es `undefined` en cada endpoint que devuelve Result<void> (delete,
+  // set-productos, etc.) — NextResponse.json(undefined, ...) lanza "Value is
+  // not JSON serializable" en vez de devolver un 200 vacio. `null` es JSON
+  // valido y no cambia nada para los endpoints que si mandan datos reales.
+  return NextResponse.json(data ?? null, { status });
 }
 
 export function errorResponse(message: string, status = 500): NextResponse {

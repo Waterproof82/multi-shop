@@ -1,86 +1,86 @@
-# Graph Report - tienda-recogida-domicilio  (2026-09-14)
+# Graph Report - segunda-imagen-producto  (2026-09-22)
 
 ## Corpus Check
-- 995 files · ~558,964 words
+- 1046 files · ~613,740 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 6440 nodes · 14280 edges · 508 communities (347 shown, 161 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 104 edges (avg confidence: 0.62)
+- 6816 nodes · 15059 edges · 575 communities (372 shown, 203 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 112 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `711fde8c`
+- Built from commit: `ab1fdf53`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - fetchWithCsrf
-- Result
-- pedido.use-case.ts
-- helpers.ts
+- IPedidoRepository
+- ModalidadEntrega
+- requireRole
 - quantity-selector-dialog.tsx
-- t
-- TgtgPromocion
-- page.tsx
-- tpv-catalog-ctx.tsx
-- mesa-orders-client.tsx
 - menu-section.tsx
+- Result
+- page.tsx
+- supabase-mesa.repository.ts
+- mesa-orders-client.tsx
+- route.ts
 - page.tsx
 - ComplementoGrupo
 - tpv-types.ts
-- page.tsx
+- waiter-banner.tsx
 - validationErrorResponse
-- tracking-page-client.tsx
+- Category
 - CobroFlow.tsx
 - IClienteRepository
 - types.ts
-- ErrorModule
-- MostradorClient.tsx
+- t
+- getSupabaseAnonClient
 - Product
 - getEmpresaUseCase
-- route.ts
+- handleResultWithStatus
 - getAuthAdminUseCase
 - page.tsx
 - compilerOptions
-- logApiError
-- route.ts
-- logger.ts
+- handleResult
+- cn
+- supabase-client.ts
 - dependencies
 - server-services.ts
 - layout.tsx
-- getAuditLogRepository
-- handleResult
+- SupabaseAdminRepository.ts
+- resolveAdminContextWithEmpresa
 - glovo.service.ts
-- index.ts
+- ErrorModule
 - supabase-pedido.repository.ts
 - getDomainFromHeaders
 - route.ts
-- descuento.use-case.ts
+- MenuVirtual
 - page.tsx
 - getMesaOrdersUseCase.ts
 - TurnoCerrarForm.tsx
 - contexto.ts
-- page.tsx
+- layout.tsx
 - Waiter Panel
 - proxy.ts
-- supabase-empresa.repository.ts
+- tracking-page-client.tsx
 - use-toast.ts
-- Fase 1 — Backend: CRUD de modalidades de entrega
+- Recogida y Envío a Domicilio para Tiendas — Implementation Plan
+- SupabasePedidoRepository
+- waiter-catalog-ctx.tsx
+- types.ts
 - rate-limit.ts
-- layout.tsx
-- cn
-- page.tsx
 - supabase-mesa-client-token.repository.ts
-- supabase-empleado-tpv.repository.ts
+- TiendaFulfillmentSelector.tsx
 - components.json
-- .next
+- layout.tsx
 - MesaOrdersClient
 - Ingrediente
-- route.ts
+- page.tsx
 - admin-sidebar.tsx
-- waiter-banner.tsx
-- route.ts
+- Menús Virtuales Implementation Plan
+- SupabaseReviewQueueRepository.ts
 - index.ts
 - compilerOptions
 - CLAUDE.md - Contexto multi_shop
@@ -89,24 +89,24 @@
 - valoracion.use-case.ts
 - HistorialClient.tsx
 - Recogida en tienda y envío a domicilio para `tipo = 'tienda'` — Diseño
-- SupabaseExportRepository.ts
+- PdfRenderer.ts
 - scripts
 - LaborControl — Registro Digital de Jornada
 - AnalyticsClient.tsx
-- promocion.use-case.ts
+- tabla-plantilla.use-case.ts
 - route.ts
 - cart-drawer.tsx
 - empresa-theme-provider.tsx
 - TooGoodToGo — Documentación del subsistema
 - InventarioFisicoClient.tsx
-- SupabaseReviewQueueRepository.ts
-- GenerarExport.usecase.ts
-- MenuPanel.tsx
-- processGlovoWebhookUseCase.ts
+- SupabaseExportRepository.ts
+- supabase-empresa.repository.ts
+- PedidoUseCase
+- route.ts
 - Carta Digital Multi-idioma
 - devDependencies
 - include
-- layout.tsx
+- MesasGrid.tsx
 - FichajeEvento
 - 20260323210214_enable_rls_all_tables.sql
 - fake-supabase.ts
@@ -120,19 +120,19 @@
 - setup.js
 - BcgScatterChart.tsx
 - PerfilLaboral
-- getSupabaseClient
+- route.ts
 - 6. Buenas prácticas
 - env-validation.ts
 - package.json
-- CobroConfirmado.tsx
+- browser-printer.ts
 - Seguridad — multi_shop
 - removeSessionItemUseCase.ts
-- banner-visibilidad.ts
+- WaiterBanner
 - register
 - create-superadmin.ts
 - processRedsysWebhookUseCase.ts
 - callbacks.ts
-- registerManualMesaPaymentUseCase.ts
+- Diseño: Menús virtuales (categorías de navegación adicionales sobre productos existentes)
 - Optimistic UI — borrado de item en ticket de mesa y envío de carrito
 - Informe de Auditoría de Cumplimiento Legal — TPV Multi-Shop
 - Flujo de Pedidos y WhatsApp
@@ -141,7 +141,7 @@
 - 20260521000000_mesa-ordering.sql
 - 20260613000001_custom_split_bill_tables.sql
 - 20260714000001_tpv_turnos_inalterabilidad.sql
-- SupabaseHoldRepository.ts
+- product.dto.ts
 - Compliance Legal — multi-shop
 - Acrónimos y Conceptos Normativos
 - error.tsx
@@ -162,47 +162,47 @@
 - 20260706000002_stock_movimientos_mermas.sql
 - 20260714000003_tpv_numero_z_detalle_items.sql
 - Diseño: desplegable de subcategorías en la navegación del menú
-- MesasGrid.tsx
+- tpv-catalog-ctx.tsx
 - capacitor.config.ts
-- getSupabaseAnonClient
-- route.ts
-- route.ts
-- page.tsx
+- Rediseño del árbol de Menús Virtuales — Implementation Plan
+- Decisiones (aprobadas visualmente por el usuario — opción A + modal + drag&drop real)
+- promocion.use-case.ts
+- Arquitectura y flujo de datos
 - Notas de validación previa (spike ya ejecutado)
 - Trampas Críticas (aprendidas en producción)
-- electron
+- MenuPanel.tsx
 - DeliveryCredentialsForm.tsx
 - esbuild
 - README.md
 - eslint.config.js
 - Kitchen Screens — Comparación Completa
-- waiter-auth.ts
+- CobroConfirmado.tsx
 - Optimistic UI — borrado de item en mesa y envío de carrito — Implementation Plan
 - Offline, resiliencia y UI optimista
 - 1. Informe Z (cierre de turno)
 - index.ts
-- layout.tsx
-- page.tsx
-- route.ts
+- Diseño: recogida en tienda implícita, sin toggle ni configuración
+- telegram.service.ts
+- toast.tsx
 - Waiter — Sistema de Pases por Ítem
 - TPV — Cumplimiento Legal y Normativo
-- mesaSesionChannel
+- route.ts
 - Diseño: mejora visual del diálogo de subcategorías
 - route.ts
-- usePagoDeMesa
+- route.ts
 - Propina (Tip) en Mesa
-- FichajeDialog.tsx
+- waiter-auth.ts
 - Menú Público — Cache y Resiliencia (GET /)
-- TicketPanel.tsx
+- processGlovoWebhookUseCase.ts
 - route.ts
 - @tailwindcss/postcss
 - QR Session Enforcement — Mesa Ordering
 - page.tsx
 - main.ts
-- eslint
+- Mejoras de UI y simplificación de recogida — Implementation Plan
 - @types/react-dom
 - Mesa Ordering — QR Table Ordering
-- CustomSelectionView
+- Pedido
 - PWA & Service Worker — Waiter Panel
 - postcss.config.mjs
 - 20260913000001_modalidades_entrega.sql
@@ -251,7 +251,7 @@
 - 20260707000001_rbac_roles_constraint.sql
 - 20260708000001_empleados_tpv.sql
 - sw.js
-- types.ts
+- SupabaseChainRepository.ts
 - Complejidad cognitiva — cómo se cerró y cómo no volver
 - TPV — Plan: Sistema WAL Local-First y Backup Fiscal
 - dotenv
@@ -267,7 +267,7 @@
 - Waiter Ticket & Payment UX
 - Waiter Validation Flow
 - route.ts
-- route.ts
+- getSupabaseClient
 - tgtg-reserva-popup.tsx
 - command-queue.ts
 - vista-mesa.ts
@@ -278,7 +278,7 @@
 - Sistema de Alérgenos por Producto
 - Sistema de Compras y Proveedores (SIALTI) — Contexto
 - TPV — Sistema de empleados con PIN y permisos
-- @playwright/test
+- Recogida implícita sin toggle — Implementation Plan
 - pin-cache.ts
 - Marketing — Flujo del Sistema
 - page.tsx
@@ -288,38 +288,46 @@
 - page.tsx
 - cierre-report-view.tsx
 - offline-queue.ts
-- tsx
+- Segunda imagen de producto (tiendas) Implementation Plan
+- Diseño: mejoras de UI y simplificación de "recogida" en modalidades de entrega
 - Imágenes — subida, optimización y coste
 - Cart Access Token — Eliminación del flujo legacy
-- browser-printer.ts
+- pedido-modalidad-revalidacion.test.ts
+- EmpresaPublic
 - useLanguage
 - Analítica Avanzada — Contexto Técnico
 - Sistema de Complementos por Producto
 - HeatmapGrid.tsx
 - proxy-autorizacion.test.ts
 - Sistema de Auditoría (Audit Log)
-- Electron TPV Windows
+- ExcelRenderer.ts
 - Mesa Payments — Pagar en mesa con Redsys
 - Atomicidad del Pago Completo (implementada 2026-07-30)
-- @types/node
+- menu.mapper.ts
 - rls-policy-hygiene.spec.ts
+- error-boundary.tsx
+- index.ts
 - 20260724000002_lc_fichajes_chain.sql
 - secrets-scan.test.ts
 - API Routes
 - Database Schema
 - Autenticación y sesión
 - page.tsx
-- @capacitor/cli
+- registerManualMesaPaymentUseCase.ts
 - Estándares y certificaciones de seguridad — referencia
+- analitica-vercel.tsx
 - Sub-features
 - supabase-security-definer.spec.ts
-- dotenv-cli
+- get-menu-use-case-no-duplicate-log.test.ts
+- Menús Virtuales
 - electron-builder
+- route.ts
 - electron-rebuild
 - Sistema de Bloqueo de Pago (`pago_en_curso`)
 - Content Security Policy (CSP)
 - Prompt: Búsqueda de Clientes Potenciales — multi_shop
 - perfil-laboral.dto.ts
+- @capacitor/push-notifications
 - 20260715000003_food_cost_analytics.sql
 - fuzz-api-inputs.test.ts
 - iva-property.test.ts
@@ -329,6 +337,7 @@
 - Mesa Client Tokens
 - Funciones SECURITY DEFINER — Trampas Críticas
 - anon-realtime-column-privileges.spec.ts
+- @capacitor/app
 - 20260801000005_pedidos_purga_pruebas.sql
 - cron-secret-timing-safe.test.ts
 - electron-security.test.ts
@@ -350,7 +359,7 @@
 - tpv-rls-multitenant.spec.ts
 - tpv-turnos-inalterabilidad.spec.ts
 - tpv-verifactu-qr.spec.ts
-- eslint-config-next
+- page.tsx
 - chain-hash.ts
 - 20260715000001_modulo_compras_sialti.sql
 - 20260720100005_clientes_rgpd.sql
@@ -373,11 +382,14 @@
 - qr-scanner-lazy.test.ts
 - verifactu-qr-url.test.ts
 - @eslint/eslintrc
-- fast-check
+- route.ts
+- @dnd-kit/core
 - husky
 - jsdom
-- @next/bundle-analyzer
+- exceljs
 - electron-builder-squirrel-windows
+- telegram-callbacks.test.ts
+- Testing & CI
 - applypatch-msg
 - commit-msg
 - husky.sh
@@ -393,18 +405,28 @@
 - pre-push
 - pre-rebase
 - prepare-commit-msg
+- FichajeDialog.tsx
 - postcss
 - @testing-library/jest-dom
+- @capacitor/core
+- mesa-delete-item-overlay.test.ts
+- get-menu.use-case.ts
 - @testing-library/react
 - tw-animate-css
-- @types/bcryptjs
+- node-thermal-printer
+- numserieAeat
 - @types/react
+- cross-env
+- useMesaToken
 - @types/uuid
-- typescript
+- @next/bundle-analyzer
 - @typescript-eslint/eslint-plugin
 - vitest
+- @supabase/supabase-js
 - @testing-library/user-event
 - @types/qrcode
+- route.ts
+- next
 - @vitest/coverage-v8
 - electron.d.ts
 - 20260228000000_add_empresas_descripcion_translations.sql
@@ -431,223 +453,264 @@
 - vitest.config.ts
 - IntersectionObserverStub
 - 20260912000001_perfiles_admin_empresa_fk.sql
+- next-themes
+- electron-store
+- SEO Multi-Tenant
+- route.ts
+- autoprefixer
+- electron
+- public.menus_virtuales
+- 20260916000004_menu_virtual_productos.sql
+- @vercel/speed-insights
+- 20260922000001_categorias_activo.sql
+- recharts
+- bcryptjs
+- @smithy/node-http-handler
+- usePagoDeMesa
+- 20260922000002_productos_foto_url_2.sql
+- @upstash/redis
+- @zxing/browser
+- 20260914000001_fix_modalidades_entrega_rls_fk.sql
+- 20260915000001_precio_cero_en_recogida.sql
+- 20260915000002_recogida_implicita_sin_toggle.sql
+- 20260916000001_add_tabla_info_a_productos.sql
+- 20260916000002_tabla_plantillas.sql
+- @capacitor/android
+- @capacitor/cli
+- @capacitor/preferences
+- class-variance-authority
+- clsx
+- @dnd-kit/utilities
+- electron-updater
+- framer-motion
+- jose
+- @radix-ui/react-dialog
+- @radix-ui/react-dropdown-menu
+- @radix-ui/react-label
+- @radix-ui/react-slot
+- @radix-ui/react-toast
+- react-dom
+- @react-pdf/renderer
+- @sentry/nextjs
+- tailwind-merge
+- @upstash/ratelimit
+- uuid
+- @vercel/analytics
+- supabase
+- tailwindcss
 
 ## God Nodes (most connected - your core abstractions)
-1. `Result` - 655 edges
-2. `getSupabaseClient()` - 241 edges
-3. `t()` - 215 edges
-4. `handleResult()` - 159 edges
-5. `validationErrorResponse()` - 150 edges
-6. `useLanguage()` - 139 edges
-7. `resolveAdminContextWithEmpresa()` - 137 edges
-8. `fetchWithCsrf()` - 107 edges
+1. `Result` - 695 edges
+2. `getSupabaseClient()` - 243 edges
+3. `t()` - 239 edges
+4. `handleResult()` - 163 edges
+5. `validationErrorResponse()` - 160 edges
+6. `resolveAdminContextWithEmpresa()` - 151 edges
+7. `useLanguage()` - 148 edges
+8. `fetchWithCsrf()` - 109 edges
 9. `requireRole()` - 72 edges
-10. `logger` - 69 edges
+10. `logger` - 72 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `CategoriasPage()` --indirect_call--> `categoria()`  [INFERRED]
+  src/app/admin/(protected)/categorias/page.tsx → tests/compliance/menu-subcategorias.test.ts
+- `MenusVirtualesPage()` --indirect_call--> `nodo()`  [INFERRED]
+  src/app/admin/(protected)/menus-virtuales/page.tsx → tests/compliance/menu-virtual-mapper.test.ts
 - `useMesaActiva()` --indirect_call--> `sesion()`  [INFERRED]
   src/hooks/tpv/useMesaActiva.ts → tests/compliance/mesa-manual-payment.test.ts
 - `filterEntry()` --indirect_call--> `item()`  [INFERRED]
   src/app/admin/(protected)/admin-sidebar.tsx → tests/compliance/waiter-cierre-al-salir.test.ts
-- `ComplementosPage()` --indirect_call--> `grupo()`  [INFERRED]
-  src/app/admin/(protected)/complementos/page.tsx → tests/compliance/menu-agrupacion.test.ts
-- `groupByMesa()` --indirect_call--> `item()`  [INFERRED]
-  src/app/waiter/bar/page.tsx → tests/compliance/waiter-cierre-al-salir.test.ts
-- `groupByOrder()` --indirect_call--> `item()`  [INFERRED]
-  src/app/waiter/bar/page.tsx → tests/compliance/waiter-cierre-al-salir.test.ts
+- `mergeByName()` --indirect_call--> `item()`  [INFERRED]
+  src/app/kitchen/page.tsx → tests/compliance/waiter-cierre-al-salir.test.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (508 total, 161 thin omitted)
+## Communities (575 total, 203 thin omitted)
 
 ### Community 0 - "fetchWithCsrf"
-Cohesion: 0.04
-Nodes (89): Cliente, ClientesPage(), LANGUAGES, ComplementosPage(), Cliente, optimizeImage(), Promocion, PromocionesPage() (+81 more)
+Cohesion: 0.03
+Nodes (85): LoginForm(), LoginFormProps, Cliente, ClientesPage(), LANGUAGES, EmpleadosTpvPage(), Cliente, optimizeImage() (+77 more)
 
-### Community 1 - "Result"
+### Community 2 - "ModalidadEntrega"
+Cohesion: 0.11
+Nodes (15): baseModalidadEntregaSchema, CreateModalidadEntregaDTO, createModalidadEntregaSchema, modalidadEntregaIdSchema, UpdateModalidadEntregaDTO, updateModalidadEntregaSchema, ModalidadEntregaUseCase, propagarError() (+7 more)
+
+### Community 3 - "requireRole"
 Cohesion: 0.05
-Nodes (7): PedidoUseCase, Pedido, Result, IPedidoRepository, applyCancelados(), pedidoEffectiveDateMs(), SupabasePedidoRepository
-
-### Community 2 - "pedido.use-case.ts"
-Cohesion: 0.09
-Nodes (21): CreateModalidadEntregaDTO, UpdateModalidadEntregaDTO, ModalidadEntregaUseCase, propagarError(), CreateMesaPedidoDTO, CreatePedidoDTO, DiscountResult, PedidoStats (+13 more)
-
-### Community 3 - "helpers.ts"
-Cohesion: 0.05
-Nodes (65): GET(), querySchema, AnonimizarSchema, POST(), GET(), QuerySchema, POST(), schema (+57 more)
+Nodes (76): GET(), querySchema, AnonimizarSchema, POST(), GET(), QuerySchema, ajusteSchema, RouteContext (+68 more)
 
 ### Community 4 - "quantity-selector-dialog.tsx"
-Cohesion: 0.05
-Nodes (59): metadata, Props, usaWizardTienda(), CartDrawer, getCategoryTab(), MenuPage(), MesaOrderHistory, WelcomeDiscountPopup (+51 more)
+Cohesion: 0.04
+Nodes (70): ComplementosPage(), metadata, usaWizardTienda(), CartDrawer, getCategoryTab(), MenuPage(), MesaOrderHistory, WelcomeDiscountPopup (+62 more)
 
-### Community 5 - "t"
-Cohesion: 0.05
-Nodes (55): AdminCharts, AvgTicketCard(), ChartTheme, ClientsCard(), ComparisonCard(), DEFAULT_CHART_THEME, EstadisticasPage(), getChartTheme() (+47 more)
+### Community 5 - "menu-section.tsx"
+Cohesion: 0.07
+Nodes (33): AdminMinimo, ConfigEmpresa, AdminDashboardClient(), AdminDashboardClientProps, DashboardPedido, DashboardPromoSummary, DashboardStats, DashboardTgtgSummary (+25 more)
 
-### Community 6 - "TgtgPromocion"
-Cohesion: 0.08
-Nodes (14): CreateTgtgResult, SendEmailsResult, TgtgUseCase, TgtgWithItems, TgtgItem, TgtgPromocion, TgtgReserva, CreateTgtgItemData (+6 more)
+### Community 6 - "Result"
+Cohesion: 0.06
+Nodes (23): CreateTgtgResult, SendEmailsResult, TgtgUseCase, TgtgWithItems, EmpleadoTpvLoginUseCase, Result, TgtgItem, TgtgPromocion (+15 more)
 
 ### Community 7 - "page.tsx"
-Cohesion: 0.12
-Nodes (26): AnyGroupValue, COUNTDOWN_COLOR, CountdownCard(), CountdownCardProps, formatTimer(), getElapsedMinutes(), getMergedActionLabel(), getTimeColor() (+18 more)
+Cohesion: 0.10
+Nodes (29): AnyGroupValue, COUNTDOWN_COLOR, CountdownCard(), CountdownCardProps, formatTimer(), getElapsedMinutes(), getMergedActionLabel(), getTimeColor() (+21 more)
 
-### Community 8 - "tpv-catalog-ctx.tsx"
-Cohesion: 0.04
-Nodes (34): MesaSesionUseCase, MesaUseCase, IMesaRepository, Mesa, MesaWithSession, DeferredItem, IMesaSesionRepository, MesaSesion (+26 more)
+### Community 8 - "supabase-mesa.repository.ts"
+Cohesion: 0.05
+Nodes (23): MesaSesionUseCase, MesaUseCase, IMesaRepository, Mesa, MesaWithSession, DeferredItem, IMesaSesionRepository, MesaSesion (+15 more)
 
 ### Community 9 - "mesa-orders-client.tsx"
-Cohesion: 0.09
-Nodes (22): BotonDePago(), buildRemainingAndPaidMaps(), CustomTurno, CustomWaitingView(), DivisionState, DivisionTypeModal(), getStoredToken(), GroupedSelectorItem (+14 more)
+Cohesion: 0.10
+Nodes (20): agruparYaPagados(), bebidasPrimero(), BotonDePago(), buildGroupedItems(), buildRemainingAndPaidMaps(), buildSeleccion(), CustomSelectionView(), CustomTurno (+12 more)
 
-### Community 10 - "menu-section.tsx"
-Cohesion: 0.05
-Nodes (52): AdminMinimo, ConfigEmpresa, AdminDashboardClient(), AdminDashboardClientProps, DashboardPedido, DashboardPromoSummary, DashboardStats, DashboardTgtgSummary (+44 more)
+### Community 10 - "route.ts"
+Cohesion: 0.22
+Nodes (12): emailSchema, GET(), getBaseUrl(), uuidSchema, emailSchema, GET(), getBaseUrl(), uuidSchema (+4 more)
 
 ### Community 11 - "page.tsx"
-Cohesion: 0.10
-Nodes (33): Cliente, comparePedidos(), computePedidoStats(), DeleteAllOrdersDialog(), DeleteOrderDialog(), ESTADO_TRANSLATION_KEYS, getAriaSortValue(), getDeleteConfirmationText() (+25 more)
+Cohesion: 0.09
+Nodes (35): Cliente, comparePedidos(), computePedidoStats(), DeleteAllOrdersDialog(), DeleteOrderDialog(), ESTADO_TRANSLATION_KEYS, getAriaSortValue(), getDeleteConfirmationText() (+27 more)
 
 ### Community 12 - "ComplementoGrupo"
 Cohesion: 0.08
-Nodes (15): ComplementoGrupoUseCase, ComplementoGrupo, ComplementoOpcion, ProductoComplementoAsignacion, CreateComplementoGrupoData, CreateComplementoOpcionData, IComplementoGrupoRepository, UpdateComplementoGrupoData (+7 more)
+Nodes (16): ComplementoGrupoUseCase, ComplementoGrupo, ComplementoOpcion, ProductoComplementoAsignacion, CreateComplementoGrupoData, CreateComplementoOpcionData, IComplementoGrupoRepository, UpdateComplementoGrupoData (+8 more)
 
 ### Community 13 - "tpv-types.ts"
-Cohesion: 0.12
-Nodes (23): Props, Props, AbrirTurnoInput, abrirTurnoUseCase(), registrarCobroUseCase(), registrarMovimientoCajaUseCase(), GetAnalyticsParams, InformeZData (+15 more)
+Cohesion: 0.10
+Nodes (24): Props, AbrirTurnoInput, abrirTurnoUseCase(), CerrarTurnoInput, cerrarTurnoUseCase(), registrarMovimientoCajaUseCase(), GetAnalyticsParams, InformeZDesglosePago (+16 more)
 
-### Community 14 - "page.tsx"
+### Community 14 - "waiter-banner.tsx"
 Cohesion: 0.04
-Nodes (86): LoginForm(), LoginFormProps, CategoriasPage(), Category, CategoryFormData, emptyForm, AddItemForm, AlbaranDetailPage() (+78 more)
+Nodes (96): AddItemForm, AlbaranDetailPage(), defaultTaxRate(), emptyAddFormBase, formatEuros(), selectedCatalogoItem(), AlbaranesPage(), EstadoBadge() (+88 more)
 
 ### Community 15 - "validationErrorResponse"
-Cohesion: 0.06
-Nodes (62): DELETE(), Params, PUT(), Params, POST(), DELETE(), Params, PUT() (+54 more)
+Cohesion: 0.07
+Nodes (49): GET(), getR2Bucket(), getS3Client(), POST(), Snapshot, SnapshotRow, PUT(), POST() (+41 more)
 
-### Community 16 - "tracking-page-client.tsx"
-Cohesion: 0.08
-Nodes (38): metadata, Props, PaymentKoCleaner(), metadata, Props, TrackingPage(), ActiveOrderBanner(), OrderEntry (+30 more)
+### Community 16 - "Category"
+Cohesion: 0.11
+Nodes (16): categoryIdSchema, CreateCategoryDTO, createCategorySchema, UpdateCategoryDTO, updateCategorySchema, CategoryUseCase, Category, CreateCategoryData (+8 more)
 
 ### Community 17 - "CobroFlow.tsx"
-Cohesion: 0.08
-Nodes (35): buildDetalleItems(), cargarOverridesDeImpuesto(), CobroSchema, RawPedido, RawPedidoItem, reconstruirDetalleDeSesion(), buildDetalleItemsSSR(), CobroPage() (+27 more)
+Cohesion: 0.11
+Nodes (29): Props, buildQuickAmounts(), CobroEfectivo(), fmt(), NUMPAD, Props, CobroFlow(), Props (+21 more)
 
 ### Community 18 - "IClienteRepository"
-Cohesion: 0.08
-Nodes (14): CreateClienteDTO, UpdateClienteDTO, anonymizeEmail(), ClienteUseCase, fusionarCliente(), Cliente, CreateClienteData, IClienteRepository (+6 more)
+Cohesion: 0.09
+Nodes (15): CreateClienteDTO, anonymizeEmail(), ClienteUseCase, fusionarCliente(), anonimizarClienteUseCase(), exportarClienteUseCase(), Cliente, CreateClienteData (+7 more)
 
 ### Community 19 - "types.ts"
+Cohesion: 0.05
+Nodes (57): addItemToAlbaranUseCase(), buildTrazabilidadError(), isFechaCaducidadValida(), schema, validateTrazabilidad(), createAlbaranUseCase(), schema, hasValidTrazabilidad() (+49 more)
+
+### Community 20 - "t"
 Cohesion: 0.04
-Nodes (61): isFechaCaducidadValida(), schema, validateTrazabilidad(), schema, hasValidTrazabilidad(), isFechaCaducidadValida(), marcarAlbaranRecibidoUseCase(), removeAlbaranItemUseCase() (+53 more)
+Nodes (66): CategoriasPage(), Category, CategoryFormData, CategoryRowActions(), CategoryStatusToggle(), CategorySubcategoriasBadge(), CategoryTypeBadges(), emptyForm (+58 more)
 
-### Community 20 - "ErrorModule"
-Cohesion: 0.22
-Nodes (7): ErrorModule, ErrorSeverity, ILogErrorRepository, LogErrorData, isValidUUID(), SupabaseLogErrorRepository, ErrorLogger
-
-### Community 21 - "MostradorClient.tsx"
-Cohesion: 0.20
-Nodes (15): MesaData, ExistingOrder, InitialMesa, Props, fmt(), NuevoPedidoPanel(), PASE_BUTTON_LABEL, Props (+7 more)
+### Community 21 - "getSupabaseAnonClient"
+Cohesion: 0.10
+Nodes (31): EMPTY_MESA_DATA, loadMesaData(), mapPedido(), MesaData, MostradorPage(), normComplement(), RawComplement, RawItem (+23 more)
 
 ### Community 22 - "Product"
-Cohesion: 0.05
-Nodes (36): Props, CreateCategoryDTO, UpdateCategoryDTO, CreateProductDTO, UpdateProductDTO, CategoryUseCase, agruparComplementosPorProducto(), agruparPor() (+28 more)
+Cohesion: 0.12
+Nodes (13): CreateProductDTO, UpdateProductDTO, ProductUseCase, ImageFit, Product, ProductoTabla, CreateProductData, IProductRepository (+5 more)
 
 ### Community 23 - "getEmpresaUseCase"
-Cohesion: 0.14
-Nodes (21): AdminDashboard(), configDeEmpresa(), GET(), PUT(), GET(), POST(), hexColor, POST() (+13 more)
+Cohesion: 0.18
+Nodes (16): GET(), PUT(), hexColor, POST(), updateColoresSchema, GET(), PUT(), RouteParams (+8 more)
 
-### Community 24 - "route.ts"
-Cohesion: 0.14
-Nodes (24): DELETE(), GET(), POST(), PUT(), toAdminCategory(), DELETE(), GET(), POST() (+16 more)
+### Community 24 - "handleResultWithStatus"
+Cohesion: 0.06
+Nodes (58): DELETE(), GET(), POST(), PUT(), toAdminCategory(), DELETE(), Params, Params (+50 more)
 
 ### Community 25 - "getAuthAdminUseCase"
-Cohesion: 0.14
-Nodes (19): ConfiguracionPage(), GET(), ALLOWED_ROLES, LaborControlLayout(), CierreTurnoPage(), TpvHistorialPage(), BrechasPage(), ROPA_ROWS (+11 more)
+Cohesion: 0.12
+Nodes (24): ConfiguracionPage(), GET(), ALLOWED_ROLES, LaborControlLayout(), CierreTurnoPage(), TpvAnalyticsPage(), buildDetalleItemsSSR(), CobroPage() (+16 more)
 
 ### Community 26 - "page.tsx"
-Cohesion: 0.11
-Nodes (26): formatTimer(), getElapsedMinutes(), getGroupedItems(), getMergedItems(), getOldestCreatedAt(), GroupedPendienteItem, makeCleanupMap(), MergedItem (+18 more)
+Cohesion: 0.12
+Nodes (24): formatTimer(), getElapsedMinutes(), getGroupedItems(), getMergedItems(), getOldestCreatedAt(), GroupedPendienteItem, makeCleanupMap(), MergedItem (+16 more)
 
 ### Community 27 - "compilerOptions"
 Cohesion: 0.06
 Nodes (32): dom, dom.iterable, esnext, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules, ./src/* (+24 more)
 
-### Community 28 - "logApiError"
-Cohesion: 0.12
-Nodes (26): PATCH(), updateHorasSchema, DELETE(), PATCH(), GET(), querySchema, GET(), POST() (+18 more)
+### Community 28 - "handleResult"
+Cohesion: 0.07
+Nodes (50): DELETE(), PATCH(), POST(), GET(), GET(), POST(), POST(), GET() (+42 more)
 
-### Community 29 - "route.ts"
-Cohesion: 0.18
-Nodes (12): GET(), QuerySchema, POST(), CreateHoldSchema, GET(), POST(), CorreccionBodyDto, CorreccionBodySchema (+4 more)
+### Community 29 - "cn"
+Cohesion: 0.07
+Nodes (32): languages, LanguageSelector(), Badge(), badgeVariants, DropdownMenu(), DropdownMenuCheckboxItem(), DropdownMenuContent(), DropdownMenuItem() (+24 more)
 
-### Community 30 - "logger.ts"
+### Community 30 - "supabase-client.ts"
 Cohesion: 0.05
-Nodes (31): CreateGlovoOrderInput, CreateGlovoOrderOutput, GetDeliveryQuoteInput, GetDeliveryQuoteOutput, CommitCustomPaymentInput, CommitCustomPaymentResult, CompleteCustomPaymentResult, InitiateCustomTurnResult (+23 more)
+Nodes (48): GET(), QuerySchema, mesaIdSchema, POST(), paramsSchema, POST(), UpdateDeliverySettingsDto, CreateGlovoOrderInput (+40 more)
 
 ### Community 31 - "dependencies"
-Cohesion: 0.03
-Nodes (79): autoprefixer, @aws-sdk/client-s3, bcryptjs, @capacitor/android, @capacitor/app, @capacitor/core, @capacitor/preferences, @capacitor/push-notifications (+71 more)
+Cohesion: 0.18
+Nodes (11): @aws-sdk/client-s3, @dnd-kit/sortable, lucide-react, dependencies, @aws-sdk/client-s3, @dnd-kit/sortable, lucide-react, @radix-ui/react-select (+3 more)
 
 ### Community 32 - "server-services.ts"
-Cohesion: 0.19
-Nodes (16): AdminLoginPage(), metadata, GET(), getIconMimeType(), manifest(), generateMetadata(), NotFound(), Home() (+8 more)
+Cohesion: 0.10
+Nodes (23): .next, AdminLoginPage(), metadata, GET(), getIconMimeType(), manifest(), generateMetadata(), NotFound() (+15 more)
 
 ### Community 33 - "layout.tsx"
-Cohesion: 0.08
-Nodes (27): FALLBACK_DESCRIPTIONS, generateMetadata(), getAvailableLangs(), getDescriptionForLang(), getMimeType(), getPrimaryLang(), inter, LANG_KEYS (+19 more)
-
-### Community 34 - "getAuditLogRepository"
 Cohesion: 0.13
-Nodes (24): CobrosRow, POST(), schema, POST(), POST(), MermaSchema, POST(), CerrarSchema (+16 more)
+Nodes (19): FALLBACK_DESCRIPTIONS, generateMetadata(), getAvailableLangs(), getDescriptionForLang(), getMimeType(), getPrimaryLang(), inter, LANG_KEYS (+11 more)
 
-### Community 35 - "handleResult"
-Cohesion: 0.06
-Nodes (65): GET(), querySchema, GET(), GET(), querySchema, GET(), DELETE(), GET() (+57 more)
+### Community 34 - "SupabaseAdminRepository.ts"
+Cohesion: 0.09
+Nodes (13): SuperAdminUseCase, DEFAULT_EMPRESA_COLORES, EmpresaStats, EmpresaWithStats, ISuperAdminRepository, SuperAdminGlobalStats, anonymizeEmail(), selectPerfilConEmpresa() (+5 more)
+
+### Community 35 - "resolveAdminContextWithEmpresa"
+Cohesion: 0.07
+Nodes (47): GET(), querySchema, GET(), GET(), querySchema, GET(), DELETE(), GET() (+39 more)
 
 ### Community 36 - "glovo.service.ts"
 Cohesion: 0.25
 Nodes (14): buildClientAssertion(), checkRateLimit(), createGlovoOrder(), estimateDeliveryFee(), getAccessToken(), getApiBaseUrl(), getStsUrl(), GlovoCredentials (+6 more)
 
-### Community 37 - "index.ts"
-Cohesion: 0.07
-Nodes (34): closeSesionSchema, createMesaSchema, DELETE(), deleteMesaSchema, GET(), PATCH(), POST(), GET() (+26 more)
+### Community 37 - "ErrorModule"
+Cohesion: 0.22
+Nodes (7): ErrorModule, ErrorSeverity, ILogErrorRepository, LogErrorData, isValidUUID(), SupabaseLogErrorRepository, ErrorLogger
 
 ### Community 38 - "supabase-pedido.repository.ts"
-Cohesion: 0.06
-Nodes (38): KitchenItem, MergedItem, KitchenItem, MergedKitchenItem, CartItem, BarOrderItem, ItemEstado, KitchenBarCounts (+30 more)
+Cohesion: 0.08
+Nodes (30): BarOrderItem, KitchenBarCounts, KitchenItemRecord, KitchenOrderItem, PendienteValidacionItem, PendienteValidacionMesa, PendienteValidacionPedido, RetenidoItem (+22 more)
 
 ### Community 39 - "getDomainFromHeaders"
 Cohesion: 0.11
-Nodes (34): POST(), POST(), GetDeliveryQuoteSchema, POST(), mesaIdSchema, POST(), mesaIdSchema, POST() (+26 more)
+Nodes (35): POST(), POST(), GetDeliveryQuoteSchema, POST(), mesaIdSchema, POST(), mesaIdSchema, POST() (+27 more)
 
 ### Community 40 - "route.ts"
 Cohesion: 0.13
-Nodes (23): checkMesaPaymentLock(), createPedidoSchema, DefaultData, defaultPedidoSchema, EmpresaOrderData, handleDefaultOrder(), handleMesaOrder(), idempotencyConflict() (+15 more)
+Nodes (21): checkMesaPaymentLock(), createPedidoSchema, DefaultData, defaultPedidoSchema, EmpresaOrderData, handleDefaultOrder(), handleMesaOrder(), idempotencyConflict() (+13 more)
 
-### Community 41 - "descuento.use-case.ts"
-Cohesion: 0.16
-Nodes (9): buildEmailHtml(), DescuentoUseCase, generateCodigo(), getEmailSubject(), CodigoDescuento, CreateCodigoDescuentoData, ICodigoDescuentoRepository, mapRow() (+1 more)
+### Community 41 - "MenuVirtual"
+Cohesion: 0.10
+Nodes (11): MenuVirtualUseCase, MenuVirtual, CreateMenuVirtualData, IMenuVirtualRepository, MenuVirtualProductoAsignacion, UpdateMenuVirtualData, findAsignacionesConRetry(), findAsignacionesQuery() (+3 more)
 
 ### Community 42 - "page.tsx"
 Cohesion: 0.12
-Nodes (25): applyLeftSwipeDrag(), applyRightSwipeDrag(), applySwipeDragVisuals(), BarOrder, BarPage(), cancelBarItems(), clearServedKeysForOrder(), COUNTDOWN_COLOR (+17 more)
+Nodes (26): applyLeftSwipeDrag(), applyRightSwipeDrag(), applySwipeDragVisuals(), BarOrder, BarPage(), cancelBarItems(), clearServedKeysForOrder(), COUNTDOWN_COLOR (+18 more)
 
 ### Community 43 - "getMesaOrdersUseCase.ts"
 Cohesion: 0.14
 Nodes (21): GET(), mesaIdSchema, addToIndexMap(), calculateTotal(), fetchEmpresaSettings(), fetchItemEstados(), fetchPaymentState(), getMesaOrdersUseCase() (+13 more)
 
 ### Community 44 - "TurnoCerrarForm.tsx"
-Cohesion: 0.21
-Nodes (12): formatCents(), formatDateTime(), InformeZModal(), Props, splitHash(), fmt(), getDiferenciaBoxClass(), getDiferenciaColorClass() (+4 more)
+Cohesion: 0.15
+Nodes (17): formatCents(), formatDateTime(), InformeZModal(), Props, splitHash(), Props, TurnoAbrirForm(), fmt() (+9 more)
 
 ### Community 45 - "contexto.ts"
 Cohesion: 0.06
 Nodes (17): adminEmail(), adminPassword(), EN_RESPUESTA, Interruptor, INTERRUPTORES, motivoParaSaltar(), mutacionesPermitidas(), fetchAnyMesaId() (+9 more)
 
-### Community 46 - "page.tsx"
+### Community 46 - "layout.tsx"
 Cohesion: 0.09
-Nodes (25): NavItemDef, CheckItemProps, CobroCount, getCobroStats(), getLastPurge(), getVerifactuMode(), LastPurge, TpvLegalPage() (+17 more)
+Nodes (30): NavItemDef, metadata, nombreDeEmpresa(), TpvLayout(), TURNO_OPTIONAL_PREFIXES, EMPTY_STATS, TurnoCerrarPage(), AccionesPanel() (+22 more)
 
 ### Community 47 - "Waiter Panel"
 Cohesion: 0.05
@@ -655,79 +718,79 @@ Nodes (43): Authentication, Auto-close on Payment, Call Waiter, Cart flags, Cart
 
 ### Community 48 - "proxy.ts"
 Cohesion: 0.06
-Nodes (52): POST(), ALLOWED_MIME_TYPES, MIME_TO_EXT, POST(), validateImageMagicBytes(), LoginDTO, loginSchema, anonymizeEmail() (+44 more)
+Nodes (50): POST(), ALLOWED_MIME_TYPES, MIME_TO_EXT, POST(), validateImageMagicBytes(), LoginDTO, loginSchema, anonymizeEmail() (+42 more)
 
-### Community 49 - "supabase-empresa.repository.ts"
-Cohesion: 0.11
-Nodes (13): UpdateEmpresaDTO, EmpresaUseCase, normalizePhone(), Empresa, EmpresaColores, IEmpresaRepository, UpdateEmpresaData, construirPayloadEmpresa() (+5 more)
+### Community 49 - "tracking-page-client.tsx"
+Cohesion: 0.09
+Nodes (35): metadata, Props, PaymentKoCleaner(), ActiveOrderBanner(), OrderEntry, DeliveryStatusBanner(), DeliveryTimeDisplay(), fetchOrderStatus() (+27 more)
 
 ### Community 50 - "use-toast.ts"
-Cohesion: 0.12
-Nodes (24): Toast, ToastAction, ToastActionElement, ToastClose, ToastDescription, ToastProps, ToastTitle, toastVariants (+16 more)
+Cohesion: 0.20
+Nodes (13): Action, ActionType, actionTypes, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState (+5 more)
 
-### Community 51 - "Fase 1 — Backend: CRUD de modalidades de entrega"
-Cohesion: 0.08
-Nodes (25): Fase 1 — Backend: CRUD de modalidades de entrega, Fase 2 — Admin UI, Fase 3 — Catálogo público y extracción de Mapbox, Fase 4 — Carrito, Fase 5 — Verificación final, Recogida y Envío a Domicilio para Tiendas — Implementation Plan, Recomendación de PRs encadenadas, Self-Review (+17 more)
-
-### Community 52 - "rate-limit.ts"
-Cohesion: 0.13
-Nodes (21): cspReportSchema, POST(), sanitizeUri(), DELETE(), paramsSchema, mesaIdSchema, POST(), cancelCustomTurnUseCase() (+13 more)
-
-### Community 53 - "layout.tsx"
-Cohesion: 0.29
-Nodes (5): metadata, KitchenOfflineBanner(), reloadWhenReady(), KitchenPinGate(), KitchenSwRegistrar()
-
-### Community 54 - "cn"
+### Community 51 - "Recogida y Envío a Domicilio para Tiendas — Implementation Plan"
 Cohesion: 0.07
-Nodes (33): languages, LanguageSelector(), Badge(), badgeVariants, DropdownMenu(), DropdownMenuCheckboxItem(), DropdownMenuContent(), DropdownMenuItem() (+25 more)
+Nodes (29): Fase 1 — Backend: CRUD de modalidades de entrega, Fase 2 — Admin UI, Fase 3 — Catálogo público y extracción de Mapbox, Fase 4 — Carrito, Fase 5 — Verificación final, Fase 6 — Hallazgos de la revisión final (post-Task 17), Fase 7 — Seguimiento post-lanzamiento (2026-09-15), Recogida y Envío a Domicilio para Tiendas — Implementation Plan (+21 more)
 
-### Community 56 - "page.tsx"
-Cohesion: 0.32
-Nodes (7): EmpresasTable(), Empresa, EmpresaStats, getData(), getPositionClasses(), GlobalStats, SuperAdminPage()
+### Community 52 - "SupabasePedidoRepository"
+Cohesion: 0.09
+Nodes (4): CartItem, applyDeliveryFields(), applyIdempotency(), SupabasePedidoRepository
+
+### Community 53 - "waiter-catalog-ctx.tsx"
+Cohesion: 0.09
+Nodes (19): metadata, metadata, KitchenOfflineBanner(), reloadWhenReady(), KitchenPinGate(), KitchenSwRegistrar(), OfflineBanner(), reloadWhenReady() (+11 more)
+
+### Community 54 - "types.ts"
+Cohesion: 0.09
+Nodes (16): CrearHoldInput, GestionarHoldUseCase, VerificarCadenaUseCase, CreateAuditEntryInput, IAuditRepository, CreateHoldInput, IHoldRepository, AuditEntry (+8 more)
+
+### Community 56 - "rate-limit.ts"
+Cohesion: 0.13
+Nodes (20): paramsSchema, POST(), mesaIdSchema, POST(), bodySchema, mesaIdSchema, GET(), tokenSchema (+12 more)
 
 ### Community 57 - "supabase-mesa-client-token.repository.ts"
-Cohesion: 0.22
+Cohesion: 0.18
 Nodes (5): MesaClientTokenUseCase, IMesaClientTokenRepository, MesaClientToken, TokenValidationResult, SupabaseMesaClientTokenRepository
 
-### Community 58 - "supabase-empleado-tpv.repository.ts"
-Cohesion: 0.12
-Nodes (6): EmpleadoTpvLoginUseCase, CreateEmpleadoTpvDto, EmpleadoTpv, IEmpleadoTpvRepository, mapRow(), SupabaseEmpleadoTpvRepository
+### Community 58 - "TiendaFulfillmentSelector.tsx"
+Cohesion: 0.15
+Nodes (15): SelectedAddress, columnaDerecha(), debeMostrarSelector(), Lang, ModalidadEntregaPublica, RECOGIDA_FIJA, TiendaFulfillmentSelector(), TiendaFulfillmentSelectorProps (+7 more)
 
 ### Community 59 - "components.json"
 Cohesion: 0.11
 Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 more)
 
-### Community 60 - ".next"
-Cohesion: 0.12
-Nodes (11): .next, metadata, Props, robots(), sitemap(), metadata, SuperAdminLayout(), SuperAdminHeader() (+3 more)
+### Community 60 - "layout.tsx"
+Cohesion: 0.27
+Nodes (6): metadata, SuperAdminLayout(), SuperAdminHeader(), SuperAdminHeaderProps, AdminThemeProvider(), ThemeProvider()
 
 ### Community 61 - "MesaOrdersClient"
-Cohesion: 0.12
-Nodes (20): applyPendingDeleteOverlay(), buildPaidByMergeKey(), canDeleteItem(), createMesaChannel(), getManualPayLabel(), getStoredActiveTurno(), getStoredHidingActions(), isExternalPaymentActive() (+12 more)
+Cohesion: 0.13
+Nodes (15): buildPaidByMergeKey(), canDeleteItem(), createMesaBroadcastChannel(), createMesaChannel(), getManualPayLabel(), getStoredActiveTurno(), getStoredHidingActions(), isExternalPaymentActive() (+7 more)
 
 ### Community 62 - "Ingrediente"
-Cohesion: 0.06
-Nodes (30): MovimientosResponse, buildEmptyForm(), fetchIngredientes(), fetchTurno(), FormState, MermasPage(), MOTIVOS, submitMerma() (+22 more)
+Cohesion: 0.07
+Nodes (28): buildQueryString(), FiltersState, formatDate(), MovimientosPage(), MovimientosResponse, TIPO_COLORS, TIPOS, AlertsResponse (+20 more)
 
-### Community 63 - "route.ts"
-Cohesion: 0.15
-Nodes (16): DeliveryPage(), GET(), PUT(), DELETE(), GET(), POST(), PUT(), UpdateDeliverySettingsDto (+8 more)
+### Community 63 - "page.tsx"
+Cohesion: 0.13
+Nodes (15): CheckItemProps, CobroCount, getCobroStats(), getLastPurge(), getVerifactuMode(), LastPurge, TpvLegalPage(), VerifactuMode (+7 more)
 
 ### Community 64 - "admin-sidebar.tsx"
+Cohesion: 0.06
+Nodes (34): AdminSidebar(), AdminSidebarProps, computeInitialOpenGroups(), FilterCtx, filterEntry(), GROUP_COLORS, GroupColor, isItemVisible() (+26 more)
+
+### Community 65 - "Menús Virtuales Implementation Plan"
 Cohesion: 0.07
-Nodes (33): AdminSidebar(), AdminSidebarProps, computeInitialOpenGroups(), FilterCtx, filterEntry(), GROUP_COLORS, GroupColor, isItemVisible() (+25 more)
+Nodes (29): Fase 2: asignación masiva desde `/admin/productos`, Fase 3: orden combinado entre categorías reales y menús virtuales, Menús Virtuales Implementation Plan, Self-review notes, Task 10: Extend `GetMenuUseCase` and its wiring, Task 11: Admin API routes, Task 12: Translations, Task 13: Admin sidebar entry (+21 more)
 
-### Community 65 - "waiter-banner.tsx"
-Cohesion: 0.10
-Nodes (23): metadata, applyMesaAuthResponse(), applyWaiterMeResponse(), CountsPayload, didCountsIncrease(), handleLogout(), Mesa, playNotificationSound() (+15 more)
-
-### Community 66 - "route.ts"
-Cohesion: 0.24
-Nodes (11): DELETE(), PATCH(), PatchSchema, CreateSchema, GET(), POST(), pinSchema, POST() (+3 more)
+### Community 66 - "SupabaseReviewQueueRepository.ts"
+Cohesion: 0.23
+Nodes (7): CreateReviewItemInput, IReviewQueueRepository, ReviewEstado, ReviewQueueItem, ReviewTipo, mapRow(), SupabaseReviewQueueRepository
 
 ### Community 67 - "index.ts"
-Cohesion: 0.18
-Nodes (15): GET(), GET(), PATCH(), PatchSchema, ExportQueryDto, ExportQuerySchema, ResumenParcialQueryDto, ResumenParcialQuerySchema (+7 more)
+Cohesion: 0.16
+Nodes (21): KioskSchema, POST(), sugerirTipo(), POST(), RouteSchema, PATCH(), PatchSchema, getEmpleadoTpvLoginUseCase() (+13 more)
 
 ### Community 68 - "compilerOptions"
 Cohesion: 0.12
@@ -735,15 +798,15 @@ Nodes (15): compilerOptions, esModuleInterop, module, outDir, resolveJsonModule,
 
 ### Community 69 - "CLAUDE.md - Contexto multi_shop"
 Cohesion: 0.05
-Nodes (38): 1. RLS, 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB), 3. Funcion auxiliar de aislamiento de tenant, 4. Como aplicar la migracion (OBLIGATORIO — nunca MCP suelto), Arquitectura y Capas, Base de Datos (Trampas Comunes), Capacitor Android PDA — Trampas Criticas, CLAUDE.md - Contexto multi_shop (+30 more)
+Nodes (39): 1. RLS, 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB), 3. Funcion auxiliar de aislamiento de tenant, 4. Como aplicar la migracion (OBLIGATORIO — nunca MCP suelto), Arquitectura y Capas, Base de Datos (Trampas Comunes), Capacitor Android PDA — Trampas Criticas, CLAUDE.md - Contexto multi_shop (+31 more)
 
 ### Community 70 - "devDependencies"
-Cohesion: 0.18
-Nodes (11): baseline-browser-mapping, cross-env, devDependencies, baseline-browser-mapping, cross-env, supabase, tailwindcss, @typescript-eslint/parser (+3 more)
+Cohesion: 0.09
+Nodes (23): baseline-browser-mapping, dotenv-cli, eslint, eslint-config-next, fast-check, devDependencies, baseline-browser-mapping, dotenv-cli (+15 more)
 
 ### Community 71 - "product-form-dialog.tsx"
 Cohesion: 0.04
-Nodes (43): ICONOS_DISPONIBLES, ModalidadEntregaRow, ModalidadesEntregaForm(), ModalidadesEntregaFormProps, AllergenSelector(), AllergenSelectorProps, Categoria, DeleteConfirmDialogProps (+35 more)
+Nodes (52): Categoria, emptyForm, IMAGE_EXTENSIONS, isValidImageUrl(), Producto, ProductosPage(), ModalidadesEntregaFormProps, AllergenSelector() (+44 more)
 
 ### Community 72 - "valoracion.use-case.ts"
 Cohesion: 0.20
@@ -757,9 +820,9 @@ Nodes (16): CobroRow, CobrosList(), ESTADO_COLOR, ESTADO_LABEL, etiquetaOriginal
 Cohesion: 0.10
 Nodes (19): 10. Fuera de alcance / futuro, 1. Contexto y problema, 2. Decisión de arquitectura, 3.1 Tabla nueva `modalidades_entrega`, 3.2 Dos columnas nuevas en `empresas`, 3. Modelo de datos, 4.1 CRUD de modalidades — `/api/admin/modalidades-entrega`, 4.2 Catálogo público en el checkout (+11 more)
 
-### Community 75 - "SupabaseExportRepository.ts"
-Cohesion: 0.10
-Nodes (25): react, react, calcTotales(), CONTRATO_LABEL, EmpresaInfo, ExportRow, fmtDate(), fmtHoras() (+17 more)
+### Community 75 - "PdfRenderer.ts"
+Cohesion: 0.13
+Nodes (17): react, react, C, calcTotales(), CONTRATO_LABEL, EmpresaInfo, ExportRow, FichajesDocument() (+9 more)
 
 ### Community 76 - "scripts"
 Cohesion: 0.09
@@ -770,20 +833,20 @@ Cohesion: 0.05
 Nodes (36): 10. Verificación de Cadena, 11. Retenciones Legales (Bloqueo RGPD), 12. Perfil Laboral, 13. Trampas Críticas, 1. Propósito, 2. Arquitectura, 3. Base de Datos, 4. Tipos de Evento (+28 more)
 
 ### Community 78 - "AnalyticsClient.tsx"
-Cohesion: 0.24
-Nodes (14): AnalyticsClient(), buildDailySummaryHtml(), calcDesdeHasta(), calcPrevDesdeHasta(), delta(), DOW_LABELS, fmt(), fmtDate() (+6 more)
+Cohesion: 0.20
+Nodes (16): AnalyticsClient(), buildDailySummaryHtml(), calcDesdeHasta(), calcPrevDesdeHasta(), delta(), DOW_LABELS, fmt(), fmtDate() (+8 more)
 
-### Community 79 - "promocion.use-case.ts"
-Cohesion: 0.22
-Nodes (5): CreatePromocionResult, PromocionUseCase, Promocion, IPromocionRepository, SupabasePromocionRepository
+### Community 79 - "tabla-plantilla.use-case.ts"
+Cohesion: 0.19
+Nodes (9): CreateTablaPlantillaDTO, propagarError(), TablaPlantillaUseCase, TablaCelda, TablaPlantilla, CreateTablaPlantillaData, ITablaPlantillaRepository, mapToDomain() (+1 more)
 
 ### Community 80 - "route.ts"
-Cohesion: 0.06
-Nodes (57): enviarEmailSchema, generateOrderEmail(), OrderItem, POST(), ASUNTOS_PROMO, construirTextoPlanoPromo(), ContenidoPromo, ContextoEnvioPromo (+49 more)
+Cohesion: 0.07
+Nodes (49): AdminDashboard(), configDeEmpresa(), enviarEmailSchema, generateOrderEmail(), OrderItem, POST(), ASUNTOS_PROMO, construirTextoPlanoPromo() (+41 more)
 
 ### Community 81 - "cart-drawer.tsx"
 Cohesion: 0.04
-Nodes (69): applySessionStorageWaiter(), attachDeliveryFields(), attachModalidadFields(), AttemptKey, bloqueoPrevioDescuento(), camposTrasCambioDeEntrega(), CartDrawer(), CartDrawerProps (+61 more)
+Nodes (73): applySessionStorageWaiter(), attachDeliveryFields(), attachModalidadFields(), AttemptKey, bloqueoPrevioDescuento(), camposTrasCambioDeEntrega(), CartDrawer(), CartDrawerProps (+65 more)
 
 ### Community 82 - "empresa-theme-provider.tsx"
 Cohesion: 0.35
@@ -797,21 +860,21 @@ Nodes (34): 1. Crear campaña, 2. Seleccionar y enviar campañas, 3. Estados de 
 Cohesion: 0.22
 Nodes (8): ApiResponse, Ingrediente, Delta, fmt(), Ingrediente, InventarioFisicoClient(), Props, Step
 
-### Community 85 - "SupabaseReviewQueueRepository.ts"
-Cohesion: 0.24
-Nodes (7): CreateReviewItemInput, IReviewQueueRepository, ReviewEstado, ReviewQueueItem, ReviewTipo, mapRow(), SupabaseReviewQueueRepository
+### Community 85 - "SupabaseExportRepository.ts"
+Cohesion: 0.20
+Nodes (7): GenerarExportOutput, GenerarExportUseCase, GenerarResumenParcialOutput, GenerarResumenParcialUseCase, IExportRepository, ExportQuery, EmpresaInfo
 
-### Community 86 - "GenerarExport.usecase.ts"
-Cohesion: 0.22
-Nodes (6): GenerarExportOutput, GenerarExportUseCase, GenerarResumenParcialOutput, GenerarResumenParcialUseCase, IExportRepository, ExportQuery
+### Community 86 - "supabase-empresa.repository.ts"
+Cohesion: 0.07
+Nodes (19): UpdateEmpresaDTO, buildEmailHtml(), DescuentoUseCase, generateCodigo(), getEmailSubject(), EmpresaUseCase, normalizePhone(), CodigoDescuento (+11 more)
 
-### Community 87 - "MenuPanel.tsx"
-Cohesion: 0.22
-Nodes (13): AddItemPayload, buildComplementMaps(), ComplementDialog(), ComplementDialogProps, ComplementDialogState, fmt(), matchesSearch(), MenuPanel() (+5 more)
+### Community 87 - "PedidoUseCase"
+Cohesion: 0.18
+Nodes (3): CreateMesaPedidoDTO, PedidoUseCase, tieneDireccionValida()
 
-### Community 88 - "processGlovoWebhookUseCase.ts"
-Cohesion: 0.27
-Nodes (8): POST(), verifyGlovoSignature(), GlovoStatus, GlovoWebhookPayload, mapGlovoStatusToPedidoEstado(), processGlovoWebhookUseCase(), { fakeSupabase, setFindResult, setUpdateResult }, { logAndReturnErrorMock, logFromCatchMock }
+### Community 88 - "route.ts"
+Cohesion: 0.33
+Nodes (8): GET(), logPurgeExecution(), GET(), GET(), purgeExpiredClientesUseCase(), getChainRepo(), getLcChainRepo(), verifyCronSecret()
 
 ### Community 89 - "Carta Digital Multi-idioma"
 Cohesion: 0.06
@@ -825,9 +888,9 @@ Nodes (6): devDependencies, electron-store, node-thermal-printer, electron-store
 Cohesion: 0.17
 Nodes (11): ./tsconfig.json, vitest.config.ts, compilerOptions, incremental, noEmit, extends, include, src/**/*.ts (+3 more)
 
-### Community 92 - "layout.tsx"
-Cohesion: 0.11
-Nodes (25): metadata, nombreDeEmpresa(), TpvLayout(), TURNO_OPTIONAL_PREFIXES, AccionesPanel(), ActionIcon(), ActionIconProps, ActionVariant (+17 more)
+### Community 92 - "MesasGrid.tsx"
+Cohesion: 0.13
+Nodes (13): cerrarMesaPagada(), FooterProps, getMesaColors(), MesaColors, MesaFooter(), MesasGrid(), Props, TpvMesaCard() (+5 more)
 
 ### Community 93 - "FichajeEvento"
 Cohesion: 0.11
@@ -858,8 +921,8 @@ Cohesion: 0.11
 Nodes (22): ACTION_LABELS, ActionBadge(), ActionBadgeProps, ACTOR_CONFIG, ACTOR_TIPOS, ActorBadgeProps, AUDIT_ACTIONS, AuditLogPage() (+14 more)
 
 ### Community 100 - "page.tsx"
-Cohesion: 0.10
-Nodes (29): addItemBackIfMissing(), applyKitchenSwipeVisuals(), applyLeftSwipe(), applyRightSwipe(), formatTimer(), getElapsedMinutes(), getItemCardColor(), getItemHintText() (+21 more)
+Cohesion: 0.08
+Nodes (33): KitchenItem, MergedItem, addItemBackIfMissing(), applyKitchenSwipeVisuals(), applyLeftSwipe(), applyRightSwipe(), formatTimer(), getElapsedMinutes() (+25 more)
 
 ### Community 102 - "20260521130331_mesa_waiter_panel.sql"
 Cohesion: 0.48
@@ -874,12 +937,12 @@ Cohesion: 0.20
 Nodes (9): BcgScatterChart(), BcgScatterChartProps, LEGEND_ITEMS, QUADRANT_BG, QUADRANT_COLOR, TooltipPayload, TooltipProps, BcgItem (+1 more)
 
 ### Community 106 - "PerfilLaboral"
-Cohesion: 0.14
-Nodes (12): derivarEstado(), ObtenerEstadoSupervisorUseCase, segundosDesde(), CreatePerfilLaboralInput, IPerfilLaboralRepository, UpdatePerfilLaboralInput, EstadoSupervisor, PerfilLaboral (+4 more)
+Cohesion: 0.13
+Nodes (10): derivarEstado(), ObtenerEstadoSupervisorUseCase, segundosDesde(), CreatePerfilLaboralInput, IPerfilLaboralRepository, UpdatePerfilLaboralInput, PerfilLaboral, TipoContrato (+2 more)
 
-### Community 107 - "getSupabaseClient"
-Cohesion: 0.07
-Nodes (33): POST(), schema, GET(), GET(), getTpvRelease(), GithubAsset, GithubRelease, parsed (+25 more)
+### Community 107 - "route.ts"
+Cohesion: 0.27
+Nodes (14): aplicarCobroSiProcede(), GET(), POST(), procesarYRedirigir(), OK(), POST(), decodificarParametros(), desdeClaves() (+6 more)
 
 ### Community 108 - "6. Buenas prácticas"
 Cohesion: 0.07
@@ -893,9 +956,9 @@ Nodes (4): ENV_VARS, EnvVar, validateEnv(), register()
 Cohesion: 0.25
 Nodes (7): name, pnpm, onlyBuiltDependencies, private, productName, type, version
 
-### Community 111 - "CobroConfirmado.tsx"
-Cohesion: 0.31
-Nodes (10): APARIENCIA, buildAeatUrl(), CobroConfirmado(), EstadoConfirmacion, fmt(), usePrinter(), numeroConCeros(), numserieAeat() (+2 more)
+### Community 111 - "browser-printer.ts"
+Cohesion: 0.33
+Nodes (10): qrcode, qrcode, buildAeatBlock(), buildAeatUrl(), buildDesgloseRows(), buildImpuestoRows(), buildReceiptHtml(), fmt() (+2 more)
 
 ### Community 112 - "Seguridad — multi_shop"
 Cohesion: 0.08
@@ -905,21 +968,21 @@ Nodes (26): Aislamiento de tenant en endpoints de mesa pública, Aislamiento mul
 Cohesion: 0.14
 Nodes (21): bodySchema, DELETE(), mesaIdSchema, calcularTotal(), cerrarSesionSiQuedaCubierta(), esElItemBuscado(), importeDeLinea(), Item (+13 more)
 
-### Community 114 - "banner-visibilidad.ts"
-Cohesion: 0.21
-Nodes (10): ClaveSeccion, ContextoBanner, debeMontarseWaiterBanner(), MotivoOculto, motivoParaOcultarBanner(), Regla, REGLAS, SECCION_POR_RUTA (+2 more)
+### Community 114 - "WaiterBanner"
+Cohesion: 0.16
+Nodes (13): applyWaiterMeResponse(), didCountsIncrease(), playNotificationSound(), WaiterBanner(), ClaveSeccion, ContextoBanner, MotivoOculto, motivoParaOcultarBanner() (+5 more)
 
 ### Community 117 - "processRedsysWebhookUseCase.ts"
-Cohesion: 0.06
-Nodes (56): aplicarCobroSiProcede(), GET(), POST(), procesarYRedirigir(), GET(), POST(), processAndRedirect(), OK() (+48 more)
+Cohesion: 0.14
+Nodes (24): GET(), POST(), processAndRedirect(), aplicarEfectosDelCobro(), cargarEmpresa(), cerrarSesionPagada(), construirPedidoParaTelegram(), DatosCliente (+16 more)
 
 ### Community 118 - "callbacks.ts"
-Cohesion: 0.09
-Nodes (38): GET(), tokenSchema, botonesRespuestaRapida(), botonesTiempoFijado(), BotonTelegram, cancelarEntregado(), Contexto, escaparMarkdown() (+30 more)
+Cohesion: 0.19
+Nodes (17): botonesRespuestaRapida(), botonesTiempoFijado(), BotonTelegram, cancelarEntregado(), escaparMarkdown(), fijarTiempo(), Manejador, marcarEntregado() (+9 more)
 
-### Community 119 - "registerManualMesaPaymentUseCase.ts"
-Cohesion: 0.24
-Nodes (12): aplicarCobro(), asentarResultado(), cargarSesionCobrable(), cobrarParteIgual(), cobrarTurnoPersonalizado(), Cobro, fallo(), RegisterManualMesaPaymentInput (+4 more)
+### Community 119 - "Diseño: Menús virtuales (categorías de navegación adicionales sobre productos existentes)"
+Cohesion: 0.10
+Nodes (20): Admin UI, API routes nuevas (`src/app/api/admin/menus-virtuales/`), Diseño: Menús virtuales (categorías de navegación adicionales sobre productos existentes), Dominio y aplicación, Edge cases, Fuera de alcance, `menu_virtual_productos`, `menus_virtuales` (+12 more)
 
 ### Community 120 - "Optimistic UI — borrado de item en ticket de mesa y envío de carrito"
 Cohesion: 0.13
@@ -949,9 +1012,9 @@ Nodes (3): public.mesa_item_pagos, public.mesa_pagos_personalizados, public.mesa
 Cohesion: 0.67
 Nodes (3): public.tpv_turnos, tpv_turno_before_insert(), tpv_turno_no_update_fields
 
-### Community 132 - "SupabaseHoldRepository.ts"
+### Community 132 - "product.dto.ts"
 Cohesion: 0.16
-Nodes (7): CrearHoldInput, GestionarHoldUseCase, CreateHoldInput, IHoldRepository, LegalHold, mapRow(), SupabaseHoldRepository
+Nodes (12): createProductSchema, imageFitValues, productIdSchema, tablaInfoSchema, updateProductSchema, tablaCeldaSchema, TablaInfoDTO, tablaInfoShapeSchema (+4 more)
 
 ### Community 133 - "Compliance Legal — multi-shop"
 Cohesion: 0.08
@@ -969,25 +1032,25 @@ Nodes (8): Actualización de actividad, Alta de cliente, Ciclo de vida completo,
 Cohesion: 0.15
 Nodes (12): 1. `src/lib/menu/subcategorias.ts` (nuevo), 2. `src/components/category-nav.tsx`, 3. `src/components/menu-section.tsx`, 4. `src/lib/translations.ts`, Animación — "nace del botón", Cambios de código, Comportamiento, Diseño: desplegable de subcategorías en la navegación del menú (+4 more)
 
-### Community 153 - "MesasGrid.tsx"
+### Community 153 - "tpv-catalog-ctx.tsx"
+Cohesion: 0.12
+Nodes (19): mesaSesionChannel(), buildComplementoMap(), CatalogResponse, MesasResponse, IMPORTANT: channel name MUST match exactly what the trigger broadcasts to ('wait, TpvCatalogContext, TpvCatalogContextValue, TpvCatalogProvider() (+11 more)
+
+### Community 155 - "Rediseño del árbol de Menús Virtuales — Implementation Plan"
+Cohesion: 0.18
+Nodes (10): Rediseño del árbol de Menús Virtuales — Implementation Plan, Task 1: Agregar `@dnd-kit`, Task 2: Claves de traducción nuevas, Task 3: Backend — conteo de productos por nodo, Task 4: Función pura de reordenamiento, Task 5: `NuevoMenuVirtualDialog`, Task 6: `EliminarMenuVirtualDialog`, Task 7: Rediseñar `menus-virtuales/page.tsx` (+2 more)
+
+### Community 156 - "Decisiones (aprobadas visualmente por el usuario — opción A + modal + drag&drop real)"
+Cohesion: 0.18
+Nodes (10): 1. Árbol — jerarquía visual clara (opción A del brainstorming), 2. Reordenar — drag & drop real con `@dnd-kit`, 3. Crear — diálogo modal en vez de creación inmediata, 4. Feedback — banner inline + diálogo de confirmación, sin `alert`/`confirm`, Contexto, Decisiones (aprobadas visualmente por el usuario — opción A + modal + drag&drop real), Diseño: rediseño del árbol de Menús Virtuales (admin), Fuera de alcance (+2 more)
+
+### Community 157 - "promocion.use-case.ts"
+Cohesion: 0.22
+Nodes (5): CreatePromocionResult, PromocionUseCase, Promocion, IPromocionRepository, SupabasePromocionRepository
+
+### Community 158 - "Arquitectura y flujo de datos"
 Cohesion: 0.13
-Nodes (15): cerrarMesaPagada(), FooterProps, getMesaColors(), MesaColors, MesaFooter(), MesasGrid(), Props, TpvMesaCard() (+7 more)
-
-### Community 155 - "getSupabaseAnonClient"
-Cohesion: 0.21
-Nodes (9): getSupabaseAnonClient(), CatalogResponse, CatalogStatus, useWaiterCatalog(), WaiterCatalogContext, WaiterCatalogProvider(), WaiterCatalogValue, CATALOG_OK (+1 more)
-
-### Community 156 - "route.ts"
-Cohesion: 0.29
-Nodes (8): GET(), logPurgeExecution(), GET(), GET(), purgeExpiredClientesUseCase(), getChainRepo(), getLcChainRepo(), verifyCronSecret()
-
-### Community 157 - "route.ts"
-Cohesion: 0.46
-Nodes (7): DELETE(), GET(), getMesaId(), LockRow, mesaIdSchema, POST(), requireMesaInOwnTenant()
-
-### Community 158 - "page.tsx"
-Cohesion: 0.31
-Nodes (8): EMPTY_MESA_DATA, loadMesaData(), mapPedido(), MostradorPage(), normComplement(), RawComplement, RawItem, RawPedido
+Nodes (14): 1. Base de datos, 2. Domain (`core/domain/entities/types.ts`), 3. Application, 4. Infrastructure (`SupabaseProductRepository.ts`), 5. Admin (`product-form-dialog.tsx`), 6. Público — View Model, 7. Público — componente compartido `ProductImageGallery`, 8. Traducciones (+6 more)
 
 ### Community 159 - "Notas de validación previa (spike ya ejecutado)"
 Cohesion: 0.20
@@ -997,21 +1060,25 @@ Nodes (9): Desplegable de subcategorías en el menú — Implementation Plan, No
 Cohesion: 0.09
 Nodes (22): 10. WaiterLoginForm — flash de PIN con sesión válida, 11. No existe `/waiter/mesas`, 12. `android/` está en .gitignore, 1. `npx cap copy android` es obligatorio antes de cada build, 2. `SameSite=strict` bloquea cookies en Capacitor, 3. `CookieManager.flush()` en onPause — obligatorio, 4. `style.display = ''` no muestra elementos con CSS display:none, 5. `window.load` no `DOMContentLoaded` para el bridge de Capacitor (+14 more)
 
+### Community 161 - "MenuPanel.tsx"
+Cohesion: 0.20
+Nodes (14): AddItemPayload, buildComplementMaps(), ComplementDialog(), ComplementDialogProps, ComplementDialogState, fmt(), matchesSearch(), MenuPanel() (+6 more)
+
 ### Community 162 - "DeliveryCredentialsForm.tsx"
 Cohesion: 0.24
 Nodes (8): ControlLargo(), ControlProps, ControlSecreto(), DeliveryCredentialsForm(), FieldProps, placeholderDeCredencial(), Props, DeliverySettings
 
 ### Community 164 - "README.md"
-Cohesion: 0.09
-Nodes (11): Archivos clave, Campos de BBDD usados, Features implementadas, SEO Multi-Tenant, CI (GitHub Actions), Contra qué corre el E2E (importante), Cómo agregar un test de regresión de seguridad nuevo, Git hooks (Husky) (+3 more)
+Cohesion: 0.11
+Nodes (8): Archivos fuente, Arquitectura, Electron TPV Windows, Pendiente verificable solo con impresora real, Proceso de build, Seguridad, Trampas, Versiones
 
 ### Community 166 - "Kitchen Screens — Comparación Completa"
 Cohesion: 0.09
 Nodes (22): "¿Cuál es la fuente de verdad del estado de un item?", En `/waiter/pendientes`, Estados y swipe, Estados y swipe, Estados y swipe, `/kitchen` — Pantalla Standalone de Cocina, Kitchen Screens — Comparación Completa, Merge key incluye nota (+14 more)
 
-### Community 167 - "waiter-auth.ts"
-Cohesion: 0.36
-Nodes (8): authSchema, POST(), deriveSalt(), getPinPepper(), getWaiterTokenSecret(), signWaiterToken(), verifyPin(), verifyWaiterToken()
+### Community 167 - "CobroConfirmado.tsx"
+Cohesion: 0.21
+Nodes (11): APARIENCIA, buildAeatUrl(), CobroConfirmado(), EstadoConfirmacion, fmt(), printer, usePrinter(), UsePrinterResult (+3 more)
 
 ### Community 168 - "Optimistic UI — borrado de item en mesa y envío de carrito — Implementation Plan"
 Cohesion: 0.22
@@ -1026,20 +1093,20 @@ Cohesion: 0.09
 Nodes (21): 1. Informe Z (cierre de turno), 2. Desglose de Ítems en Ticket (`detalle_items`), 3. Archivos afectados, 4. Decisiones de diseno, API, Cobros de mesa (auto-servidor), Cobros de mostrador (enviados por cliente), Contenido del Informe Z (+13 more)
 
 ### Community 171 - "index.ts"
-Cohesion: 0.38
-Nodes (7): printReceipt(), buildAndPrint(), centsToEur(), padEnd(), padStart(), ReceiptData, electron
+Cohesion: 0.42
+Nodes (6): buildAndPrint(), centsToEur(), padEnd(), padStart(), ReceiptData, electron
 
-### Community 172 - "layout.tsx"
-Cohesion: 0.31
-Nodes (6): metadata, OfflineBanner(), reloadWhenReady(), PushRegistrar(), registerPush(), sendToken()
+### Community 172 - "Diseño: recogida en tienda implícita, sin toggle ni configuración"
+Cohesion: 0.18
+Nodes (10): 1. Backend — persistencia implícita, 2. Admin — sin toggle, sin CRUD de recogida, 3. Carrito — lista única, recogida fija primero, 4. Dominio y DB — retirar el campo y las filas viejas, Contexto, Diseño, Diseño: recogida en tienda implícita, sin toggle ni configuración, Fuera de alcance (+2 more)
 
-### Community 173 - "page.tsx"
-Cohesion: 0.28
-Nodes (3): PrivacidadPage(), DpaPage(), FABRICANTE
+### Community 173 - "telegram.service.ts"
+Cohesion: 0.32
+Nodes (11): callbackQuerySchema, POST(), answerCallbackQuery(), buildOrderMessage(), buildTimeButtons(), deleteMessage(), editMessageReplyMarkup(), editMessageText() (+3 more)
 
-### Community 174 - "route.ts"
-Cohesion: 0.48
-Nodes (6): GET(), getR2Bucket(), getS3Client(), POST(), Snapshot, SnapshotRow
+### Community 174 - "toast.tsx"
+Cohesion: 0.23
+Nodes (11): Toast, ToastAction, ToastActionElement, ToastClose, ToastDescription, ToastProps, ToastTitle, toastVariants (+3 more)
 
 ### Community 175 - "Waiter — Sistema de Pases por Ítem"
 Cohesion: 0.09
@@ -1049,37 +1116,37 @@ Nodes (21): 1. Waiter añade ítem a la carta (suplantando mesa), 2. Pase propag
 Cohesion: 0.09
 Nodes (21): 10. Backup Fiscal Local (Electron), 1.1 Inalterabilidad e Integridad de registros, 1.2 Cadena de Hashes (Trazabilidad), 1.3 Accesibilidad para inspectores (Volcado de datos), 1.4 Código QR / URL de verificación AEAT, 1.5 Declaración de Responsabilidad del fabricante, 1.5b Declaración modo No-VeriFactu (Art. 12 RD 1007/2023) — **Fase 1 completada**, 1. Ley Antifraude + Reglamento Verifactu (RD 1007/2023) (+13 more)
 
-### Community 177 - "mesaSesionChannel"
-Cohesion: 0.29
-Nodes (5): createMesaBroadcastChannel(), mesaSesionChannel(), MIGRACION, RAIZ, SRC
+### Community 177 - "route.ts"
+Cohesion: 0.27
+Nodes (9): GET(), GET(), ExportQueryDto, ExportQuerySchema, ResumenParcialQueryDto, ResumenParcialQuerySchema, getExportRepo(), getLcGenerarExportUseCase() (+1 more)
 
 ### Community 178 - "Diseño: mejora visual del diálogo de subcategorías"
 Cohesion: 0.25
 Nodes (7): Cambios visuales, Diseño: mejora visual del diálogo de subcategorías, Fuera de alcance, Lo que NO cambia, Objetivo, Riesgos / notas, Testing
 
 ### Community 179 - "route.ts"
-Cohesion: 0.22
-Nodes (13): GET(), POST(), POST(), setupSchema, POST(), LoginSchema, POST(), rateLimitLogin() (+5 more)
+Cohesion: 0.23
+Nodes (12): GET(), POST(), POST(), setupSchema, POST(), LoginSchema, POST(), rateLimitLogin() (+4 more)
 
-### Community 180 - "usePagoDeMesa"
-Cohesion: 0.29
-Nodes (7): buildTotalMismatch(), getExpectedCents(), getStoredMismatch(), getStoredPaymentLock(), submitRedsysForm(), usePagoDeMesa(), VistaDeTurno()
+### Community 180 - "route.ts"
+Cohesion: 0.27
+Nodes (10): DELETE(), GET(), PATCH(), POST(), clienteIdSchema, createClienteSchema, idiomaSchema, UpdateClienteDTO (+2 more)
 
 ### Community 181 - "Propina (Tip) en Mesa"
 Cohesion: 0.10
 Nodes (20): API, Base de datos, División personalizada (modo `personalizado`), Flujo de pago, `GET /api/mesas/[mesaId]/orders` — respuesta, i18n, `mesa_sesiones` (delta), Migración (+12 more)
 
-### Community 182 - "FichajeDialog.tsx"
-Cohesion: 0.38
-Nodes (5): FichajeDialog(), Props, RGPD_KEY(), TIPO_LABEL, TpvLoginForm()
+### Community 182 - "waiter-auth.ts"
+Cohesion: 0.26
+Nodes (11): authSchema, POST(), getClientIp(), isFailClosed(), rateLimitWaiterLogin(), deriveSalt(), getPinPepper(), getWaiterTokenSecret() (+3 more)
 
 ### Community 183 - "Menú Público — Cache y Resiliencia (GET /)"
 Cohesion: 0.33
 Nodes (5): 1. Retry ante timeouts transitorios de PostgREST, 2. `getCachedMenu` no debe cachear un `Result` fallido, 3. LCP: `SubcategorySection` nunca propagaba `priority`, ¿Esto es "seguridad"?, Menú Público — Cache y Resiliencia (GET /)
 
-### Community 184 - "TicketPanel.tsx"
-Cohesion: 0.38
-Nodes (6): ESTADO_COLOR, ESTADO_LABEL, fmt(), paseShortLabel(), Props, TicketPanel()
+### Community 184 - "processGlovoWebhookUseCase.ts"
+Cohesion: 0.27
+Nodes (8): POST(), verifyGlovoSignature(), GlovoStatus, GlovoWebhookPayload, mapGlovoStatusToPedidoEstado(), processGlovoWebhookUseCase(), { fakeSupabase, setFindResult, setUpdateResult }, { logAndReturnErrorMock, logFromCatchMock }
 
 ### Community 185 - "route.ts"
 Cohesion: 0.40
@@ -1091,15 +1158,15 @@ Nodes (21): API Routes, Clean Architecture Flow, Client Components, Database Sch
 
 ### Community 189 - "main.ts"
 Cohesion: 0.16
-Nodes (18): blockDangerousShortcuts(), checkForPortableUpdate(), createWindow(), EmpleadoIdSchema, FiscalSnapshotPayload, FiscalSnapshotSchema, isNewerVersion(), PinCacheSchema (+10 more)
+Nodes (19): blockDangerousShortcuts(), checkForPortableUpdate(), createWindow(), EmpleadoIdSchema, FiscalSnapshotPayload, FiscalSnapshotSchema, isNewerVersion(), PinCacheSchema (+11 more)
+
+### Community 190 - "Mejoras de UI y simplificación de recogida — Implementation Plan"
+Cohesion: 0.20
+Nodes (9): Mejoras de UI y simplificación de recogida — Implementation Plan, Task 1: Migración — recogida siempre a precio 0 en la DB, Task 2: Zod — rechazar precio distinto de 0 en modalidades de recogida, Task 3: Extraer el mapeo de iconos a un módulo compartido, Task 4: Admin — ocultar el precio para modalidades de recogida, Task 5: `TiendaFulfillmentSelector` — icono visible, lista de domicilio rediseñada, recogida como línea fija, Task 6: Corregir los tests existentes que quedaron inválidos tras la Task 2 y la Task 5, Task 7: Colores del panel admin — tema oscuro fijo, igual que la sección de Glovo (+1 more)
 
 ### Community 192 - "Mesa Ordering — QR Table Ordering"
 Cohesion: 0.10
 Nodes (20): Admin Orders Panel — Mesa Behavior, API Routes, Component: `MesaOrderHistory`, Component: `MesaOrdersClient`, `consolidateSesionOrders` logic, Customer Flow, Database Schema, `empresas` (delta) (+12 more)
-
-### Community 193 - "CustomSelectionView"
-Cohesion: 0.40
-Nodes (5): agruparYaPagados(), bebidasPrimero(), buildGroupedItems(), buildSeleccion(), CustomSelectionView()
 
 ### Community 194 - "PWA & Service Worker — Waiter Panel"
 Cohesion: 0.10
@@ -1115,7 +1182,7 @@ Nodes (19): Columnas de base de datos, Configuración, Documentación: Notificac
 
 ### Community 212 - "SupervisorPanel.tsx"
 Cohesion: 0.13
-Nodes (10): ESTADO_CHIP, ESTADO_LABEL, ExportFichajes(), ESTADO_CHIP, ESTADO_DOT, ESTADO_LABEL, fmtHora(), fmtSegundos() (+2 more)
+Nodes (11): ESTADO_CHIP, ESTADO_LABEL, ExportFichajes(), ESTADO_CHIP, ESTADO_DOT, ESTADO_LABEL, fmtHora(), fmtSegundos() (+3 more)
 
 ### Community 251 - "AnalyticsPeriodParams"
 Cohesion: 0.23
@@ -1125,9 +1192,9 @@ Nodes (7): aggregateKpis(), AnalyticsUseCase, computeDeltaPercent(), AnalyticsPe
 Cohesion: 0.67
 Nodes (3): debeCachearse(), networkFirstConTimeout(), TIMEOUT
 
-### Community 271 - "types.ts"
-Cohesion: 0.11
-Nodes (14): VerificarCadenaUseCase, CreateAuditEntryInput, IAuditRepository, IChainRepository, AuditEntry, ChainAnchor, ChainVerifyResult, Compensacion (+6 more)
+### Community 271 - "SupabaseChainRepository.ts"
+Cohesion: 0.18
+Nodes (5): IChainRepository, ChainAnchor, ChainVerifyResult, mapAnchorRow(), SupabaseChainRepository
 
 ### Community 275 - "Complejidad cognitiva — cómo se cerró y cómo no volver"
 Cohesion: 0.11
@@ -1183,19 +1250,19 @@ Nodes (16): Confirm buttons (per mesa), Deferred items (bebidas) in validation c
 
 ### Community 289 - "route.ts"
 Cohesion: 0.18
-Nodes (15): bodySchema, buildOverridesByPedido(), buildSynthesizedEstado(), GET(), isRetenidoReadyToSynthesize(), ItemEstadoRow, itemSchema, normalizePedidoOrder() (+7 more)
+Nodes (14): bodySchema, buildOverridesByPedido(), buildSynthesizedEstado(), isRetenidoReadyToSynthesize(), ItemEstadoRow, itemSchema, normalizePedidoOrder(), normComplement() (+6 more)
 
-### Community 290 - "route.ts"
-Cohesion: 0.67
-Nodes (3): paramsSchema, POST(), completeCustomPaymentUseCase()
+### Community 290 - "getSupabaseClient"
+Cohesion: 0.05
+Nodes (37): POST(), schema, GET(), getTpvRelease(), GithubAsset, GithubRelease, parsed, bodySchema (+29 more)
 
 ### Community 291 - "tgtg-reserva-popup.tsx"
 Cohesion: 0.21
 Nodes (12): esAviso(), EstadoAviso, haExpiradoLaRecogida(), MENSAJE_AVISO, ModoAviso, modoTrasReservar(), motivoDeRechazo(), PopupState (+4 more)
 
 ### Community 292 - "command-queue.ts"
-Cohesion: 0.27
-Nodes (14): useOnlineStatus(), useCommandQueue(), enqueueCommand(), flushCommandQueue(), getQueuedCommands(), getQueuedCount(), isExpired(), isResumeSignal() (+6 more)
+Cohesion: 0.32
+Nodes (13): useCommandQueue(), enqueueCommand(), flushCommandQueue(), getQueuedCommands(), getQueuedCount(), isExpired(), isResumeSignal(), itemStatusKey() (+5 more)
 
 ### Community 293 - "vista-mesa.ts"
 Cohesion: 0.17
@@ -1228,6 +1295,10 @@ Nodes (13): Archivos clave, Compliance Regulatorio, Códigos de error COMPRAS_*,
 ### Community 301 - "TPV — Sistema de empleados con PIN y permisos"
 Cohesion: 0.14
 Nodes (13): Admin panel: gestión de empleados, Archivos clave, Arqueo ciego para cajero, Cookie: `tpv_employee_token`, Flujo de autenticación, Permisos por rol, Proxy (`src/proxy.ts`), Qué es (+5 more)
+
+### Community 302 - "Recogida implícita sin toggle — Implementation Plan"
+Cohesion: 0.20
+Nodes (9): Recogida implícita sin toggle — Implementation Plan, Task 1: Migración — borrar filas `recogida` y la columna del toggle, Task 2: Zod — `createModalidadEntregaSchema` solo acepta domicilio, Task 3: Backend — persistir recogida implícita sin `modalidad_entrega_id`, Task 4: Dominio y DTOs — retirar `recogidaTiendaHabilitada`, Task 5: Admin UI — sin toggle ni formulario de recogida, Task 6: `TiendaFulfillmentSelector` — lista única, recogida fija primero, Task 7: `cart-drawer.tsx` — wizard gateado solo por envío a domicilio (+1 more)
 
 ### Community 303 - "pin-cache.ts"
 Cohesion: 0.27
@@ -1265,21 +1336,33 @@ Nodes (7): CierreReportView(), CierreReportViewProps, fmtCents(), fmtDateTime(),
 Cohesion: 0.35
 Nodes (10): b64(), enqueue(), fromB64(), getOrCreateKey(), getQueueCount(), idbCommit(), idbPut(), openDb() (+2 more)
 
+### Community 312 - "Segunda imagen de producto (tiendas) Implementation Plan"
+Cohesion: 0.17
+Nodes (11): Segunda imagen de producto (tiendas) Implementation Plan, Task 10: Full verification pass, Task 1: Database migration — `foto_url_2` column, Task 2: Domain type + Zod DTOs, Task 3: Repository — interface + Supabase implementation, Task 4: Public view model — `MenuItemVM.image2`, Task 5: Translations — `productImage2` / `productImage2Help`, Task 6: Admin form — second `ImageUploader` for `tienda` (+3 more)
+
+### Community 313 - "Diseño: mejoras de UI y simplificación de "recogida" en modalidades de entrega"
+Cohesion: 0.22
+Nodes (8): 1. Recogida pasa a ser SIEMPRE gratis, en todo el sistema, 2. `TiendaFulfillmentSelector.tsx` — rediseño visual (opción B + A del brainstorming), 3. Colores del panel admin — alinear con el tema oscuro fijo existente, Contexto, Decisiones (aprobadas visualmente por el usuario), Diseño: mejoras de UI y simplificación de "recogida" en modalidades de entrega, Fuera de alcance, Testing
+
 ### Community 314 - "Imágenes — subida, optimización y coste"
-Cohesion: 0.18
+Cohesion: 0.17
 Nodes (11): Cuándo SÍ usar `next/image` normal, Cómo se usa, El banner es un caso aparte, El guard, y por qué existe, El pipeline: dónde se optimiza cada cosa, Imágenes — subida, optimización y coste, Lo que costaba de verdad, Por qué NO se usa `next/image` con esas imágenes (+3 more)
 
 ### Community 315 - "Cart Access Token — Eliminación del flujo legacy"
 Cohesion: 0.18
 Nodes (10): Adenda (post-implementación), Alcance, Cambios, Cart Access Token — Eliminación del flujo legacy, Contexto, Código, Documentación, Fuera de alcance (+2 more)
 
-### Community 316 - "browser-printer.ts"
-Cohesion: 0.20
-Nodes (15): qrcode, qrcode, printer, UsePrinterResult, BrowserPrinter, buildAeatBlock(), buildAeatUrl(), buildDesgloseRows() (+7 more)
+### Community 316 - "pedido-modalidad-revalidacion.test.ts"
+Cohesion: 0.36
+Nodes (7): CreatePedidoDTO, buildClienteRepoMock(), buildDescuentoRepoMock(), buildMesaSesionRepoMock(), buildPedidoRepoMock(), buildProductRepoMock(), buildUseCase()
+
+### Community 317 - "EmpresaPublic"
+Cohesion: 0.17
+Nodes (14): MenuPageProps, HeroBannerProps, buildMenuJsonLd(), buildRestaurantJsonLd(), JsonLd(), JsonLdProps, parseGeoFromUrl(), RESTAURANTE_FAQS (+6 more)
 
 ### Community 318 - "useLanguage"
-Cohesion: 0.05
-Nodes (57): classifyBcg(), computeMedian(), MenuEngineeringPage(), resolveQuadrant(), OcupacionPage(), ComprasProvider(), ComprasLayout(), TABS (+49 more)
+Cohesion: 0.04
+Nodes (65): classifyBcg(), computeMedian(), MenuEngineeringPage(), resolveQuadrant(), OcupacionPage(), ComprasProvider(), ComprasLayout(), TABS (+57 more)
 
 ### Community 319 - "Analítica Avanzada — Contexto Técnico"
 Cohesion: 0.20
@@ -1301,9 +1384,9 @@ Nodes (6): isTokenRevokedMock, jwtVerifyMock, rateLimitAdminMock, verifyCsrfToke
 Cohesion: 0.22
 Nodes (7): Acciones Instrumentadas, Archivos Clave, Arquitectura, Patrón de Uso en Rutas, Propósito, Sistema de Auditoría (Audit Log), Trampas
 
-### Community 324 - "Electron TPV Windows"
-Cohesion: 0.22
-Nodes (8): Archivos fuente, Arquitectura, Electron TPV Windows, Pendiente verificable solo con impresora real, Proceso de build, Seguridad, Trampas, Versiones
+### Community 324 - "ExcelRenderer.ts"
+Cohesion: 0.31
+Nodes (8): calcTotales(), CONTRATO_LABEL, EmpresaInfo, ExportRow, fmtDate(), fmtHoras(), renderFichajesExcel(), TIPO_LABEL
 
 ### Community 325 - "Mesa Payments — Pagar en mesa con Redsys"
 Cohesion: 0.22
@@ -1313,9 +1396,21 @@ Nodes (9): Activación, Archivos, Flujo: Dividir cuenta, Flujo: Pagar total, Mes
 Cohesion: 0.22
 Nodes (9): Atomicidad del Pago Completo (implementada 2026-07-30), Hardening REST API (migración `20260730000004`), Pieza 1 — Trigger `check_session_not_locked` (migración `20260730000002`), Pieza 2 — RPC `initiate_mesa_payment_atomic` (migración `20260730000003`), Pieza 3 — Cambios en `initiateRedsysMesaPaymentUseCase.ts`, Pieza 4 — Captura de `PAYMENT_IN_PROGRESS` en `POST /api/pedidos`, Por qué SERIALIZABLE no funciona aquí, Solución: bloqueo pesimista sobre la fila padre (+1 more)
 
+### Community 327 - "menu.mapper.ts"
+Cohesion: 0.13
+Nodes (18): ComplementGroupVM, ComplementVM, ProductoTablaVM, TablaCeldaVM, DescriptionTranslationMap, mapCategoryTranslations(), mapComplementoGrupoToGroupVM(), mapComplementProduct() (+10 more)
+
 ### Community 328 - "rls-policy-hygiene.spec.ts"
 Cohesion: 0.28
 Nodes (7): fetchHygieneRows(), HygieneCheckName, HygieneViolation, INTENTIONAL_DEFAULT_PRIVILEGE_GRANTORS, INTENTIONAL_PUBLIC_TRUE_TABLES, serviceRoleKey(), supabaseUrl()
+
+### Community 329 - "error-boundary.tsx"
+Cohesion: 0.25
+Nodes (3): ErrorBoundary, Props, State
+
+### Community 330 - "index.ts"
+Cohesion: 0.07
+Nodes (36): closeSesionSchema, createMesaSchema, DELETE(), deleteMesaSchema, POST(), GET(), pageSchema, PATCH() (+28 more)
 
 ### Community 331 - "20260724000002_lc_fichajes_chain.sql"
 Cohesion: 0.36
@@ -1341,9 +1436,17 @@ Nodes (8): Autenticación y sesión, Fail-closed en producción, Flujo de autent
 Cohesion: 0.43
 Nodes (7): FoodCostPage(), formatCents(), getMonthRange(), getWeekRange(), PeriodType, resolveDeviationClass(), resolveDeviationLabel()
 
+### Community 337 - "registerManualMesaPaymentUseCase.ts"
+Cohesion: 0.24
+Nodes (12): aplicarCobro(), asentarResultado(), cargarSesionCobrable(), cobrarParteIgual(), cobrarTurnoPersonalizado(), Cobro, fallo(), RegisterManualMesaPaymentInput (+4 more)
+
 ### Community 338 - "Estándares y certificaciones de seguridad — referencia"
 Cohesion: 0.29
 Nodes (7): Estándares y certificaciones de seguridad — referencia, GDPR / LOPDGDD ✅ (aplica), ISO 27001, Ley Antifraude — RD 1007/2023 ✅ (aplica al TPV), OWASP Top 10, PCI DSS (Payment Card Industry Data Security Standard), SOC 2 (Service Organization Control 2)
+
+### Community 339 - "analitica-vercel.tsx"
+Cohesion: 0.52
+Nodes (6): AnaliticaVercel(), esNavegadorAutomatizado(), esRutaDePersonal(), filtrarEventoDeAudiencia(), rutaDe(), RUTAS_DE_PERSONAL
 
 ### Community 340 - "Sub-features"
 Cohesion: 0.29
@@ -1352,6 +1455,18 @@ Nodes (6): 5.1 Exportación a Contabilidad, 5.2 Conexión con Deliveroo / Just E
 ### Community 341 - "supabase-security-definer.spec.ts"
 Cohesion: 0.29
 Nodes (3): INTENTIONAL_ANON_WHITELIST, INTENTIONAL_AUTHENTICATED_WHITELIST, RPC_FUNCTIONS_MUST_BE_BLOCKED
+
+### Community 342 - "get-menu-use-case-no-duplicate-log.test.ts"
+Cohesion: 0.20
+Nodes (7): asignacionVirtual, categoria1, dbErrorResult, { logAndReturnErrorMock }, menuVirtualHijo, menuVirtualPadre, producto1
+
+### Community 343 - "Menús Virtuales"
+Cohesion: 0.17
+Nodes (11): Admin UI, Arquitectura de capas, Cómo se integra al catálogo público, Dos vías de escritura — no confundir, Gotcha general descubierto en el camino (no específico de este feature), Mapper — `toVirtualCategoryVM` / `toVirtualSubcategoryVM`, Menús Virtuales, Qué es (+3 more)
+
+### Community 345 - "route.ts"
+Cohesion: 0.24
+Nodes (11): DeliveryPage(), GET(), PUT(), DELETE(), GET(), POST(), PUT(), UpdateDeliverySettingsDtoSchema (+3 more)
 
 ### Community 347 - "Sistema de Bloqueo de Pago (`pago_en_curso`)"
 Cohesion: 0.33
@@ -1445,6 +1560,10 @@ Nodes (4): Glovo webhook — HMAC-SHA256, Seguridad en webhooks externos, Telegr
 Cohesion: 0.50
 Nodes (3): Límites por schema, Validación de inputs, Zod en todas las API routes
 
+### Community 383 - "page.tsx"
+Cohesion: 0.24
+Nodes (9): buildEmptyForm(), fetchIngredientes(), fetchTurno(), FormState, MermasPage(), MOTIVOS, submitMerma(), MotivoMerma (+1 more)
+
 ### Community 384 - "chain-hash.ts"
 Cohesion: 0.67
 Nodes (3): ChainHashInput, computeChainHash(), verifyLink()
@@ -1481,25 +1600,73 @@ Nodes (3): Polling adaptativo, Polling Adaptativo + Realtime, Supabase Realtime
 Cohesion: 0.67
 Nodes (3): Comportamiento por entorno, Validación de entorno al startup, Variables validadas
 
+### Community 410 - "route.ts"
+Cohesion: 0.46
+Nodes (7): DELETE(), GET(), getMesaId(), LockRow, mesaIdSchema, POST(), requireMesaInOwnTenant()
+
+### Community 416 - "telegram-callbacks.test.ts"
+Cohesion: 0.36
+Nodes (7): Contexto, RUTAS_CALLBACK, ServiciosTelegram, crearContexto(), despachar(), repoFalso, rutaQueAtiende()
+
+### Community 417 - "Testing & CI"
+Cohesion: 0.29
+Nodes (7): CI (GitHub Actions), Contra qué corre el E2E (importante), Cómo agregar un test de regresión de seguridad nuevo, Git hooks (Husky), Los 5 tests que se saltan SIEMPRE, y por qué está bien, Suites de test, Testing & CI
+
+### Community 433 - "FichajeDialog.tsx"
+Cohesion: 0.38
+Nodes (5): FichajeDialog(), Props, RGPD_KEY(), TIPO_LABEL, TpvLoginForm()
+
+### Community 437 - "mesa-delete-item-overlay.test.ts"
+Cohesion: 0.33
+Nodes (6): applyPendingDeleteOverlay(), mergeKeyFor(), mergeOrderItems(), OrderItem, withoutPendingDelete(), withPendingDelete()
+
+### Community 438 - "get-menu.use-case.ts"
+Cohesion: 0.24
+Nodes (6): agruparComplementosPorProducto(), agruparPor(), GetMenuUseCase, indexarCategoriasComplemento(), IndiceComplementos, porOrden()
+
+### Community 442 - "numserieAeat"
+Cohesion: 0.67
+Nodes (4): numeroConCeros(), numserieAeat(), refTicketVisible(), urlValidacion()
+
+### Community 445 - "useMesaToken"
+Cohesion: 0.50
+Nodes (5): getStoredToken(), isTokenExpired(), storeToken(), TOKEN_KEY(), useMesaToken()
+
+### Community 453 - "route.ts"
+Cohesion: 0.67
+Nodes (3): cspReportSchema, POST(), sanitizeUri()
+
+### Community 532 - "SEO Multi-Tenant"
+Cohesion: 0.40
+Nodes (4): Archivos clave, Campos de BBDD usados, Features implementadas, SEO Multi-Tenant
+
+### Community 533 - "route.ts"
+Cohesion: 0.67
+Nodes (3): DELETE(), paramsSchema, cancelCustomTurnUseCase()
+
+### Community 543 - "usePagoDeMesa"
+Cohesion: 0.29
+Nodes (7): buildTotalMismatch(), getExpectedCents(), getStoredMismatch(), getStoredPaymentLock(), submitRedsysForm(), usePagoDeMesa(), VistaDeTurno()
+
 ## Knowledge Gaps
-- **2061 isolated node(s):** `husky.sh script`, `config`, `$schema`, `style`, `rsc` (+2056 more)
+- **2233 isolated node(s):** `husky.sh script`, `config`, `$schema`, `style`, `rsc` (+2228 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **161 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **203 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Result` connect `Result` to `pedido.use-case.ts`, `helpers.ts`, `SupabaseHoldRepository.ts`, `TgtgPromocion`, `tpv-catalog-ctx.tsx`, `ComplementoGrupo`, `tpv-types.ts`, `validationErrorResponse`, `types.ts`, `IClienteRepository`, `types.ts`, `Product`, `route.ts`, `logger.ts`, `handleResult`, `supabase-pedido.repository.ts`, `descuento.use-case.ts`, `analytics-types.ts`, `proxy.ts`, `supabase-empresa.repository.ts`, `cierre-report-view.tsx`, `supabase-mesa-client-token.repository.ts`, `supabase-empleado-tpv.repository.ts`, `Ingrediente`, `route.ts`, `valoracion.use-case.ts`, `SupabaseExportRepository.ts`, `promocion.use-case.ts`, `SupabaseReviewQueueRepository.ts`, `GenerarExport.usecase.ts`, `FichajeEvento`, `PerfilLaboral`, `getSupabaseClient`, `removeSessionItemUseCase.ts`, `processRedsysWebhookUseCase.ts`, `callbacks.ts`, `registerManualMesaPaymentUseCase.ts`, `AnalyticsPeriodParams`?**
-  _High betweenness centrality (0.088) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `dependencies` to `SupabaseExportRepository.ts`, `browser-printer.ts`, `package.json`?**
+- **Why does `Result` connect `Result` to `IPedidoRepository`, `ModalidadEntrega`, `supabase-mesa.repository.ts`, `ComplementoGrupo`, `tpv-types.ts`, `SupabaseChainRepository.ts`, `Category`, `IClienteRepository`, `types.ts`, `Product`, `handleResult`, `promocion.use-case.ts`, `supabase-client.ts`, `SupabaseAdminRepository.ts`, `getSupabaseClient`, `supabase-pedido.repository.ts`, `MenuVirtual`, `analytics-types.ts`, `TurnoCerrarForm.tsx`, `telegram.service.ts`, `proxy.ts`, `SupabasePedidoRepository`, `cierre-report-view.tsx`, `types.ts`, `supabase-mesa-client-token.repository.ts`, `Ingrediente`, `Pedido`, `SupabaseReviewQueueRepository.ts`, `valoracion.use-case.ts`, `PdfRenderer.ts`, `tabla-plantilla.use-case.ts`, `registerManualMesaPaymentUseCase.ts`, `SupabaseExportRepository.ts`, `supabase-empresa.repository.ts`, `PedidoUseCase`, `FichajeEvento`, `page.tsx`, `PerfilLaboral`, `removeSessionItemUseCase.ts`, `processRedsysWebhookUseCase.ts`, `AnalyticsPeriodParams`?**
+  _High betweenness centrality (0.098) - this node is a cross-community bridge._
+- **Why does `getSupabaseClient()` connect `getSupabaseClient` to `requireRole`, `Result`, `tpv-types.ts`, `validationErrorResponse`, `SupabaseChainRepository.ts`, `types.ts`, `getSupabaseAnonClient`, `route.ts`, `getEmpresaUseCase`, `handleResultWithStatus`, `getAuthAdminUseCase`, `route.ts`, `handleResult`, `supabase-client.ts`, `server-services.ts`, `route.ts`, `resolveAdminContextWithEmpresa`, `ErrorModule`, `getDomainFromHeaders`, `route.ts`, `analytics-types.ts`, `getMesaOrdersUseCase.ts`, `layout.tsx`, `proxy.ts`, `route.ts`, `waiter-auth.ts`, `cierre-report-view.tsx`, `processGlovoWebhookUseCase.ts`, `rate-limit.ts`, `route.ts`, `types.ts`, `Ingrediente`, `page.tsx`, `SupabaseReviewQueueRepository.ts`, `index.ts`, `PdfRenderer.ts`, `AnalyticsClient.tsx`, `route.ts`, `registerManualMesaPaymentUseCase.ts`, `SupabaseExportRepository.ts`, `route.ts`, `route.ts`, `FichajeEvento`, `page.tsx`, `PerfilLaboral`, `route.ts`, `removeSessionItemUseCase.ts`, `processRedsysWebhookUseCase.ts`?**
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `dependencies` to `next-themes`, `electron-store`, `autoprefixer`, `@vercel/speed-insights`, `@dnd-kit/core`, `recharts`, `bcryptjs`, `exceljs`, `@smithy/node-http-handler`, `@upstash/redis`, `@zxing/browser`, `@capacitor/android`, `@capacitor/preferences`, `class-variance-authority`, `clsx`, `@capacitor/core`, `@dnd-kit/utilities`, `electron-updater`, `jose`, `framer-motion`, `node-thermal-printer`, `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-label`, `@radix-ui/react-slot`, `@radix-ui/react-toast`, `react-dom`, `@react-pdf/renderer`, `@sentry/nextjs`, `@supabase/supabase-js`, `tailwind-merge`, `@upstash/ratelimit`, `uuid`, `next`, `@vercel/analytics`, `PdfRenderer.ts`, `@capacitor/push-notifications`, `@capacitor/app`, `package.json`, `browser-printer.ts`?**
   _High betweenness centrality (0.044) - this node is a cross-community bridge._
-- **Why does `react` connect `SupabaseExportRepository.ts` to `use-toast.ts`, `dependencies`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `t()` (e.g. with `InspectorPage()` and `MermasPage()`) actually correct?**
   _`t()` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `husky.sh script`, `config`, `$schema` to the rest of the system?**
-  _2061 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2233 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `fetchWithCsrf` be split into smaller, more focused modules?**
-  _Cohesion score 0.03853073463268366 - nodes in this community are weakly interconnected._
-- **Should `Result` be split into smaller, more focused modules?**
-  _Cohesion score 0.048494983277591976 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03499830105334693 - nodes in this community are weakly interconnected._
+- **Should `IPedidoRepository` be split into smaller, more focused modules?**
+  _Cohesion score 0.07142857142857142 - nodes in this community are weakly interconnected._

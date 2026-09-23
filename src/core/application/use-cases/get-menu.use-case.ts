@@ -1,10 +1,11 @@
 import type { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import type { ICategoryRepository } from "@/core/domain/repositories/ICategoryRepository";
 import type { IComplementoGrupoRepository } from '@/core/domain/repositories/IComplementoGrupoRepository';
+import type { IMenuVirtualRepository } from "@/core/domain/repositories/IMenuVirtualRepository";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
 import type { Category, Product } from "@/core/domain/entities/types";
 import type { ComplementoGrupo, ProductoComplementoAsignacion } from '@/core/domain/entities/complemento-types';
-import { MenuMapper } from "@/core/application/mappers/menu.mapper";
+import { MenuMapper, mapComplementoGrupoToGroupVM } from "@/core/application/mappers/menu.mapper";
 import { logger } from "@/core/infrastructure/logging/logger";
 
 /**
@@ -86,6 +87,7 @@ export class GetMenuUseCase {
     private readonly productRepo: IProductRepository,
     private readonly categoryRepo: ICategoryRepository,
     private readonly complementoRepo: IComplementoGrupoRepository,
+    private readonly menuVirtualRepo: IMenuVirtualRepository,
   ) {}
 
   /**
@@ -105,6 +107,53 @@ export class GetMenuUseCase {
 
     if (!asignaciones.success || !grupos.success) return new Map();
     return agruparComplementosPorProducto(asignaciones.data, grupos.data);
+  }
+
+  /**
+   * Menús virtuales (ver docs/superpowers/specs/2026-09-16-menus-virtuales-design.md).
+   * Best-effort: si cualquiera de las dos consultas falla, la carta se sirve
+   * igual sin menús virtuales — mismo criterio que cargarComplementos.
+   */
+  private async construirMenusVirtuales(
+    empresaId: string,
+    productos: Product[],
+    categoriasPorId: Map<string, Category>,
+    gruposPorProducto: Map<string, ComplementoGrupo[]>,
+  ): Promise<MenuCategoryVM[]> {
+    const [nodos, asignaciones] = await Promise.all([
+      this.menuVirtualRepo.findAllByTenant(empresaId),
+      this.menuVirtualRepo.findAsignacionesByTenant(empresaId),
+    ]);
+
+    if (!nodos.success || !asignaciones.success) return [];
+
+    const asignacionesPorNodo = agruparPor(asignaciones.data, a => a.menuVirtualId)
+      .entries();
+    const productoIdsPorNodo = new Map(
+      [...asignacionesPorNodo].map(([menuVirtualId, asigs]) => [menuVirtualId, asigs.map(a => a.productoId)])
+    );
+    const productosPorId = new Map(productos.map(p => [p.id, p]));
+    const padres = nodos.data.filter(m => !m.padreId).sort((a, b) => a.orden - b.orden);
+    const hijosPorPadre = agruparPor(
+      nodos.data.filter(m => m.padreId).sort((a, b) => a.orden - b.orden),
+      m => m.padreId!,
+    );
+
+    // toVirtualCategoryVM espera el tipo VIEW-MODEL (ComplementGroupVM), no el
+    // de dominio (ComplementoGrupo) — misma conversión que toCategoryVM hace
+    // internamente, reutilizando la función ahora exportada (Step 0).
+    const gruposVMPorProducto = new Map(
+      [...gruposPorProducto.entries()].map(([productoId, grupos]) => [productoId, grupos.map(mapComplementoGrupoToGroupVM)])
+    );
+
+    return padres.map(padre => MenuMapper.toVirtualCategoryVM(
+      padre,
+      hijosPorPadre.get(padre.id) ?? [],
+      productoIdsPorNodo,
+      productosPorId,
+      categoriasPorId,
+      gruposVMPorProducto,
+    ));
   }
 
   /**
@@ -135,7 +184,9 @@ export class GetMenuUseCase {
         productos.data,
       );
 
-      const principales = categorias.data.filter(c => !c.categoriaComplementoDe);
+      // Una categoría inactiva no se pinta en la carta pública, igual que un
+      // producto inactivo: mismo criterio, un nivel más arriba.
+      const principales = categorias.data.filter(c => !c.categoriaComplementoDe && c.activo);
       const padres = principales.filter(c => !c.categoriaPadreId).sort(porOrden);
       const subcategorias = agruparPor(
         principales.filter(c => c.categoriaPadreId).sort(porOrden),
@@ -156,9 +207,21 @@ export class GetMenuUseCase {
         gruposPorProducto,
       ));
 
+      const menuVirtualVMs = await this.construirMenusVirtuales(empresaId, productos.data, categoriasPorId, gruposPorProducto);
+
+      // Categorías reales y menús virtuales se intercalan por `orden` — el
+      // admin elige la posición relativa de ambos tipos de nodo desde sus
+      // respectivas pantallas, en vez de que los virtuales queden siempre al
+      // final. Sort estable (garantizado desde ES2019): a igual `orden`,
+      // las categorías reales mantienen su posición antes que las virtuales,
+      // que es el orden en que llegan en el spread.
+      const todasLasCategorias = [...menu, ...menuVirtualVMs].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
       // Una categoría sin nada que ofrecer no se pinta: dejaría un encabezado
-      // vacío en la carta del cliente.
-      return { data: menu.filter(categoria => categoria.items.length > 0) };
+      // vacío en la carta del cliente. Aplica igual a categorías reales y a
+      // menús virtuales — toVirtualCategoryVM puebla `items` con la unión de
+      // sus hojas justo para que este mismo filtro los alcance.
+      return { data: todasLasCategorias.filter(categoria => categoria.items.length > 0) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'GetMenuUseCase.execute', { empresaId });
       return { error: appError.message };

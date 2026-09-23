@@ -27,6 +27,7 @@ import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { AllergenIcon, ALLERGEN_KEYS, ALLERGEN_TRANSLATION_KEY } from '@/components/allergen-icons';
 import type { AllergenKey } from '@/components/allergen-icons';
+import { ProductTablaEditor, type ProductoTablaForm } from '@/components/admin/ProductTablaEditor';
 
 interface Categoria {
   id: string;
@@ -49,6 +50,7 @@ interface ProductoFormData {
   descripcion_de: string;
   precio: string;
   foto_url: string;
+  foto_url_2: string;
   foto_object_fit: ImageFit;
   categoria_id: string;
   es_especial: boolean;
@@ -56,6 +58,7 @@ interface ProductoFormData {
   tipo_producto: 'comida' | 'bebida';
   porcentajeImpuestoOverride: number | null;
   alergenos: string[];
+  tabla_info: ProductoTablaForm;
 }
 
 interface ProductComplementosSectionProps {
@@ -286,6 +289,7 @@ interface ProductFormDialogProps {
   saving: boolean;
   onSubmit: (e: React.SyntheticEvent) => void;
   empresaTipo?: 'restaurante' | 'tienda' | null;
+  empresaId: string;
 }
 
 export function ProductFormDialog({
@@ -300,6 +304,7 @@ export function ProductFormDialog({
   saving,
   onSubmit,
   empresaTipo,
+  empresaId,
 }: Readonly<ProductFormDialogProps>) {
   const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
@@ -418,6 +423,19 @@ export function ProductFormDialog({
               />
             </div>
 
+            {empresaTipo === 'tienda' && (
+              <div className="col-span-2">
+                <ImageUploader
+                  value={formData.foto_url_2}
+                  onChange={(url) => onFormChange({ ...formData, foto_url_2: url })}
+                  objectFit={formData.foto_object_fit}
+                  onObjectFitChange={(fit) => onFormChange({ ...formData, foto_object_fit: fit })}
+                  label={t("productImage2", language)}
+                  helpText={t("productImage2Help", language)}
+                />
+              </div>
+            )}
+
             <div className="col-span-2">
               <button
                 type="button"
@@ -498,6 +516,15 @@ export function ProductFormDialog({
               />
             </div>
           )}
+
+          <div className="col-span-2 pt-2 border-t border-border">
+            <ProductTablaEditor
+              value={formData.tabla_info}
+              onChange={(tabla_info) => onFormChange({ ...formData, tabla_info })}
+              showTranslations={showTranslations}
+              empresaId={empresaId}
+            />
+          </div>
 
           {editingId !== null && (
             <div className="col-span-2 pt-2 border-t border-border">

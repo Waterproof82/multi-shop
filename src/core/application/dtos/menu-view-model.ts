@@ -1,5 +1,18 @@
 type TranslationEntry = { name: string; description?: string };
 
+export interface TablaCeldaVM {
+  es: string;
+  en?: string;
+  fr?: string;
+  it?: string;
+  de?: string;
+}
+
+export interface ProductoTablaVM {
+  columnas: TablaCeldaVM[];
+  filas: TablaCeldaVM[][];
+}
+
 export interface ComplementVM {
   id: string;
   name: string;
@@ -36,6 +49,7 @@ export interface MenuItemVM {
   price: number;
   category: string;
   image?: string;
+  image2?: string;
   imageFit?: ImageFit;
   highlight?: boolean;
   tipoProducto?: 'comida' | 'bebida';
@@ -49,6 +63,7 @@ export interface MenuItemVM {
   requiresComplement?: boolean;
   complementGroups?: ComplementGroupVM[];
   alergenos?: string[];
+  table?: ProductoTablaVM;
 }
 
 export interface MenuSubcategoryVM {
@@ -73,6 +88,7 @@ export interface MenuSubcategoryVM {
 export interface MenuCategoryVM {
   id: string;
   label: string;
+  orden?: number;
   descripcion?: string;
   tipoProducto?: 'comida' | 'bebida';
   items: MenuItemVM[];

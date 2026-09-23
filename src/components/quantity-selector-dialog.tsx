@@ -15,12 +15,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RippleButton } from "@/components/ui/ripple-button"
-import { ImagenSubida } from "@/components/ui/imagen-subida"
+import { ProductImageGallery } from "@/components/product-image-gallery"
+import { ImageZoomDialog } from "@/components/image-zoom-dialog"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
-import type { MenuItemVM, ComplementGroupVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
+import type { MenuItemVM, ComplementGroupVM, ComplementVM, ProductoTablaVM, TablaCeldaVM } from "@/core/application/dtos/menu-view-model"
 import { AllergenList } from "@/components/allergen-icons"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
@@ -37,34 +38,72 @@ function resolveDescription(item: MenuItemVM, language: string): string | undefi
   return item.description;
 }
 
-/**
- * Imagen (o video) de cabecera del dialogo. Los productos con `.mp4` en
- * `image` (mismo campo que usan las tarjetas del catalogo) no tienen un
- * fotograma fijo utilizable como imagen: se reproducen igual que en
- * `menu-section.tsx` en vez de mostrarse rotos.
- */
-function DialogMedia({ item, alt }: Readonly<{ item: MenuItemVM; alt: string }>) {
-  if (item.image?.endsWith('.mp4')) {
-    return (
-      <video
-        src={item.image}
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="h-full w-full object-cover"
-        aria-label={alt}
-      />
-    );
-  }
+function resolveCelda(celda: TablaCeldaVM, language: string): string {
+  const lang = asLanguageKey(language);
+  if (lang && celda[lang]) return celda[lang];
+  return celda.es;
+}
+
+function filaKey(fila: TablaCeldaVM[]): string {
+  return fila.map(celda => celda.es).join('|');
+}
+
+function zipCeldaConColumna(fila: TablaCeldaVM[], columnas: TablaCeldaVM[]): { celda: TablaCeldaVM; columnaKey: string }[] {
+  return fila.map((celda, idx) => ({ celda, columnaKey: columnas[idx]?.es ?? celda.es }));
+}
+
+function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; language: string }>) {
   return (
-    <ImagenSubida
-      src={item.image!}
-      alt={alt}
-      fill
-      sizes="100vw"
-      className={`object-${item.imageFit || 'cover'}`}
-      loading="eager"
+    <div className="rounded-xl border border-border overflow-hidden shadow-xs">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-primary/10">
+              {table.columnas.map((columna) => (
+                <th
+                  key={columna.es}
+                  scope="col"
+                  className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-primary"
+                >
+                  {resolveCelda(columna, language)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {table.filas.map((fila, r) => (
+              <tr key={filaKey(fila)} className={r % 2 === 1 ? 'bg-muted/30' : undefined}>
+                {zipCeldaConColumna(fila, table.columnas).map(({ celda, columnaKey }) => (
+                  <td key={columnaKey} className="px-3 py-2 text-foreground">
+                    {resolveCelda(celda, language)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Video de cabecera del dialogo para productos con `.mp4` en `image` (mismo
+ * campo que usan las tarjetas del catalogo): no tienen un fotograma fijo
+ * utilizable como imagen, así que se reproducen igual que en
+ * `menu-section.tsx` en vez de mostrarse rotos. El slot de segunda imagen
+ * (`image2`) no aplica a video.
+ */
+function DialogVideo({ src, alt }: Readonly<{ src: string; alt: string }>) {
+  return (
+    <video
+      src={src}
+      autoPlay
+      loop
+      muted
+      playsInline
+      className="h-full w-full object-cover"
+      aria-label={alt}
     />
   );
 }
@@ -133,6 +172,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [selectedPase, setSelectedPase] = useState<PaseKey | null>(null)
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
+  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
   const { language } = useLanguage()
   const { addItem } = useCart()
 
@@ -146,6 +187,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       setSelectedPase(null);
       setNote('');
       setShowNote(false);
+      setIsImageZoomOpen(false);
+      setActiveImageIndex(0);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item?.id]);
@@ -214,10 +257,33 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-screen h-dvh overflow-hidden max-w-none sm:max-w-none rounded-none border-0 shadow-none flex flex-col p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-        {item.image && (
+        {item.image?.endsWith('.mp4') && (
           <div className="relative h-40 sm:h-48 w-full shrink-0 overflow-hidden bg-muted">
-            <DialogMedia item={item} alt={displayName} />
+            <DialogVideo src={item.image} alt={displayName} />
           </div>
+        )}
+        {item.image && !item.image.endsWith('.mp4') && (
+          <div className="shrink-0 bg-muted">
+            <ProductImageGallery
+              images={item.image2 ? [item.image, item.image2] : [item.image]}
+              alt={displayName}
+              objectFit={item.imageFit}
+              mainImageClassName="relative h-40 sm:h-48 w-full overflow-hidden"
+              sizes="100vw"
+              onImageClick={() => setIsImageZoomOpen(true)}
+              onIndexChange={setActiveImageIndex}
+            />
+          </div>
+        )}
+        {item.image && !item.image.endsWith('.mp4') && (
+          <ImageZoomDialog
+            open={isImageZoomOpen}
+            onOpenChange={setIsImageZoomOpen}
+            images={item.image2 ? [item.image, item.image2] : [item.image]}
+            alt={displayName}
+            objectFit={item.imageFit}
+            initialIndex={activeImageIndex}
+          />
         )}
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
           <DialogTitle>{displayName}</DialogTitle>
@@ -304,6 +370,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           )}
 
           <AllergenList alergenos={item.alergenos} language={language} />
+
+          {item.table && <ProductTable table={item.table} language={language} />}
 
           <div className="space-y-3">
           <div className="space-y-2">

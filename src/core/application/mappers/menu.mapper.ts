@@ -1,5 +1,5 @@
-import type { Product, Category } from "@/core/domain/entities/types";
-import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM, ComplementGroupVM } from "@/core/application/dtos/menu-view-model";
+import type { Product, Category, ProductoTabla, TablaCelda, MenuVirtual } from "@/core/domain/entities/types";
+import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM, ComplementGroupVM, ProductoTablaVM, TablaCeldaVM } from "@/core/application/dtos/menu-view-model";
 import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
 
 type TranslationMap = MenuItemVM["translations"];
@@ -32,6 +32,33 @@ function mapProductTranslations(p: Product): TranslationMap {
   };
 }
 
+function mapNameOnlyTranslations(t?: { en?: string; fr?: string; it?: string; de?: string }): TranslationMap {
+  if (!t) return {};
+  return {
+    en: t.en ? { name: t.en } : undefined,
+    fr: t.fr ? { name: t.fr } : undefined,
+    it: t.it ? { name: t.it } : undefined,
+    de: t.de ? { name: t.de } : undefined,
+  };
+}
+
+function mapTablaCelda(celda: TablaCelda): TablaCeldaVM {
+  return {
+    es: celda.es,
+    en: celda.en || undefined,
+    fr: celda.fr || undefined,
+    it: celda.it || undefined,
+    de: celda.de || undefined,
+  };
+}
+
+function mapTabla(tabla: ProductoTabla): ProductoTablaVM {
+  return {
+    columnas: tabla.columnas.map(mapTablaCelda),
+    filas: tabla.filas.map((fila) => fila.map(mapTablaCelda)),
+  };
+}
+
 function mapComplementProduct(c: Product): ComplementVM {
   return {
     id: c.id,
@@ -50,15 +77,17 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
     price: product.precio,
     category: categoryName.toLowerCase().replaceAll(" ", "-"),
     image: product.fotoUrl || undefined,
+    image2: product.fotoUrl2 || undefined,
     imageFit: product.fotoObjectFit || undefined,
     highlight: product.esEspecial,
     tipoProducto: product.tipoProducto,
     translations: mapProductTranslations(product),
     alergenos: product.alergenos ?? [],
+    table: product.tabla && product.tabla.columnas.length > 0 ? mapTabla(product.tabla) : undefined,
   };
 }
 
-function mapComplementoGrupoToGroupVM(grupo: ComplementoGrupo): ComplementGroupVM {
+export function mapComplementoGrupoToGroupVM(grupo: ComplementoGrupo): ComplementGroupVM {
   return {
     id: grupo.id,
     name: grupo.nombre_es,
@@ -121,6 +150,7 @@ export class MenuMapper {
     return {
       id: `category-${parentCat.id}`,
       label: parentCat.nombre ?? "Unnamed Category",
+      orden: parentCat.orden,
       descripcion: parentCat.descripcion || undefined,
       tipoProducto: parentCat.tipoProducto,
       translations: mapCategoryTranslations(parentCat),
@@ -149,6 +179,70 @@ export class MenuMapper {
           complementGroups: complementoGruposByProductId?.get(p.id)?.map(mapComplementoGrupoToGroupVM),
         };
       }),
+    };
+  }
+
+  static toVirtualSubcategoryVM(
+    nodo: MenuVirtual,
+    productoIds: string[],
+    productosPorId: Map<string, Product>,
+    categoriasPorId: Map<string, Category>,
+    complementoGruposByProductId?: Map<string, ComplementGroupVM[]>,
+  ): MenuSubcategoryVM {
+    const productos = productoIds
+      .map((id) => productosPorId.get(id))
+      .filter((p): p is Product => p !== undefined && p.activo)
+      .map((p) => {
+        const categoriaReal = p.categoriaId ? categoriasPorId.get(p.categoriaId) : undefined;
+        const item = mapProductToItem(p, categoriaReal?.nombre ?? "uncategorized");
+        return {
+          ...item,
+          complementGroups: complementoGruposByProductId?.get(p.id),
+        };
+      });
+
+    return {
+      id: nodo.id,
+      nombre: nodo.nombre,
+      translations: mapNameOnlyTranslations(nodo.translations),
+      products: productos,
+    };
+  }
+
+  static toVirtualCategoryVM(
+    padre: MenuVirtual,
+    hijos: MenuVirtual[],
+    asignacionesPorNodo: Map<string, string[]>,
+    productosPorId: Map<string, Product>,
+    categoriasPorId: Map<string, Category>,
+    complementoGruposByProductId?: Map<string, ComplementGroupVM[]>,
+  ): MenuCategoryVM {
+    const subcategories = hijos.map((hijo) =>
+      MenuMapper.toVirtualSubcategoryVM(hijo, asignacionesPorNodo.get(hijo.id) ?? [], productosPorId, categoriasPorId, complementoGruposByProductId)
+    );
+
+    // items = unión de todos los hijos, con duplicados posibles si un producto
+    // está en más de una hoja — mismo criterio que combinedProducts en
+    // toCategoryVM. Necesario porque el filtro final de GetMenuUseCase.execute
+    // solo mira `items.length`, no `subcategories`.
+    const items = subcategories.flatMap((s) => s.products);
+
+    // Igual que las categorías reales: si TODOS los items son bebida, el menú
+    // virtual cuenta como bebida para el split de pestañas del restaurante
+    // (getCategoryTab en client-menu-page.tsx). Mixto o vacío → undefined, que
+    // ya cae en "comida" por el fallback `cat.tipoProducto ?? 'comida'` existente.
+    const tipoProducto = items.length > 0 && items.every((item) => item.tipoProducto === 'bebida')
+      ? 'bebida' as const
+      : undefined;
+
+    return {
+      id: padre.id,
+      label: padre.nombre,
+      orden: padre.orden,
+      tipoProducto,
+      translations: mapNameOnlyTranslations(padre.translations),
+      subcategories: subcategories.length > 0 ? subcategories : undefined,
+      items,
     };
   }
 }

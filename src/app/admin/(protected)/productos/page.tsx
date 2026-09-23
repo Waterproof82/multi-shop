@@ -19,9 +19,12 @@ import { t } from '@/lib/translations';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import { emptyTablaForm, tablaFormFromApi, tablaFormToApi } from '@/components/admin/ProductTablaEditor';
 import type { ImageFit } from '@/core/application/dtos/menu-view-model';
+import type { ProductoTabla } from '@/core/domain/entities/types';
 import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/format-price';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface Categoria {
   id: string;
@@ -44,6 +47,7 @@ interface Producto {
   descripcion_de: string | null;
   precio: number;
   foto_url: string | null;
+  foto_url_2: string | null;
   foto_object_fit: ImageFit | null;
   categoria_id: string | null;
   es_especial: boolean;
@@ -51,6 +55,7 @@ interface Producto {
   tipo_producto: 'comida' | 'bebida';
   porcentaje_impuesto_override: number | null;
   alergenos: string[];
+  tabla_info: ProductoTabla | null;
 }
 
 const emptyForm: ProductoFormData = {
@@ -66,6 +71,7 @@ const emptyForm: ProductoFormData = {
   descripcion_de: '',
   precio: '',
   foto_url: '',
+  foto_url_2: '',
   foto_object_fit: 'contain',
   categoria_id: '',
   es_especial: false,
@@ -73,6 +79,7 @@ const emptyForm: ProductoFormData = {
   tipo_producto: 'comida',
   porcentajeImpuestoOverride: null,
   alergenos: [],
+  tabla_info: emptyTablaForm(),
 };
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
@@ -101,6 +108,10 @@ export default function ProductosPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showTranslations, setShowTranslations] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; nombre: string | null }>({ show: false, id: null, nombre: null });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [menusVirtuales, setMenusVirtuales] = useState<{ id: string; padreId: string | null; nombre: string }[]>([]);
+  const [showAsignarPicker, setShowAsignarPicker] = useState(false);
+  const [asignando, setAsignando] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -137,6 +148,16 @@ export default function ProductosPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    void fetchWithCsrf(`/api/admin/menus-virtuales?empresaId=${effectiveEmpresaId}`, {}, {
+      maxRetries: 3,
+      baseDelay: 1000,
+      retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+    })
+      .then(res => res.ok ? res.json() : [])
+      .then((data: { id: string; padreId: string | null; nombre: string }[]) => setMenusVirtuales(data));
+  }, [effectiveEmpresaId]);
+
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     setSaving(true);
@@ -163,8 +184,10 @@ export default function ProductosPage() {
         descripcion_it: formData.descripcion_it || null,
         descripcion_de: formData.descripcion_de || null,
         foto_url: formData.foto_url || null,
+        foto_url_2: formData.foto_url_2 || null,
         foto_object_fit: formData.foto_object_fit || 'contain',
         porcentaje_impuesto_override: formData.porcentajeImpuestoOverride ?? null,
+        tabla_info: tablaFormToApi(formData.tabla_info),
       };
 
       const res = await fetchWithCsrf(url, {
@@ -206,6 +229,7 @@ export default function ProductosPage() {
       descripcion_de: producto.descripcion_de || '',
       precio: producto.precio.toString(),
       foto_url: producto.foto_url || '',
+      foto_url_2: producto.foto_url_2 || '',
       foto_object_fit: producto.foto_object_fit || 'contain',
       categoria_id: producto.categoria_id || '',
       es_especial: producto.es_especial,
@@ -213,6 +237,7 @@ export default function ProductosPage() {
       tipo_producto: producto.tipo_producto ?? 'comida',
       porcentajeImpuestoOverride: producto.porcentaje_impuesto_override ?? null,
       alergenos: producto.alergenos ?? [],
+      tabla_info: tablaFormFromApi(producto.tabla_info),
     });
     setEditingId(producto.id);
     setIsModalOpen(true);
@@ -347,6 +372,54 @@ export default function ProductosPage() {
     }), // eslint-disable-next-line react-hooks/exhaustive-deps -- Helper functions defined inline, stable references
     [productos, searchTerm, sortField, sortDirection, categorias]);
 
+  const nodosHoja = useMemo(() => {
+    const hijosDe = (id: string) => menusVirtuales.filter(m => m.padreId === id);
+    return menusVirtuales
+      .filter(m => hijosDe(m.id).length === 0)
+      .map(m => {
+        const padre = m.padreId ? menusVirtuales.find(p => p.id === m.padreId) : null;
+        return { id: m.id, label: padre ? `${padre.nombre} › ${m.nombre}` : m.nombre };
+      });
+  }, [menusVirtuales]);
+
+  const todosVisiblesSeleccionados = filteredProductos.length > 0 && filteredProductos.every(p => selectedIds.has(p.id));
+
+  function toggleSeleccion(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSeleccionarTodos() {
+    setSelectedIds(prev => {
+      const todosSeleccionados = filteredProductos.length > 0 && filteredProductos.every(p => prev.has(p.id));
+      return todosSeleccionados ? new Set() : new Set(filteredProductos.map(p => p.id));
+    });
+  }
+
+  async function handleAsignar(nodoId: string) {
+    setAsignando(true);
+    setError('');
+    try {
+      const res = await fetchWithCsrf(`/api/admin/menus-virtuales/${nodoId}/productos?empresaId=${effectiveEmpresaId}`, {
+        method: 'POST',
+        body: JSON.stringify({ productoIds: [...selectedIds] }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || t('menuVirtualAsignarError', language));
+      }
+      setSelectedIds(new Set());
+      setShowAsignarPicker(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("unknownError", language));
+    } finally {
+      setAsignando(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -425,6 +498,22 @@ export default function ProductosPage() {
         </Button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-4 backdrop-blur-xl bg-primary/10 border border-primary/20 rounded-xl px-4 py-3">
+          <span className="text-sm text-foreground">
+            {selectedIds.size} {t('menuVirtualProductosSeleccionadosSufijo', language)}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setShowAsignarPicker(true)}
+            disabled={nodosHoja.length === 0}
+            title={nodosHoja.length === 0 ? t('menuVirtualSinNodos', language) : undefined}
+          >
+            {t('menuVirtualAsignarAMenu', language)}
+          </Button>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 text-red-300 rounded-md">
           {error}
@@ -443,6 +532,15 @@ export default function ProductosPage() {
           <table className="min-w-full divide-y divide-white/10">
             <thead className="bg-white/5 border-b border-white/10">
               <tr>
+                <th scope="col" className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    aria-label={t("selectAll", language)}
+                    checked={todosVisiblesSeleccionados}
+                    onChange={toggleSeleccionarTodos}
+                    className="w-4 h-4 accent-primary shrink-0"
+                  />
+                </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("image", language)}
                 </th>
@@ -495,6 +593,15 @@ export default function ProductosPage() {
             <tbody className="bg-card divide-y divide-border">
               {filteredProductos.map((prod) => (
                 <tr key={prod.id} className="hover:bg-muted/50">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      aria-label={`${t("select", language)} ${prod.titulo_es}`}
+                      checked={selectedIds.has(prod.id)}
+                      onChange={() => toggleSeleccion(prod.id)}
+                      className="w-4 h-4 accent-primary shrink-0"
+                    />
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {(() => {
                       if (isValidImageUrl(prod.foto_url)) {
@@ -595,7 +702,7 @@ export default function ProductosPage() {
               ))}
               {filteredProductos.length === 0 && (
                 <tr>
-                  <td colSpan={6} aria-live="polite" className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} aria-live="polite" className="px-6 py-8 text-center text-muted-foreground">
                     {searchTerm ? t("noProductsFound", language) : t("noProductsYet", language)}
                   </td>
                 </tr>
@@ -609,6 +716,15 @@ export default function ProductosPage() {
           {filteredProductos.map((prod) => (
             <div key={prod.id} className="p-4 hover:bg-muted/50">
               <div className="flex gap-3">
+                  <div className="flex-shrink-0 flex items-start pt-1">
+                    <input
+                      type="checkbox"
+                      aria-label={`${t("select", language)} ${prod.titulo_es}`}
+                      checked={selectedIds.has(prod.id)}
+                      onChange={() => toggleSeleccion(prod.id)}
+                      className="w-4 h-4 accent-primary shrink-0"
+                    />
+                  </div>
                   <div className="flex-shrink-0">
                     {(() => {
                       if (isValidImageUrl(prod.foto_url)) {
@@ -707,6 +823,7 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaTipo={empresaTipo}
+        empresaId={effectiveEmpresaId}
       />
 
       <DeleteConfirmDialog
@@ -715,6 +832,30 @@ export default function ProductosPage() {
         productName={deleteConfirm.nombre}
         onConfirm={confirmDeleteProduct}
       />
+
+      <Dialog open={showAsignarPicker} onOpenChange={setShowAsignarPicker}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('menuVirtualElegirNodo', language)}</DialogTitle>
+            <DialogDescription>
+              {selectedIds.size} {t('menuVirtualProductosSeleccionadosSufijo', language)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 max-h-80 overflow-y-auto">
+            {nodosHoja.map(nodo => (
+              <button
+                key={nodo.id}
+                type="button"
+                disabled={asignando}
+                onClick={() => handleAsignar(nodo.id)}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted/50 disabled:opacity-50"
+              >
+                {nodo.label}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

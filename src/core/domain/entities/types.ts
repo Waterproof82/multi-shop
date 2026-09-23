@@ -1,5 +1,26 @@
 export type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
 
+export interface TablaCelda {
+  es: string;
+  en?: string | null;
+  fr?: string | null;
+  it?: string | null;
+  de?: string | null;
+}
+
+export interface ProductoTabla {
+  columnas: TablaCelda[];
+  filas: TablaCelda[][];
+}
+
+export interface TablaPlantilla {
+  id: string;
+  empresaId: string;
+  nombre: string;
+  columnas: TablaCelda[];
+  createdAt: Date;
+}
+
 export interface Product {
   id: string;
   empresaId: string;
@@ -16,6 +37,7 @@ export interface Product {
   descripcion_de: string | null;
   precio: number;
   fotoUrl: string | null;
+  fotoUrl2: string | null;
   fotoObjectFit: ImageFit | null;
   esEspecial: boolean;
   activo: boolean;
@@ -23,6 +45,7 @@ export interface Product {
   createdAt: Date;
   porcentajeImpuestoOverride?: number | null;
   alergenos: string[];
+  tabla: ProductoTabla | null;
 }
 
 export interface Category {
@@ -35,6 +58,7 @@ export interface Category {
   categoriaComplementoDe: string | null;
   complementoObligatorio: boolean;
   categoriaPadreId: string | null;
+  activo: boolean;
   translations?: {
     en?: string;
     fr?: string;
@@ -47,6 +71,20 @@ export interface Category {
     it?: string;
     de?: string;
   };
+}
+
+export interface MenuVirtual {
+  id: string;
+  empresaId: string;
+  padreId: string | null;
+  nombre: string;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  orden: number;
 }
 
 export interface EmpresaColores {
