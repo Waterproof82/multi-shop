@@ -36,6 +36,7 @@ interface SortableSlideProps {
 }
 
 function SortableSlide({ url, onRemove, onReplace }: Readonly<SortableSlideProps>) {
+  const { language } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: url });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -50,7 +51,7 @@ function SortableSlide({ url, onRemove, onReplace }: Readonly<SortableSlideProps
         {...attributes}
         {...listeners}
         className="absolute top-1 left-1 z-10 p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/90 backdrop-blur-sm rounded-full shadow-elegant cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="Reordenar imagen"
+        aria-label={t('bannerSliderReorder', language)}
       >
         <GripVertical className="w-4 h-4" />
       </button>
