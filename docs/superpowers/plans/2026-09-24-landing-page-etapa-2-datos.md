@@ -56,7 +56,7 @@ CREATE TABLE public.empresa_landing_secciones (
   tipo TEXT NOT NULL CHECK (tipo IN ('hero','nosotros','cta_carta','testimonio','galeria','visitanos')),
   activo BOOLEAN NOT NULL DEFAULT false,
   orden INTEGER NOT NULL DEFAULT 0,
-  contenido JSONB NOT NULL DEFAULT '{}'::jsonb,
+  contenido JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(contenido) = 'object'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (empresa_id, tipo)
 );
