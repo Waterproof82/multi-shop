@@ -470,6 +470,8 @@ export default function LandingAdminPage() {
         ...prev,
         [tipoActivo]: { activo: updated.activo, orden: updated.orden, contenido: updated.contenido },
       }));
+    } catch {
+      setError(t("landingSeccionGuardarError", language));
     } finally {
       setSaving(false);
     }
@@ -570,8 +572,11 @@ export default function LandingAdminPage() {
           <button
             key={tipo}
             type="button"
-            onClick={() => setTipoActivo(tipo)}
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+            onClick={() => {
+              setTipoActivo(tipo);
+              setError("");
+            }}
+            className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
               tipoActivo === tipo ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"
             }`}
           >
