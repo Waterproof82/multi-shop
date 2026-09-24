@@ -365,6 +365,7 @@ Este mapa debe corresponder EXACTAMENTE, campo por campo, a los schemas Zod de `
 import { useState, useEffect } from "react";
 import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useLanguage } from "@/lib/language-context";
@@ -509,12 +510,11 @@ export default function LandingAdminPage() {
           <label className="block text-sm font-medium text-foreground" htmlFor={fieldId}>
             {campo.label}
           </label>
-          <input
+          <Input
             id={fieldId}
             type="text"
             value={(valor as string | null | undefined) ?? ""}
             onChange={(e) => actualizarCampo(campo.key, e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
       );
@@ -601,14 +601,14 @@ export default function LandingAdminPage() {
           <label className="text-sm text-muted-foreground" htmlFor="landing-seccion-orden">
             {t("orderLabel", language)}
           </label>
-          <input
+          <Input
             id="landing-seccion-orden"
             type="number"
             min={0}
             max={100}
             value={seccionActual.orden}
             onChange={(e) => actualizarOrden(Number.parseInt(e.target.value, 10) || 0)}
-            className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm"
+            className="w-20"
           />
         </div>
       </div>
