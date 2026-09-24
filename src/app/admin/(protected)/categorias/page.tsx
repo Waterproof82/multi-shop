@@ -87,6 +87,29 @@ type TopLevelNode =
   | { kind: 'categoria'; id: string; orden: number; categoria: Category }
   | { kind: 'menu_virtual'; id: string; orden: number; menu: MenuVirtualAdmin };
 
+// Los menús virtuales no tienen columna `activo` — no existe el concepto de
+// "menú virtual inactivo", así que siempre cuentan como activos a efectos
+// de este orden.
+function esNodoActivo(nodo: TopLevelNode): boolean {
+  return nodo.kind === 'menu_virtual' || nodo.categoria.activo;
+}
+
+// Inactivos siempre al final: si no, arrastrar una categoría activa
+// reindexa por posición visual TODA la lista (incluidas las inactivas
+// intercaladas), y el orden que el admin ve para las inactivas cambia
+// aunque nunca las haya tocado.
+function compararTopLevelNodes(a: TopLevelNode, b: TopLevelNode): number {
+  const aActivo = esNodoActivo(a);
+  const bActivo = esNodoActivo(b);
+  if (aActivo !== bActivo) return aActivo ? -1 : 1;
+  return a.orden - b.orden;
+}
+
+function compararCategoriasPorActivoYOrden(a: Category, b: Category): number {
+  if (a.activo !== b.activo) return a.activo ? -1 : 1;
+  return a.orden - b.orden;
+}
+
 const emptyForm: CategoryFormData = {
   nombre_es: '',
   nombre_en: '',
@@ -590,11 +613,11 @@ export default function CategoriasPage() {
     const nodosMenu: TopLevelNode[] = menusVirtuales
       .filter((m) => !m.padreId)
       .map((menu) => ({ kind: 'menu_virtual' as const, id: menu.id, orden: menu.orden, menu }));
-    return [...nodosCategoria, ...nodosMenu].sort((a, b) => a.orden - b.orden);
+    return [...nodosCategoria, ...nodosMenu].sort(compararTopLevelNodes);
   }, [categorias, menusVirtuales]);
 
   const hijosDe = useCallback(
-    (padreId: string) => categorias.filter((c) => c.categoria_padre_id === padreId).sort((a, b) => a.orden - b.orden),
+    (padreId: string) => categorias.filter((c) => c.categoria_padre_id === padreId).sort(compararCategoriasPorActivoYOrden),
     [categorias]
   );
 

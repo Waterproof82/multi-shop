@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ImagenSubida as Image } from './ui/imagen-subida';
 import { useLanguage } from '@/lib/language-context';
@@ -22,6 +22,20 @@ function previousIndex(current: number, total: number): number {
   return (current - 1 + total) % total;
 }
 
+// Direccion mas corta (por el camino circular) entre dos indices, para que
+// saltar de dot en dot deslice hacia el lado visualmente mas cercano.
+function directionTo(from: number, to: number, total: number): 1 | -1 {
+  const forward = (to - from + total) % total;
+  const backward = (from - to + total) % total;
+  return forward <= backward ? 1 : -1;
+}
+
+const slideVariants = {
+  enter: (direction: 1 | -1) => ({ x: direction > 0 ? '100%' : '-100%' }),
+  center: { x: 0 },
+  exit: (direction: 1 | -1) => ({ x: direction > 0 ? '-100%' : '100%' }),
+};
+
 // Chequeo directo via matchMedia en vez de framer-motion's useReducedMotion():
 // ese hook cachea el resultado a nivel de modulo (initPrefersReducedMotion
 // corre una sola vez por proceso), asi que no reacciona a un cambio real del
@@ -35,12 +49,14 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
   const { language } = useLanguage();
   const shouldReduceMotion = prefersReducedMotion();
   const [index, setIndex] = useState(0);
+  const [direction, setDirection] = useState<1 | -1>(1);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (shouldReduceMotion || paused || slides.length <= 1) return;
     timerRef.current = setInterval(() => {
+      setDirection(1);
       setIndex((current) => nextIndex(current, slides.length));
     }, AUTOPLAY_MS);
     return () => {
@@ -52,6 +68,11 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
 
   const altText = `${t('bannerSliderAlt', language)} ${empresaNombre}`;
 
+  function goTo(next: number) {
+    setDirection(directionTo(index, next, slides.length));
+    setIndex(next);
+  }
+
   return (
     <div
       data-testid="slider-banner-root"
@@ -61,31 +82,34 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      {slides.map((url, i) => (
+      <AnimatePresence initial={false} custom={direction}>
         <motion.div
-          key={url}
+          key={index}
+          custom={direction}
+          variants={slideVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: shouldReduceMotion ? 0 : 0.5, ease: 'easeInOut' }}
           className="absolute inset-0"
-          initial={false}
-          animate={{ opacity: i === index ? 1 : 0 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
         >
           <Image
-            src={url}
+            src={slides[index]}
             alt={altText}
             fill
             className="object-cover"
             sizes="100vw"
-            priority={i === 0}
-            loading={i === 0 ? 'eager' : 'lazy'}
+            priority={index === 0}
+            loading={index === 0 ? 'eager' : 'lazy'}
           />
         </motion.div>
-      ))}
+      </AnimatePresence>
 
       {slides.length > 1 && (
         <>
           <button
             type="button"
-            onClick={() => setIndex(previousIndex(index, slides.length))}
+            onClick={() => goTo(previousIndex(index, slides.length))}
             className="absolute left-2 top-1/2 -translate-y-1/2 z-10 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/70 backdrop-blur-sm rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors hover:bg-card/90"
             aria-label={t('bannerSliderPrevious', language)}
           >
@@ -93,7 +117,7 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
           </button>
           <button
             type="button"
-            onClick={() => setIndex(nextIndex(index, slides.length))}
+            onClick={() => goTo(nextIndex(index, slides.length))}
             className="absolute right-2 top-1/2 -translate-y-1/2 z-10 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/70 backdrop-blur-sm rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors hover:bg-card/90"
             aria-label={t('bannerSliderNext', language)}
           >
@@ -104,7 +128,7 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
               <button
                 key={url}
                 type="button"
-                onClick={() => setIndex(i)}
+                onClick={() => goTo(i)}
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label={`${t('bannerSliderGoTo', language)} ${i + 1}`}
               >

@@ -8,6 +8,7 @@ import { t } from "@/lib/translations"
 import { subcategoriasConProductos, tieneSubcategoriasConProductos } from "@/lib/menu/subcategorias"
 import { transformOriginFromClick } from "@/lib/menu/transform-origin"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { LayoutGrid } from "lucide-react"
 
 interface CategoryNavProps {
   categories: MenuCategoryVM[]
@@ -238,16 +239,16 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
             <>
               <DialogHeader>
                 <DialogTitle>{catLabel(activeDialogCategory)}</DialogTitle>
-                <DialogDescription>{t("chooseSubcategory", language)}</DialogDescription>
+                <DialogDescription className="sr-only">{t("chooseSubcategory", language)}</DialogDescription>
               </DialogHeader>
               <ul className="max-h-72 overflow-y-auto -mx-1">
                 <li className="border-b border-border">
                   <button
                     type="button"
                     onClick={() => pickAndClose(activeDialogCategory.id, activeDialogCategory.id)}
-                    className="w-full flex items-center gap-2 text-left px-3 py-3 rounded-md text-sm font-semibold text-muted-foreground hover:bg-secondary"
+                    className="w-full flex items-center gap-2 text-left px-3 py-3 rounded-md text-sm font-semibold text-primary hover:bg-primary/10"
                   >
-                    <span aria-hidden="true">▸</span>
+                    <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {t("viewAllCollection", language)}
                   </button>
                 </li>
