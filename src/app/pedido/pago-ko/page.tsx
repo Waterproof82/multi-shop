@@ -26,7 +26,7 @@ export default async function PagoKoPage({ searchParams }: Props) {
         <h1 className="text-2xl font-bold">{tx.paymentKoTitle}</h1>
         <p className="text-muted-foreground">{tx.paymentKoMessage}</p>
         <Link
-          href="/"
+          href="/carta"
           className="inline-block mt-2 px-6 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
         >
           {tx.trackingBackToHome}
