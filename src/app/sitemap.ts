@@ -14,5 +14,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 1,
     },
+    {
+      url: `${baseUrl}/carta`,
+      lastModified,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
   ];
 }

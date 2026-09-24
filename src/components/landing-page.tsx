@@ -69,7 +69,7 @@ export function LandingPage({ empresa }: Readonly<LandingPageProps>) {
         </section>
       )}
 
-      <SiteFooter empresa={empresa} />
+      <SiteFooter empresa={empresa} hideMap={showDondeEstamos} />
     </div>
   );
 }

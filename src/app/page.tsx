@@ -3,6 +3,7 @@ import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { LandingPage } from "@/components/landing-page";
 import { CartaRoute } from "@/components/carta-route";
+import { JsonLd } from "@/components/json-ld";
 import { shouldBypassLanding } from "@/lib/landing/should-bypass-landing";
 import { cookies } from "next/headers";
 
@@ -50,8 +51,11 @@ export default async function Home({ searchParams }: Readonly<HomeProps>) {
     return <CartaRoute searchParams={searchParams} />;
   }
 
+  const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
+
   return (
     <EmpresaThemeProvider colores={empresa.colores}>
+      <JsonLd empresa={empresa} menuData={[]} baseUrl={baseUrl} />
       <LandingPage empresa={empresa} />
     </EmpresaThemeProvider>
   );

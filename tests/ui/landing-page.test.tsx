@@ -97,4 +97,9 @@ describe('LandingPage', () => {
     // SiteFooter también renderiza un mapa — el primero es del LandingPage
     expect(screen.getAllByTitle('Ubicación del negocio')[0]).toHaveAttribute('src', 'https://maps.google.com/embed?x');
   });
+
+  it('no duplica el mapa entre la sección Dónde estamos y el footer', () => {
+    const { container } = renderLanding({ direccion: null, telefono: null, urlMapa: 'https://maps.google.com/embed?x' });
+    expect(container.querySelectorAll('iframe').length).toBe(1);
+  });
 });
