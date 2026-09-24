@@ -87,6 +87,18 @@ export interface MenuVirtual {
   orden: number;
 }
 
+export const LANDING_SECCION_TIPOS = ['hero', 'nosotros', 'cta_carta', 'testimonio', 'galeria', 'visitanos'] as const;
+export type LandingSeccionTipo = typeof LANDING_SECCION_TIPOS[number];
+
+export interface LandingSeccion {
+  id: string;
+  empresaId: string;
+  tipo: LandingSeccionTipo;
+  activo: boolean;
+  orden: number;
+  contenido: Record<string, unknown>;
+}
+
 export interface EmpresaColores {
   primary: string;
   primaryForeground: string;
