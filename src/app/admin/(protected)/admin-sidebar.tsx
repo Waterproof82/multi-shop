@@ -10,7 +10,7 @@ import {
   UtensilsCrossed, MapPin, Star, Archive, BookOpen, History,
   ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt,
   FileText, TrendingUp, DollarSign, Grid2X2, CalendarDays,
-  ArrowLeftRight, ChevronDown,
+  ArrowLeftRight, ChevronDown, LayoutTemplate,
 } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
@@ -166,6 +166,7 @@ const NAV_ENTRIES: NavEntry[] = [
   },
   { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresRestaurant: true } },
   { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresRestaurant: true } },
+  { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
 ];
 
