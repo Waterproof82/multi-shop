@@ -41,6 +41,7 @@ const DEBEN_USAR_ENVOLTORIO = [
   'src/components/hero-banner.tsx',
   'src/components/slider-banner.tsx',
   'src/components/site-header-client.tsx',
+  'src/components/landing-header.tsx',
   'src/components/google-reviews-widget.tsx',
   'src/components/mesa-orders-client.tsx',
   'src/components/ui/image-uploader.tsx',
