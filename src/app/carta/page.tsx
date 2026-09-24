@@ -2,10 +2,10 @@ import { CartaRoute } from "@/components/carta-route";
 
 export const dynamic = 'force-dynamic';
 
-interface HomeProps {
+interface CartaPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function Home({ searchParams }: Readonly<HomeProps>) {
+export default async function CartaPage({ searchParams }: Readonly<CartaPageProps>) {
   return <CartaRoute searchParams={searchParams} />;
 }
