@@ -192,7 +192,9 @@ Solo togglean `activo`; el contenido se edita entrando como la empresa
   acoplado a carrito/mesa/scroll-a-categoría): logo + `LanguageSelector`
   (mismo `LanguageProvider` global, ya disponible en `layout.tsx`) + 3 links:
   "Carta" → `/carta`, "Nosotros" → `#nosotros`, "Dónde estamos" →
-  `#visitanos`.
+  `#donde-estamos` (el ancla HTML usa este id; `visitanos` sigue siendo el
+  nombre del `tipo` de sección en la tabla — son dos cosas distintas, no
+  renombrar una para que combine con la otra).
 - Componente por tipo: `HeroSection`, `NosotrosSection`, `CtaCartaSection`,
   `TestimonioSection`, `GaleriaSection`, `VisitanosSection`. Se renderiza
   solo lo que existe y está `activo`, ordenado por `orden`.
@@ -206,7 +208,7 @@ Solo togglean `activo`; el contenido se edita entrando como la empresa
   `docs/context/imagenes.md`, y se debe sumar esta pantalla a
   `tests/compliance/imagenes-sin-doble-optimizacion.test.ts`).
 - Footer: reutiliza `<SiteFooter empresa={empresa} />` sin cambios.
-- Anclas de scroll (`#nosotros`, `#visitanos`) son nativas del navegador,
+- Anclas de scroll (`#nosotros`, `#donde-estamos`) son nativas del navegador,
   sin JS adicional.
 
 ## Fuera de alcance (explícito)
