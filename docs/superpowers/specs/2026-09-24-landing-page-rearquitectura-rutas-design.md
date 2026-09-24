@@ -119,9 +119,10 @@ obligatorios post-2026-07-31.
 discriminated union por `tipo` (no a nivel de Postgres) — mismo patrón que
 ya usa el proyecto para DTOs (`safeParse` + `max()` en strings).
 
-Además: nueva columna `empresas.whatsapp TEXT NULL` (dato de contacto
-general, igual que `telefono` — no es contenido de una sección, vive en
-`empresa` para poder reusarse en footer u otros lugares a futuro).
+No hace falta columna nueva para WhatsApp: `empresa.telefono` (API pública)
+ya está respaldado por la columna `telefono_whatsapp` en `empresas`
+(`supabase-empresa.repository.ts`) — es decir, el teléfono público de la
+empresa YA es, por diseño, el número de WhatsApp. No se duplica.
 
 ### Campos por tipo (`TranslatableText` = mismo shape que `descripcion`/`footer1`, 5 idiomas)
 
@@ -132,7 +133,7 @@ general, igual que `telefono` — no es contenido de una sección, vive en
 | `cta_carta` | `kicker`, `titulo`, `descripcion`, `ctaSecundariaTexto`/`ctaSecundariaUrl` (opcional) | CTA principal fijo → `/carta` |
 | `testimonio` | `texto` (cita), `autor` | — |
 | `galeria` | `titulo` (opcional), `imagenes: string[]` (mismo patrón que `bannerSlides`) | — |
-| `visitanos` | `kicker`, `titulo`, `horario` (TranslatableText) | `direccion`, `telefono`, `urlMapa`, `emailNotification`, `whatsapp` |
+| `visitanos` | `kicker`, `titulo`, `horario` (TranslatableText) | `direccion`, `telefono`, `urlMapa`, `emailNotification` |
 
 Motivo de esta separación: `direccion`/`telefono`/`urlMapa`/`email` ya son
 la fuente de verdad usada por `SiteFooter` y `JsonLd`. La sección
