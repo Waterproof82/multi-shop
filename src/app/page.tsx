@@ -1,22 +1,24 @@
-import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, getModalidadesEntregaPublicas } from "@/lib/server-services"
-import { MenuPage } from "@/components/client-menu-page"
-import SiteHeaderWrapper from "@/components/site-header-wrapper";
-import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
-import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
+import { getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
 import { getDomainFromHeaders } from "@/lib/domain-utils";
-import { logger } from "@/core/infrastructure/logging/logger";
+import { getLandingSeccionUseCase } from "@/core/infrastructure/database";
+import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
+import { LandingPage } from "@/components/landing-page";
+import { CartaRoute } from "@/components/carta-route";
 import { JsonLd } from "@/components/json-ld";
+import { shouldBypassLanding } from "@/lib/landing/should-bypass-landing";
+import { logger } from "@/core/infrastructure/logging/logger";
 import { cookies } from "next/headers";
+import type { LandingSeccion } from "@/core/domain/entities/types";
 
 export const dynamic = 'force-dynamic';
 
-export default async function Home({
-  searchParams,
-}: Readonly<{
+interface HomeProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}>) {
+}
+
+export default async function Home({ searchParams }: Readonly<HomeProps>) {
   const resolvedParams = await searchParams;
-  const rawMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
+  const hasMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
   const cookieStore = await cookies();
   const isWaiterMode = !!cookieStore.get('waiter_token')?.value;
   const fullDomain = await getDomainFromHeaders();
@@ -31,9 +33,7 @@ export default async function Home({
     empresa = await getEmpresaByDomain(mainDomain);
   }
 
-  const empresaId = empresa?.id;
-
-  if (!empresa && empresaId === undefined) {
+  if (!empresa) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center p-8">
@@ -44,31 +44,27 @@ export default async function Home({
     );
   }
 
-  // If mesas are disabled for this empresa, treat mesa param as absent
-  const mesasHabilitadas = empresa?.mesasHabilitadas ?? true;
-  const hasMesaParam = rawMesaParam && mesasHabilitadas;
-  const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
-  const isRestaurant = empresa?.tipo === 'restaurante';
-  // When a mesa URL is present but mesas are disabled, suppress the cart for customers.
-  // Waiter mode bypasses this — staff can always place orders regardless of the toggle.
-  const mesaDisabledContext = rawMesaParam && !mesasHabilitadas && !isWaiterMode;
-  // - pedidos subdomain: always
-  // - waiter session or mesa QR: always (regardless of mostrarCarritoEmpresa)
-  // - tienda with mostrarCarritoEmpresa=true: yes
-  // - restaurante on main domain with no table/waiter: never (must come via QR or waiter)
-  // - mesa URL with mesas disabled: never (overrides all the above)
-  const showCart = !mesaDisabledContext && (isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant));
+  const bypass = shouldBypassLanding({
+    hasMesaParam,
+    isWaiterMode,
+    isPedidosSubdomain: isPedidos,
+  });
 
-  let menuData: MenuCategoryVM[] = [];
+  if (bypass) {
+    return <CartaRoute searchParams={searchParams} />;
+  }
 
+  const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
+
+  let sections: LandingSeccion[] = [];
   try {
-    const menuResult = await getCachedMenu(empresaId!);
-    if (menuResult.data) {
-      menuData = menuResult.data;
-    } else if (menuResult.error) {
+    const seccionesResult = await getLandingSeccionUseCase().getAll(empresa.id);
+    if (seccionesResult.success) {
+      sections = seccionesResult.data.filter((seccion) => seccion.activo);
+    } else {
       logger.logError({
-        codigo: 'MENU_FETCH_ERROR',
-        mensaje: menuResult.error,
+        codigo: 'LANDING_SECCIONES_FETCH_ERROR',
+        mensaje: seccionesResult.error.message,
         modulo: 'use-case',
         metodo: 'execute',
         severity: 'error',
@@ -78,17 +74,10 @@ export default async function Home({
     logger.logFromCatch(error, 'use-case', 'execute');
   }
 
-  const modalidadesEntrega = empresa?.tipo === 'tienda'
-    ? await getModalidadesEntregaPublicas(empresaId!)
-    : [];
-
-  const header = await SiteHeaderWrapper({ showCart, empresa });
-  const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
-
   return (
-    <EmpresaThemeProvider colores={empresa?.colores || null}>
-      {empresa && <JsonLd empresa={empresa} menuData={menuData} baseUrl={baseUrl} />}
-      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} modalidadesEntrega={modalidadesEntrega} />
+    <EmpresaThemeProvider colores={empresa.colores}>
+      <JsonLd empresa={empresa} menuData={[]} baseUrl={baseUrl} />
+      <LandingPage empresa={empresa} sections={sections} />
     </EmpresaThemeProvider>
   );
 }

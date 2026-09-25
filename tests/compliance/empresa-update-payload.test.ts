@@ -88,3 +88,21 @@ describe('combinaciones', () => {
     expect(payload).toEqual({ fb: null, mostrar_promociones: false });
   });
 });
+
+describe('banner slider: tipo_banner y banner_slides son campos directos', () => {
+  it('incluye tipo_banner tal cual', () => {
+    expect(construirPayloadEmpresa({ tipo_banner: 'slider' })).toEqual({ tipo_banner: 'slider' });
+  });
+
+  it('un array vacío de banner_slides se guarda como array vacío, no como null', () => {
+    // Si esto pasara por camposTextoPresentes, `[] || null` lo convertiría en
+    // null y la columna volvería a su DEFAULT — perdiendo que el admin vació
+    // deliberadamente el slider.
+    expect(construirPayloadEmpresa({ banner_slides: [] })).toEqual({ banner_slides: [] });
+  });
+
+  it('conserva el array completo de banner_slides', () => {
+    const slides = ['https://cdn.example.com/a.webp', 'https://cdn.example.com/b.webp'];
+    expect(construirPayloadEmpresa({ banner_slides: slides })).toEqual({ banner_slides: slides });
+  });
+});

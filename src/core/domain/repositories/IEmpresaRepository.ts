@@ -11,6 +11,8 @@ export interface UpdateEmpresaData {
   mostrar_logo?: boolean;
   url_image?: string | null;
   banner_fit?: string | null;
+  tipo_banner?: 'imagen' | 'slider';
+  banner_slides?: string[];
   descripcion_es?: string | null;
   descripcion_en?: string | null;
   descripcion_fr?: string | null;

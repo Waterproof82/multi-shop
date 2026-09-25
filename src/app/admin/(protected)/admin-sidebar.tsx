@@ -10,7 +10,7 @@ import {
   UtensilsCrossed, MapPin, Star, Archive, BookOpen, History,
   ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt,
   FileText, TrendingUp, DollarSign, Grid2X2, CalendarDays,
-  ArrowLeftRight, ChevronDown,
+  ArrowLeftRight, ChevronDown, LayoutTemplate,
 } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
@@ -166,6 +166,7 @@ const NAV_ENTRIES: NavEntry[] = [
   },
   { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresRestaurant: true } },
   { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresRestaurant: true } },
+  { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
 ];
 
@@ -516,7 +517,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
               </a>
             )}
             <Link
-              href="/"
+              href="/carta"
               className="flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             >
               <ExternalLink className="h-4 w-4 flex-shrink-0" />

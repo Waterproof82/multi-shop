@@ -1,6 +1,8 @@
 import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
-import { getSuperAdminUseCase } from '@/core/infrastructure/database';
+import { getSuperAdminUseCase, getLandingSeccionUseCase } from '@/core/infrastructure/database';
+import { logger } from '@/core/infrastructure/logging/logger';
+import type { ActivasPorEmpresa } from '@/core/application/use-cases/landing-seccion.use-case';
 import { EmpresasTable } from './empresas-table';
 
 interface EmpresaStats {
@@ -70,6 +72,24 @@ function getPositionClasses(posicion: number): string {
   }
 }
 
+// No crítico: si falla, la tabla muestra todos los switches de landing apagados en vez de romper el panel.
+async function getLandingActivas(): Promise<ActivasPorEmpresa> {
+  try {
+    const result = await getLandingSeccionUseCase().getActivasPorEmpresa();
+    if (result.success) return result.data;
+    logger.logError({
+      codigo: 'LANDING_ACTIVAS_FETCH_ERROR',
+      mensaje: result.error.message,
+      modulo: 'use-case',
+      metodo: 'execute',
+      severity: 'error',
+    });
+  } catch (error) {
+    logger.logFromCatch(error, 'use-case', 'execute');
+  }
+  return {};
+}
+
 async function getData(): Promise<{ empresas: Empresa[]; globalStats: GlobalStats | null; error: string | null }> {
   try {
     const empresasResult = await getSuperAdminUseCase().getAllEmpresas();
@@ -97,7 +117,10 @@ async function getData(): Promise<{ empresas: Empresa[]; globalStats: GlobalStat
 }
 
 export default async function SuperAdminPage() {
-  const { empresas, globalStats, error: fetchError } = await getData();
+  const [{ empresas, globalStats, error: fetchError }, landingActivas] = await Promise.all([
+    getData(),
+    getLandingActivas(),
+  ]);
 
   const totalStats = empresas.reduce((acc, emp) => ({
     totalPedidos: acc.totalPedidos + emp.stats.totalPedidos,
@@ -260,6 +283,7 @@ export default async function SuperAdminPage() {
               stats: e.stats,
               totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,
+              landingActivas: landingActivas[e.id] ?? [],
             }))}
           />
         )}

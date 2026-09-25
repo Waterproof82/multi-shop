@@ -31,8 +31,10 @@ import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-c
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
 import { SupabaseMenuVirtualRepository } from './SupabaseMenuVirtualRepository';
+import { SupabaseLandingSeccionRepository } from './SupabaseLandingSeccionRepository';
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
 import { MenuVirtualUseCase } from '@/core/application/use-cases/menu-virtual.use-case';
+import { LandingSeccionUseCase } from '@/core/application/use-cases/landing-seccion.use-case';
 import { SupabaseModalidadEntregaRepository } from './SupabaseModalidadEntregaRepository';
 import { ModalidadEntregaUseCase } from '@/core/application/use-cases/modalidad-entrega.use-case';
 import { SupabaseTablaPlantillaRepository } from './SupabaseTablaPlantillaRepository';
@@ -118,6 +120,11 @@ let _menuVirtualRepository: SupabaseMenuVirtualRepository | undefined;
 export function getMenuVirtualRepository(): SupabaseMenuVirtualRepository {
   _menuVirtualRepository ??= new SupabaseMenuVirtualRepository(getSupabaseClient());
   return _menuVirtualRepository;
+}
+
+let _landingSeccionRepository: SupabaseLandingSeccionRepository | undefined;
+export function getLandingSeccionRepository(): SupabaseLandingSeccionRepository {
+  return _landingSeccionRepository ??= new SupabaseLandingSeccionRepository(getSupabaseClient());
 }
 
 let _empresaPublicRepository: SupabaseEmpresaRepository | undefined;
@@ -260,6 +267,11 @@ let _menuVirtualUseCase: MenuVirtualUseCase | undefined;
 export function getMenuVirtualUseCase(): MenuVirtualUseCase {
   _menuVirtualUseCase ??= new MenuVirtualUseCase(getMenuVirtualRepository());
   return _menuVirtualUseCase;
+}
+
+let _landingSeccionUseCase: LandingSeccionUseCase | undefined;
+export function getLandingSeccionUseCase(): LandingSeccionUseCase {
+  return _landingSeccionUseCase ??= new LandingSeccionUseCase(getLandingSeccionRepository());
 }
 
 let _stockRepository: SupabaseStockRepository | undefined;

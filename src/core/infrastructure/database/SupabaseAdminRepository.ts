@@ -196,6 +196,8 @@ export class SupabaseAdminRepository implements IAdminRepository {
       emailNotification: (row.email_notification as string | null) ?? null,
       urlImage: (row.url_image as string | null) ?? null,
       bannerFit: (row.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
+      tipoBanner: (row.tipo_banner as "imagen" | "slider" | undefined) ?? "imagen",
+      bannerSlides: Array.isArray(row.banner_slides) ? (row.banner_slides as string[]) : [],
       descripcion,
       colores,
       fb: (row.fb as string | null) ?? null,

@@ -8,9 +8,10 @@ import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface SiteFooterProps {
   readonly empresa?: EmpresaPublic | null;
+  readonly hideMap?: boolean;
 }
 
-export function SiteFooter({ empresa }: SiteFooterProps) {
+export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
   const { language } = useLanguage()
   const currentYear = new Date().getFullYear()
 
@@ -80,7 +81,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           </div>
 
           {/* Columna 3: Mapa */}
-          {empresa.urlMapa && (
+          {empresa.urlMapa && !hideMap && (
             <div className="space-y-4">
               <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("location", language)}</h3>
               <div className="rounded-lg overflow-hidden border border-background/10 h-48 w-full">

@@ -28,6 +28,8 @@ interface EmpresaApariencia {
   mostrar_logo: boolean;
   url_image: string | null;
   banner_fit: "contain" | "cover" | "fill" | null;
+  tipo_banner: "imagen" | "slider";
+  banner_slides: string[];
   descripcion_es: string;
   descripcion_en: string;
   descripcion_fr: string;

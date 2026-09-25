@@ -27,6 +27,7 @@ import { t } from '@/lib/translations';
 import { reordenarPorArrastre } from '@/lib/drag-reorder';
 import { NuevoMenuVirtualDialog } from '@/components/admin/NuevoMenuVirtualDialog';
 import { EliminarMenuVirtualDialog } from '@/components/admin/EliminarMenuVirtualDialog';
+import { ADMIN_INPUT_CLASS, ADMIN_LABEL_CLASS, ADMIN_OUTLINE_BUTTON_CLASS } from '@/components/admin/admin-styles';
 
 interface MenuVirtual {
   id: string;
@@ -69,7 +70,7 @@ function SortableNodoRow({ nodo, selected, esHijo, subcategoriasCount, onSelect 
       <button
         type="button"
         aria-label={t('orderLabel', language)}
-        className="touch-none p-1.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        className="touch-none p-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -80,14 +81,14 @@ function SortableNodoRow({ nodo, selected, esHijo, subcategoriasCount, onSelect 
         onClick={onSelect}
         className={`flex-1 text-left px-2 py-2 rounded-lg text-sm flex items-center gap-2 ${
           esHijo ? '' : 'font-medium'
-        } ${selected ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50 text-foreground'}`}
+        } ${selected ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-white/10 text-white'}`}
       >
         <Icono className="w-4 h-4 shrink-0 opacity-70" />
         <span className="truncate">{nodo.nombre}</span>
         {vacio ? (
-          <span className="ml-auto text-xs text-muted-foreground">{t('menuVirtualVacio', language)}</span>
+          <span className="ml-auto text-xs text-slate-400">{t('menuVirtualVacio', language)}</span>
         ) : (
-          <span className="ml-auto text-xs text-muted-foreground shrink-0">
+          <span className="ml-auto text-xs text-slate-400 shrink-0">
             {esHijo ? nodo.productosCount : subcategoriasCount}
           </span>
         )}
@@ -315,7 +316,7 @@ export default function MenusVirtualesPage() {
   }, [productos, productoSearch]);
 
   if (loading) {
-    return <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+    return <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
   }
 
   return (
@@ -325,7 +326,7 @@ export default function MenusVirtualesPage() {
           <Plus className="w-4 h-4" /> {t('menuVirtualNuevoMenu', language)}
         </Button>
         {padres.length === 0 && (
-          <p className="text-sm text-muted-foreground py-4">{t('menuVirtualSinNodos', language)}</p>
+          <p className="text-sm text-slate-400 py-4">{t('menuVirtualSinNodos', language)}</p>
         )}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPadres}>
           <SortableContext items={padres.map(p => p.id)} strategy={verticalListSortingStrategy}>
@@ -363,7 +364,7 @@ export default function MenusVirtualesPage() {
                   <button
                     type="button"
                     onClick={() => abrirDialogoNuevaSubcategoria(padre.id)}
-                    className="w-full text-left pl-8 pr-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+                    className="w-full text-left pl-8 pr-3 py-1 text-xs text-slate-400 hover:text-white"
                   >
                     + {t('menuVirtualNuevaSubcategoria', language)}
                   </button>
@@ -383,18 +384,18 @@ export default function MenusVirtualesPage() {
           )}
 
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-slate-400">
               {selectedPadre ? `${selectedPadre.nombre} › ${selectedNodo.nombre}` : selectedNodo.nombre}
             </p>
-            <div>
-              <label htmlFor="menu-virtual-nombre" className="text-sm font-medium text-foreground">{t('menuVirtualNombre', language)}</label>
-              <Input id="menu-virtual-nombre" value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+            <div className="space-y-2">
+              <label htmlFor="menu-virtual-nombre" className={ADMIN_LABEL_CLASS}>{t('menuVirtualNombre', language)}</label>
+              <Input id="menu-virtual-nombre" value={editNombre} onChange={e => setEditNombre(e.target.value)} className={ADMIN_INPUT_CLASS} />
             </div>
             <div className="flex items-end gap-2">
               <Button onClick={handleGuardarNombre} disabled={saving} className="gap-2">
                 <Save className="w-4 h-4" /> {t('menuVirtualGuardar', language)}
               </Button>
-              <Button variant="outline" onClick={() => pedirEliminar(selectedNodo)} className="gap-2 text-destructive">
+              <Button variant="outline" onClick={() => pedirEliminar(selectedNodo)} className={`gap-2 ${ADMIN_OUTLINE_BUTTON_CLASS} text-red-300 hover:text-red-200`}>
                 <Trash2 className="w-4 h-4" /> {t('menuVirtualEliminar', language)}
               </Button>
             </div>
@@ -403,7 +404,7 @@ export default function MenusVirtualesPage() {
           {selectedEsHoja && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-foreground">
+                <h3 className="text-sm font-medium text-white">
                   {t('menuVirtualProductosAsociados', language)} ({selectedProductoIds.length})
                 </h3>
                 <Button size="sm" onClick={handleGuardarProductos} disabled={savingProductos} className="gap-2">
@@ -416,20 +417,21 @@ export default function MenusVirtualesPage() {
                 onChange={e => setProductoSearch(e.target.value)}
                 placeholder={t('menuVirtualBuscarProducto', language)}
                 aria-label={t('menuVirtualBuscarProducto', language)}
+                className={ADMIN_INPUT_CLASS}
               />
-              <div className="max-h-96 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+              <div className="max-h-96 overflow-y-auto space-y-1 border border-white/20 rounded-lg p-2">
                 {productosFiltrados.map(producto => (
                   <label
                     key={producto.id}
-                    className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-muted/50"
+                    className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-white/10"
                   >
                     <input
                       type="checkbox"
                       checked={selectedProductoIds.includes(producto.id)}
                       onChange={() => toggleProducto(producto.id)}
-                      className="w-4 h-4 accent-primary shrink-0"
+                      className="w-4 h-4 accent-cyan-500 shrink-0"
                     />
-                    <span className="text-sm text-foreground truncate">{producto.titulo_es}</span>
+                    <span className="text-sm text-white truncate">{producto.titulo_es}</span>
                   </label>
                 ))}
               </div>

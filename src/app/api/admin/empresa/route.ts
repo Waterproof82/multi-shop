@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
       direccion: empresa.direccion || '',
       nif: empresa.nif || '',
       url_image: empresa.urlImage || null,
+      tipo_banner: empresa.tipoBanner ?? 'imagen',
+      banner_slides: empresa.bannerSlides ?? [],
       descripcion_es: empresa.descripcion?.es || '',
       descripcion_en: empresa.descripcion?.en || '',
       descripcion_fr: empresa.descripcion?.fr || '',
