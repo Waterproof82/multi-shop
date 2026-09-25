@@ -26,7 +26,7 @@ export function HeroSection({ contenido, empresaNombre }: Readonly<HeroSectionPr
     <section className="relative flex flex-col items-center justify-center gap-6 overflow-hidden px-4 py-24 text-center">
       {imagenUrl && (
         <div className="absolute inset-0 -z-10">
-          <Image src={imagenUrl} alt="" fill sizes="100vw" className="object-cover" loading="eager" />
+          <Image src={imagenUrl} alt="" fill sizes="100vw" className="object-cover" priority />
           <div className="absolute inset-0 bg-background/70" />
         </div>
       )}
