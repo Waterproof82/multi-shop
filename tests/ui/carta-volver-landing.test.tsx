@@ -4,7 +4,7 @@ import { LanguageProvider } from '@/lib/language-context';
 import { CartProvider } from '@/lib/cart-context';
 import { SiteHeaderClient } from '@/components/site-header-client';
 
-// Enlace "Inicio" de la cabecera de la carta: lleva de /carta a la landing.
+// Enlace (icono de casa) de la cabecera de la carta: lleva de /carta a la landing.
 // CartaRoute solo lo activa en /carta y fuera de mesa/camarero/pedidos.
 function renderHeader(mostrarVolverLanding?: boolean) {
   return render(
@@ -21,7 +21,9 @@ describe('cabecera de la carta — enlace de vuelta a la landing', () => {
     renderHeader(true);
     const enlace = screen.getByRole('link', { name: 'Volver a la página de inicio' });
     expect(enlace).toHaveAttribute('href', '/');
-    expect(enlace).toHaveTextContent('Inicio');
+    // Solo icono de casa, sin texto visible.
+    expect(enlace).toHaveTextContent('');
+    expect(enlace.querySelector('svg')).not.toBeNull();
   });
 
   it('por defecto no pinta el enlace', () => {
