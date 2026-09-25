@@ -101,7 +101,7 @@
     "electron-builder": "^26.15.7",
     "electron-builder-squirrel-windows": "26.15.7",
     "electron-rebuild": "^3.2.9",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
     "fast-check": "^4.9.0",
