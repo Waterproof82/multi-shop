@@ -1,73 +1,50 @@
 "use client";
 
-import Link from "next/link";
 import { LandingHeader } from "@/components/landing-header";
 import { SiteFooter } from "@/components/site-footer";
-import { useLanguage } from "@/lib/language-context";
-import { t } from "@/lib/translations";
-import { hasNosotrosContent, hasDondeEstamosContent } from "@/lib/landing/landing-content";
-import type { EmpresaPublic } from "@/core/domain/entities/types";
+import { HeroSection } from "@/components/landing/hero-section";
+import { NosotrosSection } from "@/components/landing/nosotros-section";
+import { CtaCartaSection } from "@/components/landing/cta-carta-section";
+import { TestimonioSection } from "@/components/landing/testimonio-section";
+import { GaleriaSection } from "@/components/landing/galeria-section";
+import { VisitanosSection } from "@/components/landing/visitanos-section";
+import type { EmpresaPublic, LandingSeccion } from "@/core/domain/entities/types";
 
 interface LandingPageProps {
   empresa: EmpresaPublic;
+  sections: LandingSeccion[];
 }
 
-export function LandingPage({ empresa }: Readonly<LandingPageProps>) {
-  const { language } = useLanguage();
-  const showNosotros = hasNosotrosContent(empresa.descripcion);
-  const showDondeEstamos = hasDondeEstamosContent(empresa);
-  const descripcion = empresa.descripcion?.[language] ?? empresa.descripcion?.es ?? null;
+function renderSeccion(seccion: LandingSeccion, empresa: EmpresaPublic) {
+  switch (seccion.tipo) {
+    case "nosotros":
+      return <NosotrosSection key={seccion.id} contenido={seccion.contenido} />;
+    case "cta_carta":
+      return <CtaCartaSection key={seccion.id} contenido={seccion.contenido} />;
+    case "testimonio":
+      return <TestimonioSection key={seccion.id} contenido={seccion.contenido} />;
+    case "galeria":
+      return <GaleriaSection key={seccion.id} contenido={seccion.contenido} />;
+    case "visitanos":
+      return <VisitanosSection key={seccion.id} contenido={seccion.contenido} empresa={empresa} />;
+    default:
+      return null;
+  }
+}
+
+export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
+  const heroContenido = sections.find((s) => s.tipo === "hero")?.contenido ?? {};
+  const showNosotros = sections.some((s) => s.tipo === "nosotros");
+  const showDondeEstamos = sections.some((s) => s.tipo === "visitanos");
+  const restoDeSecciones = sections.filter((s) => s.tipo !== "hero");
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <LandingHeader empresa={empresa} showNosotros={showNosotros} showDondeEstamos={showDondeEstamos} />
 
-      <section className="flex flex-col items-center justify-center gap-6 px-4 py-24 text-center">
-        {empresa.titulo && (
-          <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-            {empresa.titulo}
-          </p>
-        )}
-        <h1 className="text-4xl font-bold text-foreground md:text-6xl">{empresa.nombre}</h1>
-        {empresa.subtitulo && <p className="text-lg text-muted-foreground">{empresa.subtitulo}</p>}
-        <Link
-          href="/carta"
-          className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-6 text-base font-semibold text-primary-foreground hover:opacity-90"
-        >
-          {t("viewMenu", language)}
-        </Link>
-      </section>
+      <HeroSection contenido={heroContenido} empresaNombre={empresa.nombre} />
 
-      {showNosotros && (
-        <section id="nosotros" className="mx-auto w-full max-w-3xl px-4 py-16">
-          <h2 className="mb-4 text-2xl font-bold text-foreground">{t("landingNavAboutUs", language)}</h2>
-          <p className="text-base leading-relaxed text-muted-foreground">{descripcion}</p>
-        </section>
-      )}
-
-      {showDondeEstamos && (
-        <section id="donde-estamos" className="mx-auto w-full max-w-3xl px-4 py-16">
-          <h2 className="mb-4 text-2xl font-bold text-foreground">{t("landingNavWhereWeAre", language)}</h2>
-          <div className="space-y-2 text-base text-muted-foreground">
-            {empresa.direccion && <p>{empresa.direccion}</p>}
-            {empresa.telefono && <p>{empresa.telefono}</p>}
-          </div>
-          {empresa.urlMapa && (
-            <div className="mt-6 h-80 w-full overflow-hidden rounded-lg border border-border">
-              <iframe
-                title={t("locationIframe", language)}
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-                src={empresa.urlMapa}
-              />
-            </div>
-          )}
-        </section>
-      )}
+      {restoDeSecciones.map((seccion) => renderSeccion(seccion, empresa))}
 
       <SiteFooter empresa={empresa} hideMap={showDondeEstamos} />
     </div>
