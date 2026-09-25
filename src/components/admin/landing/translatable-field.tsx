@@ -6,6 +6,7 @@ import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ADMIN_INPUT_CLASS } from "@/components/admin/admin-styles";
 
 export interface TranslatableTextValue {
   es?: string | null;
@@ -47,6 +48,7 @@ function renderLangInput(
         maxLength={maxLength}
         rows={3}
         onChange={(e) => onInput(e.target.value)}
+        className={ADMIN_INPUT_CLASS}
       />
     );
   }
@@ -57,6 +59,7 @@ function renderLangInput(
       value={currentValue}
       maxLength={maxLength}
       onChange={(e) => onInput(e.target.value)}
+      className={ADMIN_INPUT_CLASS}
     />
   );
 }
@@ -74,7 +77,7 @@ export function TranslatableField({ label, value, onChange, multiline = false, m
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-foreground" htmlFor={esId}>
+      <label className="block text-sm font-medium text-white" htmlFor={esId}>
         {label}
       </label>
       {renderLangInput(esId, value?.es ?? "", multiline, maxLength, (text) => setLang("es", text))}
@@ -82,19 +85,19 @@ export function TranslatableField({ label, value, onChange, multiline = false, m
         type="button"
         onClick={() => setShowTranslations((v) => !v)}
         aria-expanded={showTranslations}
-        className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary"
+        className="flex items-center gap-2 text-xs font-medium text-slate-300 hover:text-cyan-300"
       >
         {showTranslations ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         <Languages className="h-3.5 w-3.5" />
         {t("translationsToggle", language)} ({showTranslations ? t("hideLabel", language) : t("showLabel", language)})
       </button>
       {showTranslations && (
-        <div className="grid grid-cols-1 gap-3 border-l-2 border-border pl-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 border-l-2 border-white/20 pl-4 sm:grid-cols-2">
           {OTHER_LANGS.map(({ key, label: langLabel }) => {
             const fieldId = `${uid}-${key}`;
             return (
               <div key={key}>
-                <label className="mb-1 block text-xs text-muted-foreground" htmlFor={fieldId}>
+                <label className="mb-1 block text-xs text-slate-300" htmlFor={fieldId}>
                   {langLabel}
                 </label>
                 {renderLangInput(fieldId, value?.[key] ?? "", multiline, maxLength, (text) => setLang(key, text))}

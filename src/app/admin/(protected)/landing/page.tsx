@@ -9,6 +9,11 @@ import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { TranslatableField, type TranslatableTextValue } from "@/components/admin/landing/translatable-field";
+import {
+  ADMIN_INPUT_CLASS,
+  ADMIN_LABEL_CLASS as LABEL_CLASS,
+  ADMIN_OUTLINE_BUTTON_CLASS as OUTLINE_BUTTON_CLASS,
+} from "@/components/admin/admin-styles";
 import { SECCION_CAMPOS, type CampoConfig } from "@/components/admin/landing/seccion-campos";
 import { LANDING_SECCION_TIPOS, type LandingSeccionTipo } from "@/core/domain/entities/types";
 
@@ -35,6 +40,14 @@ const TIPO_LABELS: Record<LandingSeccionTipo, string> = {
   galeria: "Galería",
   visitanos: "Visítanos",
 };
+
+// ImageUploader es compartido y usa tokens del tema; aca lo aclaramos solo dentro de este fondo oscuro.
+const UPLOADER_WRAPPER_CLASS = "[&_label]:text-white [&_span]:text-slate-300";
+
+function tabClass(activa: boolean): string {
+  if (activa) return "bg-cyan-500/20 text-cyan-300";
+  return "text-slate-300 hover:bg-white/10 hover:text-white";
+}
 
 function seccionVacia(): SeccionState {
   return { activo: false, orden: 0, contenido: {} };
@@ -132,8 +145,7 @@ export default function LandingAdminPage() {
 
     if (campo.kind === "imagen") {
       return (
-        <div key={campo.key} className="space-y-2">
-          <span className="block text-sm font-medium text-foreground">{campo.label}</span>
+        <div key={campo.key} className={UPLOADER_WRAPPER_CLASS}>
           <ImageUploader
             value={(valor as string | null | undefined) ?? ""}
             onChange={(url) => actualizarCampo(campo.key, url)}
@@ -147,7 +159,7 @@ export default function LandingAdminPage() {
       const fieldId = `campo-${campo.key}`;
       return (
         <div key={campo.key} className="space-y-2">
-          <label className="block text-sm font-medium text-foreground" htmlFor={fieldId}>
+          <label className={LABEL_CLASS} htmlFor={fieldId}>
             {campo.label}
           </label>
           <Input
@@ -155,6 +167,7 @@ export default function LandingAdminPage() {
             type="text"
             value={(valor as string | null | undefined) ?? ""}
             onChange={(e) => actualizarCampo(campo.key, e.target.value)}
+            className={ADMIN_INPUT_CLASS}
           />
         </div>
       );
@@ -163,10 +176,10 @@ export default function LandingAdminPage() {
     const imagenes = (valor as string[] | undefined) ?? [];
     return (
       <div key={campo.key} className="space-y-2">
-        <span className="block text-sm font-medium text-foreground">{campo.label}</span>
+        <span className={LABEL_CLASS}>{campo.label}</span>
         <div className="space-y-3">
           {imagenes.map((url, idx) => (
-            <div key={idx} className="flex items-start gap-2">
+            <div key={idx} className={`flex items-start gap-2 ${UPLOADER_WRAPPER_CLASS}`}>
               <ImageUploader
                 value={url}
                 onChange={(nuevaUrl) => {
@@ -179,6 +192,7 @@ export default function LandingAdminPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className={OUTLINE_BUTTON_CLASS}
                 onClick={() => actualizarCampo("imagenes", imagenes.filter((_, i) => i !== idx))}
               >
                 {t("remove", language)}
@@ -186,7 +200,12 @@ export default function LandingAdminPage() {
             </div>
           ))}
           {imagenes.length < 20 && (
-            <Button variant="outline" size="sm" onClick={() => actualizarCampo("imagenes", [...imagenes, ""])}>
+            <Button
+              variant="outline"
+              size="sm"
+              className={OUTLINE_BUTTON_CLASS}
+              onClick={() => actualizarCampo("imagenes", [...imagenes, ""])}
+            >
               + {t("landingSeccionAgregarImagen", language)}
             </Button>
           )}
@@ -198,14 +217,15 @@ export default function LandingAdminPage() {
   if (loading) {
     return (
       <div className="flex justify-center p-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl space-y-6 p-6">
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+    <div className="p-6">
+    <div className="max-w-3xl space-y-6 rounded-2xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
+      <div className="flex flex-wrap gap-2 border-b border-white/20 pb-3">
         {LANDING_SECCION_TIPOS.map((tipo) => (
           <button
             key={tipo}
@@ -214,9 +234,9 @@ export default function LandingAdminPage() {
               setTipoActivo(tipo);
               setError("");
             }}
-            className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-              tipoActivo === tipo ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"
-            }`}
+            className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tabClass(
+              tipoActivo === tipo
+            )}`}
           >
             {TIPO_LABELS[tipo]}
             {secciones[tipo].activo && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
@@ -236,12 +256,12 @@ export default function LandingAdminPage() {
             type="checkbox"
             checked={seccionActual.activo}
             onChange={(e) => actualizarActivo(e.target.checked)}
-            className="h-4 w-4 rounded border-border text-primary accent-primary"
+            className="h-4 w-4 rounded border-white/20 accent-cyan-500"
           />
-          <span className="text-sm text-foreground">{t("active", language)}</span>
+          <span className="text-sm text-white">{t("active", language)}</span>
         </label>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-muted-foreground" htmlFor="landing-seccion-orden">
+          <label className="text-sm text-slate-300" htmlFor="landing-seccion-orden">
             {t("orderLabel", language)}
           </label>
           <Input
@@ -251,7 +271,7 @@ export default function LandingAdminPage() {
             max={100}
             value={seccionActual.orden}
             onChange={(e) => actualizarOrden(Number.parseInt(e.target.value, 10) || 0)}
-            className="w-20"
+            className={`w-20 ${ADMIN_INPUT_CLASS}`}
           />
         </div>
       </div>
@@ -261,6 +281,7 @@ export default function LandingAdminPage() {
       <Button onClick={handleGuardar} disabled={saving} className="gap-2">
         <Save className="h-4 w-4" /> {t("landingSeccionGuardar", language)}
       </Button>
+    </div>
     </div>
   );
 }
