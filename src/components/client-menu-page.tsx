@@ -20,6 +20,7 @@ import { useCart } from "@/lib/cart-context"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
+import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -57,7 +58,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'empty' {
 
 export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false, modalidadesEntrega }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
-  const { clearCart, closeCart, isCartOpen } = useCart();
+  const { clearCart, closeCart, openCart, isCartOpen } = useCart();
   const mesaId = useMesaId();
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
@@ -82,6 +83,17 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     if (!mesaId) return;
     void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/activate`, { method: 'POST' });
   }, [isWaiterMode, mesaId]);
+
+  // El FAB de la landing llega con ?carrito=abierto. Se limpia la URL ANTES de
+  // abrir: openCart() apila una entrada de historial con el href actual.
+  useEffect(() => {
+    if (!showCart) return;
+    const url = new URL(globalThis.location.href);
+    if (url.searchParams.get(PARAM_ABRIR_CARRITO) !== VALOR_ABRIR_CARRITO) return;
+    url.searchParams.delete(PARAM_ABRIR_CARRITO);
+    globalThis.history.replaceState(globalThis.history.state, '', url.toString());
+    openCart();
+  }, [showCart, openCart]);
 
   // Close search when cart opens in waiter mode
   useEffect(() => {
