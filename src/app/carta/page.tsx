@@ -7,5 +7,5 @@ interface CartaPageProps {
 }
 
 export default async function CartaPage({ searchParams }: Readonly<CartaPageProps>) {
-  return <CartaRoute searchParams={searchParams} />;
+  return <CartaRoute searchParams={searchParams} desdeRutaCarta />;
 }

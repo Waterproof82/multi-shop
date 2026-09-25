@@ -177,4 +177,11 @@ describe('LandingPage', () => {
     // 3 palabras (la vacía entre comas se descarta) + 3 separadores, por 2 copias
     expect(cinta?.children).toHaveLength(12);
   });
+
+  it('usa el mismo pie de página que la carta (SiteFooter)', () => {
+    renderLanding([], { direccion: 'Calle Falsa 123' });
+    const footer = screen.getByRole('contentinfo');
+    expect(within(footer).getByRole('heading', { name: 'Contacto' })).toBeInTheDocument();
+    expect(within(footer).getByText('Calle Falsa 123')).toBeInTheDocument();
+  });
 });

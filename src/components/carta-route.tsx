@@ -10,10 +10,13 @@ import { cookies } from "next/headers";
 
 interface CartaRouteProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+  /** true cuando se sirve desde /carta (no desde el bypass de `/`). */
+  desdeRutaCarta?: boolean;
 }
 
 export async function CartaRoute({
   searchParams,
+  desdeRutaCarta = false,
 }: Readonly<CartaRouteProps>) {
   const resolvedParams = await searchParams;
   const rawMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
@@ -82,7 +85,11 @@ export async function CartaRoute({
     ? await getModalidadesEntregaPublicas(empresaId!)
     : [];
 
-  const header = await SiteHeaderWrapper({ showCart, empresa });
+  // Enlace de vuelta a la landing solo para el visitante normal de /carta:
+  // con QR de mesa, modo camarero o subdominio de pedidos, `/` sirve la
+  // carta directamente (bypass), asi que el enlace no llevaria a la landing.
+  const mostrarVolverLanding = desdeRutaCarta && !rawMesaParam && !isWaiterMode && !isPedidos;
+  const header = await SiteHeaderWrapper({ showCart, empresa, mostrarVolverLanding });
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
 
   return (
