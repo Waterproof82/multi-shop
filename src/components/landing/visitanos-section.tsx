@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { MapPin } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
@@ -10,8 +11,8 @@ import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import {
   Eyebrow,
   TituloResaltado,
-  landingBtnGhost,
-  landingBtnPrimary,
+  landingBtnOscuro,
+  landingBtnWhatsapp,
   landingH2,
   mapsSearchUrl,
 } from "@/components/landing/landing-ui";
@@ -131,12 +132,13 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
           {(mapsHref || whatsappHref) && (
             <div className="flex flex-wrap gap-3">
               {mapsHref && (
-                <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={landingBtnPrimary}>
+                <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={`${landingBtnOscuro} px-[30px] py-3 text-[15px]`}>
+                  <MapPin className="size-[18px] shrink-0" aria-hidden="true" />
                   {t("landingOpenInMaps", language)}
                 </a>
               )}
               {whatsappHref && (
-                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={landingBtnGhost}>
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={landingBtnWhatsapp}>
                   <WhatsAppIcon className="size-[18px]" />
                   WhatsApp
                 </a>

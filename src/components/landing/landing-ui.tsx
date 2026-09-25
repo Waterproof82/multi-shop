@@ -9,7 +9,12 @@ import type { ReactNode } from "react";
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
-export const landingBtnPrimary = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border-2 border-primary bg-primary px-[30px] py-3 text-[15px] font-extrabold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 ${focusRing}`;
+// Mismo lenguaje visual que el FAB del carrito (oscuro + aro). No usa el primary
+// del tenant: si es verde, el boton se confundiria con WhatsApp.
+export const landingBtnOscuro = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-foreground font-extrabold text-background ring-2 ring-background shadow-[0_10px_26px_-6px_color-mix(in_oklch,var(--foreground)_45%,transparent)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-95 motion-reduce:hover:translate-y-0 ${focusRing}`;
+
+// --whatsapp-strip y no --whatsapp: el verde brillante no da contraste AA con blanco.
+export const landingBtnWhatsapp = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border-2 border-whatsapp bg-whatsapp-strip px-[30px] py-3 text-[15px] font-extrabold text-white transition-transform duration-200 hover:-translate-y-0.5 active:scale-95 motion-reduce:hover:translate-y-0 ${focusRing}`;
 
 export const landingBtnGhost = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border-2 border-foreground bg-transparent px-[30px] py-3 text-[15px] font-extrabold text-foreground transition-colors duration-200 hover:bg-foreground hover:text-background ${focusRing}`;
 

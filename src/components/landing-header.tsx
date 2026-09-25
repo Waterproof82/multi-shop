@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
+import { landingBtnOscuro } from "@/components/landing/landing-ui";
 import { LanguageSelector } from "@/components/language-selector";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -57,8 +59,9 @@ export function LandingHeader({ empresa, showNosotros, showDondeEstamos }: Reado
           )}
           <Link
             href="/carta"
-            className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full bg-primary px-4 text-sm font-extrabold md:px-5 text-primary-foreground transition-all hover:-translate-y-px hover:opacity-90"
+            className={`${landingBtnOscuro} whitespace-nowrap px-4 text-sm md:px-5`}
           >
+            <ShoppingBag className="size-4 shrink-0" aria-hidden="true" />
             {t("viewMenu", language)}
           </Link>
           <LanguageSelector />

@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
-import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
@@ -11,7 +11,7 @@ import {
   Eyebrow,
   TituloResaltado,
   landingBtnGhost,
-  landingBtnPrimary,
+  landingBtnOscuro,
   landingShadowSoft,
 } from "@/components/landing/landing-ui";
 
@@ -19,7 +19,6 @@ interface HeroSectionProps {
   contenido: Record<string, unknown>;
   empresaNombre: string;
   telefono: string | null;
-  whatsappHref: string | null;
 }
 
 function gridClass(conImagen: boolean): string {
@@ -41,7 +40,7 @@ function Meta({ etiqueta, children }: Readonly<MetaProps>) {
   );
 }
 
-export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }: Readonly<HeroSectionProps>) {
+export function HeroSection({ contenido, empresaNombre, telefono }: Readonly<HeroSectionProps>) {
   const { language } = useLanguage();
   const kicker = readTranslatable(contenido, "kicker", language);
   const titulo = readTranslatable(contenido, "titulo", language) ?? empresaNombre;
@@ -81,8 +80,9 @@ export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }
             {descripcion}
           </p>
         )}
-        <div className="mb-6 flex flex-wrap gap-3">
-          <Link href="/carta" className={landingBtnPrimary}>
+        <div className="mb-10 flex flex-wrap gap-3">
+          <Link href="/carta" className={`${landingBtnOscuro} px-[30px] py-3 text-[15px]`}>
+            <ShoppingBag className="size-5 shrink-0" aria-hidden="true" />
             {t("viewMenu", language)}
           </Link>
           {ctaSecundariaTexto && ctaSecundariaUrl && (
@@ -91,19 +91,6 @@ export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }
             </a>
           )}
         </div>
-        {whatsappHref && (
-          <p className="mb-10 text-sm">
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-[44px] items-center gap-2 border-b border-transparent font-semibold text-whatsapp-ink transition-colors hover:border-whatsapp-ink"
-            >
-              <WhatsAppIcon className="size-[18px] shrink-0" />
-              <span>{t("landingHeroWhatsappHint", language)}</span>
-            </a>
-          </p>
-        )}
         {(horario || telefono) && (
           <div className="grid grid-cols-1 gap-6 border-t border-border pt-8 text-sm text-muted-foreground sm:grid-cols-2">
             {horario && <Meta etiqueta={t("landingHours", language)}>{horario}</Meta>}
