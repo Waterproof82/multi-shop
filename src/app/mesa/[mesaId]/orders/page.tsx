@@ -15,5 +15,9 @@ export default async function MesaOrdersPage({ params }: Props) {
   // El modo camarero lo resuelve el propio cliente comparando su mesa guardada
   // con esta. Aquí se leía además la cookie `waiter_token` para pasarlo como
   // prop, pero el componente nunca lo leía: era trabajo de servidor tirado.
-  return <MesaOrdersClient mesaId={mesaId} />;
+  return (
+    <main id="main-content">
+      <MesaOrdersClient mesaId={mesaId} />
+    </main>
+  );
 }

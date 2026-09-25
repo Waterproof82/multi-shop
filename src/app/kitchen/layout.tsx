@@ -18,7 +18,7 @@ export default function KitchenLayout({ children }: Readonly<{ children: React.R
       <PushRegistrar />
       <KitchenSwRegistrar />
       <KitchenOfflineBanner />
-      {children}
+      <main id="main-content">{children}</main>
     </KitchenPinGate>
   );
 }

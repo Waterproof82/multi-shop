@@ -367,7 +367,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         </>
       )}
 
-      <div className="flex-1">
+      <main id="main-content" className="flex-1">
         {menuData.length > 0 ? (
           <>
             {!searchResultsCategory && (
@@ -402,7 +402,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
             </div>
           </div>
         )}
-      </div>
+      </main>
       <SiteFooter empresa={empresa} />
       {/* Welcome discount popup - shows after 30 seconds for empresas with feature enabled */}
       {showCart && !isWaiterMode && empresa?.descuentoBienvenidaActivo && (

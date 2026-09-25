@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = empresa?.nombre || "Restaurante";
 
   return {
-    title: `Página no encontrada - ${title}`,
+    title: { absolute: `Página no encontrada · ${title}` },
     description: "La página que buscas no existe o ha sido movida. Vuelve al menú digital del restaurante.",
     robots: { index: false, follow: true },
   };
@@ -24,7 +24,7 @@ export default async function NotFound() {
   const nombre = empresa?.nombre || "Restaurante";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+    <main id="main-content" className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
       <div className="text-center max-w-md">
         <h1 className="text-6xl font-bold text-foreground mb-4">404</h1>
         <p className="text-lg font-semibold text-foreground mb-2">
@@ -56,6 +56,6 @@ export default async function NotFound() {
       <p className="mt-8 text-sm text-muted-foreground text-center">
         {nombre} - Carta digital
       </p>
-    </div>
+    </main>
   );
 }

@@ -1,13 +1,16 @@
 "use client";
 
+import { useId } from "react";
 import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
-import { Eyebrow, TituloResaltado, landingH2, landingPadX } from "@/components/landing/landing-ui";
+import { Eyebrow, TituloResaltado, landingH2, landingPadX, tituloPlano } from "@/components/landing/landing-ui";
 
 interface GaleriaSectionProps {
   contenido: Record<string, unknown>;
+  /** Para el `alt` de cada foto: el admin no escribe uno por imagen. */
+  empresaNombre: string;
 }
 
 function imagenesValidas(contenido: Record<string, unknown>): string[] {
@@ -69,39 +72,51 @@ function sizesGaleria(total: number, idx: number): string {
   return "(max-width: 768px) 50vw, 25vw";
 }
 
-export function GaleriaSection({ contenido }: Readonly<GaleriaSectionProps>) {
+/**
+ * `alt` de cada foto. Sin texto por imagen, lo mas descriptivo que hay es el
+ * titulo de la seccion + el negocio: "El local · La Mermelada (2 de 5)" dice
+ * a Google Imagenes y al lector de pantalla DE QUE es la foto, no solo que
+ * es "Imagen 2".
+ */
+export function altGaleria(titulo: string, empresaNombre: string, idx: number, total: number): string {
+  const base = `${tituloPlano(titulo).trim()} · ${empresaNombre}`;
+  return total > 1 ? `${base} (${idx + 1}/${total})` : base;
+}
+
+export function GaleriaSection({ contenido, empresaNombre }: Readonly<GaleriaSectionProps>) {
   const { language } = useLanguage();
   const kicker = readTranslatable(contenido, "kicker", language);
   const titulo = readTranslatable(contenido, "titulo", language) ?? t("landingGaleriaTituloDefault", language);
   const imagenes = imagenesValidas(contenido);
+  const tituloId = useId();
 
   if (imagenes.length === 0) return null;
 
   return (
-    <section id="galeria" className={`mx-auto w-full max-w-7xl py-[clamp(56px,8vw,110px)] ${landingPadX}`}>
+    <section id="galeria" aria-labelledby={tituloId} className={`mx-auto w-full max-w-7xl py-[clamp(56px,8vw,110px)] ${landingPadX}`}>
       <div className="mb-[38px] max-w-[46ch]">
         {kicker && <Eyebrow solo>{kicker}</Eyebrow>}
-        <h2 className={landingH2}>
+        <h2 id={tituloId} className={landingH2}>
           <TituloResaltado texto={titulo} />
         </h2>
       </div>
-      <div className={`grid gap-3.5 ${gridGaleriaClass(imagenes.length)}`}>
+      <ul className={`m-0 grid list-none gap-3.5 p-0 ${gridGaleriaClass(imagenes.length)}`}>
         {imagenes.map((url, idx) => (
-          <figure
+          <li
             key={`${url}-${idx}`}
-            className={`group relative m-0 overflow-hidden rounded-[26px] bg-muted shadow-[0_2px_10px_color-mix(in_oklch,var(--foreground)_8%,transparent)] ${itemGaleriaClass(imagenes.length, idx)}`}
+            className={`group relative overflow-hidden rounded-[26px] bg-muted shadow-[0_2px_10px_color-mix(in_oklch,var(--foreground)_8%,transparent)] ${itemGaleriaClass(imagenes.length, idx)}`}
           >
             <Image
               src={url}
-              alt={`${t("landingGaleriaImagenAlt", language)} ${idx + 1}`}
+              alt={altGaleria(titulo, empresaNombre, idx, imagenes.length)}
               fill
               sizes={sizesGaleria(imagenes.length, idx)}
               className="object-cover transition-transform duration-[600ms] ease-out group-hover:scale-105 motion-reduce:transition-none"
               loading="lazy"
             />
-          </figure>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

@@ -1,16 +1,34 @@
 import type { MetadataRoute } from "next";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 
+// Zonas privadas o efimeras: paneles internos, API, sesiones de mesa y
+// resultados de pago. Solo `/`, `/carta` y `/privacidad` son indexables.
+const DISALLOW_PATHS = [
+  "/admin/",
+  "/api/",
+  "/superadmin/",
+  "/waiter/",
+  "/kitchen/",
+  "/tpv/",
+  "/laborcontrol/",
+  "/mesa/",
+  "/pedido/",
+  "/tracking/",
+  // `?mesa=` convierte `/` y `/carta` en la carta de una mesa concreta.
+  "/*?mesa=",
+  "/*&mesa=",
+];
+
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const domain = await getDomainFromHeaders();
   const baseUrl = domain ? `https://${domain}` : "https://localhost:3000";
 
-return {
+  return {
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin/", "/api/", "/superadmin/", "/waiter/", "/mesa/", "/tracking/"],
+        disallow: DISALLOW_PATHS,
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

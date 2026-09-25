@@ -15,7 +15,7 @@ export default async function LaborControlLayout({ children }: { readonly childr
   if (adminToken) {
     const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin && ALLOWED_ROLES.has(admin.rol)) {
-      return <>{children}</>;
+      return <main id="main-content">{children}</main>;
     }
   }
 
@@ -24,7 +24,7 @@ export default async function LaborControlLayout({ children }: { readonly childr
   if (employeeToken) {
     const payload = await verifyTpvEmployeeToken(employeeToken);
     if (payload && ALLOWED_ROLES.has(payload.rol)) {
-      return <>{children}</>;
+      return <main id="main-content">{children}</main>;
     }
   }
 

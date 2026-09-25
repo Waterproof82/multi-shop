@@ -38,7 +38,7 @@ function renderSeccion(seccion: LandingSeccion, ctx: RenderContext) {
     case "testimonio":
       return <TestimonioSection key={seccion.id} contenido={seccion.contenido} />;
     case "galeria":
-      return <GaleriaSection key={seccion.id} contenido={seccion.contenido} />;
+      return <GaleriaSection key={seccion.id} contenido={seccion.contenido} empresaNombre={ctx.empresa.nombre} />;
     case "visitanos":
       return (
         <VisitanosSection
@@ -87,7 +87,7 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
 
       <LandingHeader empresa={empresa} showNosotros={showNosotros} showDondeEstamos={showDondeEstamos} />
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <HeroSection
           contenido={heroContenido}
           empresaNombre={empresa.nombre}

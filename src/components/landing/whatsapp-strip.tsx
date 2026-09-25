@@ -3,7 +3,7 @@
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { landingPadX } from "@/components/landing/landing-ui";
+import { AvisoNuevaPestana, landingPadX } from "@/components/landing/landing-ui";
 
 interface WhatsappStripProps {
   href: string;
@@ -12,9 +12,10 @@ interface WhatsappStripProps {
 // Franja verde bajo el hero (".order-strip" de la referencia).
 export function WhatsappStrip({ href }: Readonly<WhatsappStripProps>) {
   const { language } = useLanguage();
+  const titulo = t("landingWhatsappStripTitle", language);
 
   return (
-    <aside className="border-y border-white/15 bg-gradient-to-r from-whatsapp-strip to-whatsapp-strip-2 text-white">
+    <aside aria-label={titulo} className="border-y border-white/15 bg-gradient-to-r from-whatsapp-strip to-whatsapp-strip-2 text-white">
       <a
         href={href}
         target="_blank"
@@ -25,12 +26,13 @@ export function WhatsappStrip({ href }: Readonly<WhatsappStripProps>) {
           <WhatsAppIcon className="size-7" />
         </span>
         <span>
-          <strong className="block font-serif text-[clamp(18px,2.2vw,24px)] font-normal italic leading-tight">
-            {t("landingWhatsappStripTitle", language)}
-          </strong>
-          <em className="mt-0.5 block text-[13px] not-italic leading-snug opacity-90">
+          <span className="block font-serif text-[clamp(18px,2.2vw,24px)] font-normal italic leading-tight">
+            {titulo}
+          </span>
+          <span className="mt-0.5 block text-[13px] leading-snug opacity-90">
             {t("landingWhatsappStripSub", language)}
-          </em>
+          </span>
+          <AvisoNuevaPestana texto={t("opensInNewTab", language)} />
         </span>
         <span
           aria-hidden="true"

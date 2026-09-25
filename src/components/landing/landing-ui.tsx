@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 // Primitivas visuales compartidas por las secciones de la landing.
 // Estilo "mesón cálido": eyebrow en versalitas con filetes, titulares serif
@@ -23,6 +23,19 @@ export const landingShadowSoft =
   "shadow-[0_22px_48px_-24px_color-mix(in_oklch,var(--foreground)_50%,transparent)]";
 
 export const landingPadX = "px-[clamp(20px,4vw,64px)]";
+
+interface AvisoNuevaPestanaProps {
+  /** Texto traducido: `t("opensInNewTab", language)`. */
+  texto: string;
+}
+
+/**
+ * Aviso solo para lectores de pantalla en enlaces `target="_blank"` (WCAG
+ * 3.2.5 / G201): el cambio de contexto no debe pillar por sorpresa.
+ */
+export function AvisoNuevaPestana({ texto }: Readonly<AvisoNuevaPestanaProps>) {
+  return <span className="sr-only"> {texto}</span>;
+}
 
 interface EyebrowProps {
   children: ReactNode;
@@ -68,7 +81,10 @@ export function TituloResaltado({ texto, acentoClassName = "italic text-primary"
             </em>
           );
         }
-        return <span key={key}>{parte}</span>;
+        // Texto suelto, sin <span>: con un elemento por tramo, el calculo del
+        // nombre accesible (aria-labelledby de la seccion) puede comerse el
+        // espacio entre tramos ("Cocinade verdad").
+        return <Fragment key={key}>{parte}</Fragment>;
       })}
     </>
   );
@@ -84,6 +100,11 @@ export function whatsappUrl(telefono: string | null | undefined): string | null 
   const digitos = telefono.replaceAll(/\D/g, "");
   if (digitos.length < 6) return null;
   return `https://wa.me/${digitos}`;
+}
+
+/** `tel:` marcable: sin espacios ni separadores, conservando el `+` inicial. */
+export function telHref(telefono: string): string {
+  return `tel:${telefono.replaceAll(/[^\d+]/g, "")}`;
 }
 
 export function mapsSearchUrl(direccion: string | null | undefined, nombre: string): string | null {

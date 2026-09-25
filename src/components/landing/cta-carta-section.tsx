@@ -1,10 +1,11 @@
 "use client";
 
+import { useId } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
-import { Eyebrow, TituloResaltado } from "@/components/landing/landing-ui";
+import { AvisoNuevaPestana, Eyebrow, TituloResaltado } from "@/components/landing/landing-ui";
 
 interface CtaCartaSectionProps {
   contenido: Record<string, unknown>;
@@ -24,16 +25,21 @@ export function CtaCartaSection({ contenido }: Readonly<CtaCartaSectionProps>) {
   const ctaSecundariaTexto = readTranslatable(contenido, "ctaSecundariaTexto", language);
   const ctaSecundariaUrl =
     typeof contenido.ctaSecundariaUrl === "string" && contenido.ctaSecundariaUrl ? contenido.ctaSecundariaUrl : null;
+  const tituloId = useId();
 
+  // Region con nombre: su titulo si lo hay; si no, el texto del boton.
   return (
-    <section className="relative mx-[clamp(20px,4vw,64px)] my-[clamp(40px,6vw,80px)] overflow-hidden rounded-[42px] bg-foreground px-[clamp(20px,4vw,64px)] py-[clamp(80px,11vw,160px)] text-center text-background">
+    <section
+      aria-labelledby={titulo ? tituloId : undefined}
+      aria-label={titulo ? undefined : t("viewMenu", language)}
+      className="relative mx-[clamp(20px,4vw,64px)] my-[clamp(40px,6vw,80px)] overflow-hidden rounded-[42px] bg-foreground px-[clamp(20px,4vw,64px)] py-[clamp(80px,11vw,160px)] text-center text-background">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={TRAMA_PANEL} />
       <span aria-hidden="true" className="absolute left-1/2 top-0 h-[60px] w-px -translate-x-1/2 bg-background/50" />
 
       <div className="relative z-[1] mx-auto max-w-[920px]">
         {kicker && <Eyebrow className="justify-center !text-background/80">{kicker}</Eyebrow>}
         {titulo && (
-          <h2 className="mb-7 font-serif text-[clamp(40px,7vw,96px)] font-bold leading-[1.05] tracking-[-0.01em]">
+          <h2 id={tituloId} className="mb-7 font-serif text-[clamp(40px,7vw,96px)] font-bold leading-[1.05] tracking-[-0.01em]">
             <TituloResaltado texto={titulo} acentoClassName="italic text-background/70" />
           </h2>
         )}
@@ -57,6 +63,7 @@ export function CtaCartaSection({ contenido }: Readonly<CtaCartaSectionProps>) {
               className="inline-flex min-h-[44px] items-center justify-center rounded-full border-2 border-background/40 bg-transparent px-[30px] py-3 text-[15px] font-extrabold text-background transition-colors duration-200 hover:border-background hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-background focus-visible:ring-offset-2 focus-visible:ring-offset-foreground"
             >
               {ctaSecundariaTexto}
+              <AvisoNuevaPestana texto={t("opensInNewTab", language)} />
             </a>
           )}
         </div>
