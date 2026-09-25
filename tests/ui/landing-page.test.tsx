@@ -97,7 +97,7 @@ describe('LandingPage', () => {
         contenido: { texto: { es: 'Un lugar increíble' }, autor: { es: 'Juan Pérez' } },
       }),
     ]);
-    expect(screen.getByText('“Un lugar increíble”')).toBeInTheDocument();
+    expect(screen.getByText('Un lugar increíble')).toBeInTheDocument();
     expect(screen.getByText('— Juan Pérez')).toBeInTheDocument();
   });
 

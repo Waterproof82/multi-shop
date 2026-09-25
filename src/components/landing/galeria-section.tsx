@@ -4,6 +4,7 @@ import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
+import { landingH2 } from "@/components/landing/landing-ui";
 
 interface GaleriaSectionProps {
   contenido: Record<string, unknown>;
@@ -22,20 +23,23 @@ export function GaleriaSection({ contenido }: Readonly<GaleriaSectionProps>) {
   if (imagenes.length === 0) return null;
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 py-16">
-      {titulo && <h2 className="mb-6 text-center text-2xl font-bold text-foreground">{titulo}</h2>}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+    <section className="mx-auto w-full max-w-7xl px-[clamp(20px,4vw,64px)] py-[clamp(56px,8vw,110px)]">
+      {titulo && <h2 className={`${landingH2} mb-[38px] max-w-[46ch]`}>{titulo}</h2>}
+      <div className="grid grid-cols-2 gap-3.5 min-[900px]:grid-cols-4">
         {imagenes.map((url, idx) => (
-          <div key={`${url}-${idx}`} className="relative aspect-square overflow-hidden rounded-lg border border-border">
+          <figure
+            key={`${url}-${idx}`}
+            className="group relative m-0 aspect-[3/4] overflow-hidden rounded-[26px] shadow-[0_2px_10px_color-mix(in_oklch,var(--foreground)_8%,transparent)]"
+          >
             <Image
               src={url}
               alt={`${t("landingGaleriaImagenAlt", language)} ${idx + 1}`}
               fill
-              sizes="(max-width: 768px) 50vw, 33vw"
-              className="object-cover"
+              sizes="(max-width: 900px) 50vw, 25vw"
+              className="object-cover transition-transform duration-[600ms] ease-out group-hover:scale-105"
               loading="lazy"
             />
-          </div>
+          </figure>
         ))}
       </div>
     </section>
