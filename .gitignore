@@ -30,16 +30,14 @@ Thumbs.db
 .idea/
 *.swp
 
-# MCP
-.mcp.json
-
 # Claude Code
 .claude/settings.local.json
 # Playwright MCP
 .playwright-mcp/
 
-# MCP tool files (may contain secrets)
-.mcp.json
+# MCP: .mcp.json SI se commitea (lo leen las sesiones cloud) y NUNCA lleva
+# secretos — solo ${VARIABLES}. Las versiones Windows con credenciales viven
+# en el scope local (`claude mcp add-json --scope local`), fuera del repo.
 network-requests.json
 *.network-requests.json
 
@@ -55,7 +53,11 @@ $HOME/
 
 # PAI / Claude Code / OpenCode local
 PAI-SETUP.md
-.claude/
+# .claude/: se commitean settings.json y skills/ (los usan las sesiones cloud);
+# el resto (settings.local.json, worktrees/...) es local.
+.claude/*
+!.claude/settings.json
+!.claude/skills/
 .opencode/
 
 # Lock files
