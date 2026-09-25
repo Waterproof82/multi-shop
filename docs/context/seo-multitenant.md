@@ -31,6 +31,10 @@
 - **Un solo `<main>` por pagina, y lo pone la pagina/layout de seccion**, no el
   layout raiz (ver `landing-page.tsx`, `client-menu-page.tsx`). Si el raiz lo
   pone, header/footer quedan dentro y dejan de ser landmarks banner/contentinfo.
+- **FAB del carrito (`?carrito=abierto`)**: es estado de UI, no una pagina.
+  Enlace con `rel="nofollow"`, excluido en robots.ts y su canonical es
+  `/carta`. Los botones del carrito usan `etiquetaAbrirCarrito()` para que el
+  `aria-label` incluya el contador (el badge va `aria-hidden`).
 - **Enlaces `target="_blank"`** en la landing: `<AvisoNuevaPestana>` (sr-only,
   WCAG 3.2.5). Test: `tests/ui/landing-accesibilidad.test.tsx`.
 

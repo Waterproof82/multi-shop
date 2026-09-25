@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
+import { CartProvider } from '@/lib/cart-context';
 import { LandingPage } from '@/components/landing-page';
 import type { EmpresaPublic, LandingSeccion } from '@/core/domain/entities/types';
 
@@ -148,5 +149,37 @@ describe('LanguageProvider — ?lang=', () => {
     globalThis.history.replaceState(null, '', '/?lang=constructor');
     renderLanding([]);
     expect(await screen.findByRole('navigation', { name: 'Navegación principal' })).toBeInTheDocument();
+  });
+});
+
+describe('Landing — FAB del carrito (tienda)', () => {
+  function renderTienda() {
+    return render(
+      <LanguageProvider>
+        <CartProvider>
+          <LandingPage
+            empresa={{ ...empresa, tipo: 'tienda', mostrarCarrito: true } as EmpresaPublic}
+            sections={[]}
+          />
+        </CartProvider>
+      </LanguageProvider>
+    );
+  }
+
+  it('enlaza a la carta con el carrito abierto, sin pasar autoridad a una URL de estado', () => {
+    renderTienda();
+    const fab = screen.getByRole('link', { name: 'Abrir carrito' });
+    expect(fab).toHaveAttribute('href', '/carta?carrito=abierto');
+    expect(fab).toHaveAttribute('rel', 'nofollow');
+  });
+
+  it('WhatsApp sigue avisando de pestaña nueva cuando se apila sobre el carrito', () => {
+    renderTienda();
+    expect(screen.getByRole('link', { name: 'Escríbenos por WhatsApp (se abre en una pestaña nueva)' })).toBeInTheDocument();
+  });
+
+  it('restaurante: sin FAB de carrito (la carta no tendria carrito)', () => {
+    renderLanding([]);
+    expect(screen.queryByRole('link', { name: /Abrir carrito/ })).not.toBeInTheDocument();
   });
 });

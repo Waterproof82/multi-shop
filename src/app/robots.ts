@@ -17,6 +17,9 @@ const DISALLOW_PATHS = [
   // `?mesa=` convierte `/` y `/carta` en la carta de una mesa concreta.
   "/*?mesa=",
   "/*&mesa=",
+  // `?carrito=abierto` (FAB de la landing) solo abre el carrito: estado de UI.
+  "/*?carrito=",
+  "/*&carrito=",
 ];
 
 export default async function robots(): Promise<MetadataRoute.Robots> {

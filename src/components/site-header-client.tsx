@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, BellRing, House } from "lucide-react";
+import { ShoppingCart, ShoppingBag, BellRing, House } from "lucide-react";
 import { ImagenSubida as Image } from './ui/imagen-subida';
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
@@ -11,6 +11,7 @@ import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
 import { getWaiterMesa } from "@/components/waiter-login-form";
 import { useMesaId } from "@/lib/mesa/use-mesa-id";
+import { etiquetaAbrirCarrito } from "@/lib/cart-abrir-param";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 const SCROLL_OFFSET_PX = 140;
@@ -137,11 +138,12 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
               size="icon"
               className="relative min-h-[44px] min-w-[44px] hover:bg-muted/50 hover:scale-105 motion-reduce:hover:scale-100 transition-all duration-200"
               onClick={handleOpenCart}
-              aria-label={t("openCart", language)}
+              aria-label={etiquetaAbrirCarrito(totalItems, language)}
             >
-              <ShoppingCart className="size-5 transition-transform duration-200 hover:scale-110" />
+              <ShoppingCart aria-hidden="true" className="size-5 transition-transform duration-200 hover:scale-110" />
               {totalItems > 0 && (
                 <span
+                  aria-hidden="true"
                   key={totalItems}
                   className={`absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop motion-reduce:animate-none' : ''} hover:scale-110 motion-reduce:hover:scale-100 transition-transform duration-200`}
                 >
@@ -157,13 +159,14 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
       <button
         type="button"
         onClick={handleOpenCart}
-        aria-label={t("openCart", language)}
-        className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-200 hover:scale-105 motion-reduce:hover:scale-100 animate-in fade-in-0 zoom-in-75 duration-200 md:right-6"
+        aria-label={etiquetaAbrirCarrito(totalItems, language)}
+        className="fixed bottom-5 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-foreground text-background ring-2 ring-background shadow-[0_10px_26px_-6px_color-mix(in_oklch,var(--foreground)_45%,transparent)] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105 active:scale-95 motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 animate-in fade-in-0 zoom-in-75 md:right-6 md:bottom-6"
       >
-        <ShoppingCart className="size-6" />
+        <ShoppingBag className="size-6" aria-hidden="true" />
         <span
+          aria-hidden="true"
           key={totalItems}
-          className={`absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop motion-reduce:animate-none' : ''}`}
+          className={`absolute -top-1.5 -right-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground ring-2 ring-background ${animate ? 'animate-badge-pop motion-reduce:animate-none' : ''}`}
         >
           {totalItems}
         </span>
