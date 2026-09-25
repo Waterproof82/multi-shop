@@ -17,6 +17,7 @@ const heroContenidoSchema = z.object({
   ctaSecundariaTexto: translatableTextSchema.optional(),
   ctaSecundariaUrl: z.string().max(2000).nullable().optional(),
   horario: translatableTextSchema.optional(),
+  marquee: translatableTextSchema.optional(),
 });
 
 const nosotrosContenidoSchema = z.object({
@@ -40,6 +41,7 @@ const testimonioContenidoSchema = z.object({
 });
 
 const galeriaContenidoSchema = z.object({
+  kicker: translatableTextSchema.optional(),
   titulo: translatableTextSchema.optional(),
   imagenes: z.array(z.string().max(2000)).max(20).default([]),
 });

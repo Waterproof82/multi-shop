@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
 import { LandingPage } from '@/components/landing-page';
 import type { EmpresaPublic, LandingSeccion } from '@/core/domain/entities/types';
@@ -123,7 +123,8 @@ describe('LandingPage', () => {
 
   it('el header solo muestra el link Nosotros si esa sección está activa', () => {
     renderLanding([seccion({ id: 's-nosotros', tipo: 'nosotros' })]);
-    expect(screen.getByRole('link', { name: 'Nosotros' })).toHaveAttribute('href', '#nosotros');
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Nosotros' })).toHaveAttribute('href', '#nosotros');
   });
 
   it('el hero se renderiza siempre primero, sin importar el orden de las demás secciones', () => {
@@ -133,5 +134,47 @@ describe('LandingPage', () => {
     ]);
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent('Título hero');
+  });
+
+  it('la galería muestra un título por defecto cuando el admin no lo rellena', () => {
+    renderLanding([
+      seccion({ id: 's-gal', tipo: 'galeria', contenido: { imagenes: ['https://cdn.example.com/1.webp'] } }),
+    ]);
+    expect(screen.getByRole('heading', { level: 2, name: 'El local' })).toBeInTheDocument();
+  });
+
+  it('resalta en cursiva el tramo del título entre asteriscos, sin mostrar los asteriscos', () => {
+    renderLanding([
+      seccion({ id: 's-hero', tipo: 'hero', contenido: { titulo: { es: 'Cocina *de verdad*' } } }),
+    ]);
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('Cocina de verdad');
+    expect(within(heading).getByText('de verdad').tagName).toBe('EM');
+  });
+
+  it('con teléfono muestra los accesos a WhatsApp (hero, franja, visítanos y botón flotante)', () => {
+    renderLanding([seccion({ id: 's-visit', tipo: 'visitanos' })], { telefono: '+34 600 11 22 33' });
+    const enlaces = screen
+      .getAllByRole('link')
+      .filter((a) => a.getAttribute('href') === 'https://wa.me/34600112233');
+    expect(enlaces.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('sin teléfono no pinta ningún enlace de WhatsApp', () => {
+    renderLanding([seccion({ id: 's-visit', tipo: 'visitanos' })]);
+    const enlaces = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('https://wa.me/'));
+    expect(enlaces).toHaveLength(0);
+  });
+
+  it('la cinta animada sale con las palabras del hero separadas por comas', () => {
+    const { container } = renderLanding([
+      seccion({ id: 's-hero', tipo: 'hero', contenido: { marquee: { es: 'Tandoori, Biryani ,, Naan' } } }),
+    ]);
+    const cinta = container.querySelector('.animate-landing-marquee');
+    expect(cinta).not.toBeNull();
+    // dos copias de la pista para el bucle continuo
+    expect(within(cinta as HTMLElement).getAllByText('Biryani')).toHaveLength(2);
+    // 3 palabras (la vacía entre comas se descarta) + 3 separadores, por 2 copias
+    expect(cinta?.children).toHaveLength(12);
   });
 });
