@@ -1,11 +1,14 @@
 import { getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
 import { getDomainFromHeaders } from "@/lib/domain-utils";
+import { getLandingSeccionUseCase } from "@/core/infrastructure/database";
 import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { LandingPage } from "@/components/landing-page";
 import { CartaRoute } from "@/components/carta-route";
 import { JsonLd } from "@/components/json-ld";
 import { shouldBypassLanding } from "@/lib/landing/should-bypass-landing";
+import { logger } from "@/core/infrastructure/logging/logger";
 import { cookies } from "next/headers";
+import type { LandingSeccion } from "@/core/domain/entities/types";
 
 export const dynamic = 'force-dynamic';
 
@@ -53,10 +56,28 @@ export default async function Home({ searchParams }: Readonly<HomeProps>) {
 
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
 
+  let sections: LandingSeccion[] = [];
+  try {
+    const seccionesResult = await getLandingSeccionUseCase().getAll(empresa.id);
+    if (seccionesResult.success) {
+      sections = seccionesResult.data.filter((seccion) => seccion.activo);
+    } else {
+      logger.logError({
+        codigo: 'LANDING_SECCIONES_FETCH_ERROR',
+        mensaje: seccionesResult.error.message,
+        modulo: 'use-case',
+        metodo: 'execute',
+        severity: 'error',
+      });
+    }
+  } catch (error) {
+    logger.logFromCatch(error, 'use-case', 'execute');
+  }
+
   return (
     <EmpresaThemeProvider colores={empresa.colores}>
       <JsonLd empresa={empresa} menuData={[]} baseUrl={baseUrl} />
-      <LandingPage empresa={empresa} />
+      <LandingPage empresa={empresa} sections={sections} />
     </EmpresaThemeProvider>
   );
 }
