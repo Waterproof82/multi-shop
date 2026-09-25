@@ -60,6 +60,7 @@ importers:
 <<<<<<< HEAD
         specifier: ^10.74.0
 <<<<<<< HEAD
+<<<<<<< HEAD
         version: 10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
 =======
         version: 10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28))
@@ -68,6 +69,9 @@ importers:
         specifier: ^10.75.0
         version: 10.75.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+        version: 10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       '@smithy/node-http-handler':
         specifier: ^4.4.14
         version: 4.4.14
@@ -83,16 +87,22 @@ importers:
       '@vercel/analytics':
         specifier: ^2.0.1
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
         version: 2.0.1(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@vercel/speed-insights':
         specifier: ^2.0.0
         version: 2.0.0(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+<<<<<<< HEAD
 =======
         version: 2.0.1(next@16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@vercel/speed-insights':
         specifier: ^2.0.0
         version: 2.0.0(next@16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       '@zxing/browser':
         specifier: ^0.2.0
         version: 0.2.0(@zxing/library@0.22.0)
@@ -129,10 +139,14 @@ importers:
       next:
         specifier: 16.2.12
 <<<<<<< HEAD
+<<<<<<< HEAD
         version: 16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 =======
         version: 16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+        version: 16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -258,8 +272,8 @@ importers:
         specifier: ^8.5
         version: 8.5.28
       supabase:
-        specifier: ^2.111.0
-        version: 2.111.0
+        specifier: ^2.117.0
+        version: 2.117.0
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2
@@ -2464,47 +2478,47 @@ packages:
     resolution: {integrity: sha512-Cmosty12gyKGK9N3bQb+lMmuAFev5nmUzaR1AsmZHqKOAGzqX1VQzmp49CNPwOx/pw0H9Qqk4rs9yhwTlKpfDg==}
     engines: {node: '>=22.0.0'}
 
-  '@supabase/cli-darwin-arm64@2.111.0':
-    resolution: {integrity: sha512-H1ucZ+9Z37Ha7uqYrKHfAy1vXWMVsN4gNlKaOpjKUYoHwDEbueEHVIDA1/PBIUd4HX+usJfpq+R+gWqzM/FKqQ==}
+  '@supabase/cli-darwin-arm64@2.117.0':
+    resolution: {integrity: sha512-MQVIxL+B5/U9xiXcUtky0vJQ5Qe0qhGkK2JLGwi5BAo5XxcC+iP+KCsVB1/2zzYT+d+fOlZnKyTFFWYO6Ut1sw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@supabase/cli-darwin-x64@2.111.0':
-    resolution: {integrity: sha512-4iMYm/XaAZJ8YzdJ2HBRVc7i9SRIwE6VQrnSt968WTt83M1y6knC7UENCKjMtO+As4QeZkICpUk50CeathqxbA==}
+  '@supabase/cli-darwin-x64@2.117.0':
+    resolution: {integrity: sha512-NMuY3n8Bfe+sPCdrUQQSFkOLFqlQYkg1C0SuqvJG4HVU8ukZ7IH2gy+HFGXNuVitFPapmHTPT8NjbZ+YrunZQw==}
     cpu: [x64]
     os: [darwin]
 
-  '@supabase/cli-linux-arm64-musl@2.111.0':
-    resolution: {integrity: sha512-RnvbVlJ4TX/UIwLiglBVQ2eL4GAl9SfWZmM5LENXyIaohBcRZHDva5t2OyK+BPGBtngjVGpb3QyfLdvkt9yJcw==}
+  '@supabase/cli-linux-arm64-musl@2.117.0':
+    resolution: {integrity: sha512-n5yZuBbBD5MnWqczezH72GAEfdTBHBk9Ei/pgpCnAJtClei9QQsiN1UZNw2A7K1EP4VWxgO/YZr3gFYgFFH1WQ==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@supabase/cli-linux-arm64@2.111.0':
-    resolution: {integrity: sha512-2KSHITFMXe2u5yALupBWHGeQ1IY4C8GkcIWPWgNFdtAPo03pgs1hLWgL1eeqSh/a0wB/6rgUlM1fQR/hAgCyCA==}
+  '@supabase/cli-linux-arm64@2.117.0':
+    resolution: {integrity: sha512-CcMHEB8znY9usMJ2dwAKQV06XIYHzLgnq1KY6HzVT9XmXo0qZxTifC/oWgHX39SmCFm7a3HR4K5J95ysYz+8Hg==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@supabase/cli-linux-x64-musl@2.111.0':
-    resolution: {integrity: sha512-2QVpsy/3v+TzqE5GgTCPruoxTlF3d8QPGirjcnah8hP66nxXStB9yTvxmJq+LtO3gwMt1Kpm7is0roZVkV55Pw==}
+  '@supabase/cli-linux-x64-musl@2.117.0':
+    resolution: {integrity: sha512-rlVDN5kXTOe+50wFN7DywFFx956XoYpEJpDkADvZ3k+qL5+7jGxSzQN/7xhHqlhjtSlHfx4QlxajfOerJNnrlg==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@supabase/cli-linux-x64@2.111.0':
-    resolution: {integrity: sha512-NwwNhiZZT4WYEPDXAbgZL+l77z/hoJ+w5t+52WBN1VlmoxwDmf2NP+UERM8wuCGFe/tmBlUuFE1eJYZfab0/qA==}
+  '@supabase/cli-linux-x64@2.117.0':
+    resolution: {integrity: sha512-qDJEURD/YajKD/OQ91O9XNHB/LHK9V8xZ9qGiUQCFhP9OAvMQjUT12j8k/mgTe4PqIxigGpfvm+eNxRcKnU9Rw==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@supabase/cli-windows-arm64@2.111.0':
-    resolution: {integrity: sha512-twawKY5xfU2dNOnZrKDmrudxRG/XIKcBxOb6X2lMGJU3N1Hd+8oWpI9TwM5Qv+eXehtlsKDmUvbitStXvJr/xQ==}
+  '@supabase/cli-windows-arm64@2.117.0':
+    resolution: {integrity: sha512-JNjI4dHhogjx1994jNoV9uUMioCrdzfdDJDeq0rZhYEepBGE9W+2gLniBQfQRzGxXK81mg5K3p9CTJYBZzbAKg==}
     cpu: [arm64]
     os: [win32]
 
-  '@supabase/cli-windows-x64@2.111.0':
-    resolution: {integrity: sha512-1F+X5tAYxAGx93ZZoIQBnIQ2Q2NnplKqjpigAS/zpTsNaWAjNi7EnxmuQKaEoAdqOHKbLhegVVDiw1+us3ZVpA==}
+  '@supabase/cli-windows-x64@2.117.0':
+    resolution: {integrity: sha512-oFmeLMwgWAyQhzPoR6w+eUOfyJcRMNHN2Ju4BxBtpZ9vW+dO1bAsWd7aVVcpn1sgHA/ptM8U48P+se5yZR7BdQ==}
     cpu: [x64]
     os: [win32]
 
@@ -4862,8 +4876,8 @@ packages:
   jose@6.1.3:
     resolution: {integrity: sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==}
 
-  jose@6.2.5:
-    resolution: {integrity: sha512-2E5L2yRp03FnwreJLJX8/r7mHiZICCf8kG7fAsTWkSQTDAcc46NIZoQLKy+EJ8sPoJlxyS4OQR5H70LjIZZlIQ==}
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   js-md5@0.8.3:
     resolution: {integrity: sha512-qR0HB5uP6wCuRMrWPTrkMaev7MJZwJuuw4fnwAzRgP4J4/F8RwtodOKpGp4XpqsLBFzzgqIO42efFAyz2Et6KQ==}
@@ -6317,8 +6331,8 @@ packages:
     resolution: {integrity: sha512-MvjXzkz/BOfyVDkG0oFOtBxHX2u3gKbMHIF/dXblZsgD3BWOFLmHovIpZY7BykJdAjcqRCBi1WYBNdEC9yI7vg==}
     engines: {node: '>= 8.0'}
 
-  supabase@2.111.0:
-    resolution: {integrity: sha512-0cjCRdYNV1h2XXa0wm04mdct7QuDU7sMul/NwETRJmN3+HCsdEu6u5n0oygL97fdf6sDrGmnAdBh8E4wsv1ayg==}
+  supabase@2.117.0:
+    resolution: {integrity: sha512-V4UDf/kgrqllHbc22vs89bL7pdBj3xhVolvDflByS5FuJb+tXpWhHZxYEbBQspxA0fBzaj+lpiedB72xTAZA4w==}
     hasBin: true
 
   supports-color@7.2.0:
@@ -9010,6 +9024,7 @@ snapshots:
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   '@sentry/bundler-plugins@10.70.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))':
 =======
   '@sentry/bundler-plugins@10.70.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28))':
@@ -9017,6 +9032,9 @@ snapshots:
 =======
   '@sentry/bundler-plugins@10.70.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))':
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  '@sentry/bundler-plugins@10.70.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))':
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
       '@sentry/cli': 2.58.6(encoding@0.1.13)(supports-color@8.1.1)
@@ -9029,6 +9047,7 @@ snapshots:
       rollup: 4.62.4
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)
 =======
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28)
@@ -9036,6 +9055,9 @@ snapshots:
 =======
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -9100,10 +9122,14 @@ snapshots:
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   '@sentry/nextjs@10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))':
 =======
   '@sentry/nextjs@10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28))':
 >>>>>>> origin/dependabot/npm_and_yarn/postcss-8.5.28
+=======
+  '@sentry/nextjs@10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))':
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.62.4)
@@ -9116,6 +9142,7 @@ snapshots:
       '@sentry/react': 10.74.0(react@19.2.8)
       '@sentry/server-utils': 10.74.0
       '@sentry/vercel-edge': 10.74.0
+<<<<<<< HEAD
 <<<<<<< HEAD
       '@sentry/webpack-plugin': 5.4.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
 =======
@@ -9139,6 +9166,10 @@ snapshots:
       '@sentry/webpack-plugin': 5.4.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
       next: 16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+      '@sentry/webpack-plugin': 5.4.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
+      next: 16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       rollup: 4.62.4
       stacktrace-parser: 0.1.11
     transitivePeerDependencies:
@@ -9151,10 +9182,14 @@ snapshots:
       - webpack
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   '@sentry/node-core@10.74.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))':
 =======
   '@sentry/node-core@10.75.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))':
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  '@sentry/node-core@10.74.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))':
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.75.0
@@ -9167,10 +9202,14 @@ snapshots:
       '@opentelemetry/sdk-trace-base': 2.10.0(@opentelemetry/api@1.9.1)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   '@sentry/node@10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)':
 =======
   '@sentry/node@10.75.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)':
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  '@sentry/node@10.74.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)':
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/instrumentation': 0.220.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
@@ -9230,12 +9269,16 @@ snapshots:
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
   '@sentry/webpack-plugin@5.4.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))':
     dependencies:
       '@sentry/bundler-plugins': 10.70.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
   '@sentry/webpack-plugin@5.4.0(encoding@0.1.13)(rollup@4.62.4)(supports-color@8.1.1)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28))':
@@ -9245,6 +9288,8 @@ snapshots:
 >>>>>>> origin/dependabot/npm_and_yarn/postcss-8.5.28
 =======
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     transitivePeerDependencies:
       - encoding
       - rollup
@@ -9625,28 +9670,28 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@supabase/cli-darwin-arm64@2.111.0':
+  '@supabase/cli-darwin-arm64@2.117.0':
     optional: true
 
-  '@supabase/cli-darwin-x64@2.111.0':
+  '@supabase/cli-darwin-x64@2.117.0':
     optional: true
 
-  '@supabase/cli-linux-arm64-musl@2.111.0':
+  '@supabase/cli-linux-arm64-musl@2.117.0':
     optional: true
 
-  '@supabase/cli-linux-arm64@2.111.0':
+  '@supabase/cli-linux-arm64@2.117.0':
     optional: true
 
-  '@supabase/cli-linux-x64-musl@2.111.0':
+  '@supabase/cli-linux-x64-musl@2.117.0':
     optional: true
 
-  '@supabase/cli-linux-x64@2.111.0':
+  '@supabase/cli-linux-x64@2.117.0':
     optional: true
 
-  '@supabase/cli-windows-arm64@2.111.0':
+  '@supabase/cli-windows-arm64@2.117.0':
     optional: true
 
-  '@supabase/cli-windows-x64@2.111.0':
+  '@supabase/cli-windows-x64@2.117.0':
     optional: true
 
   '@supabase/functions-js@2.116.0':
@@ -10171,6 +10216,9 @@ snapshots:
       uncrypto: 0.1.3
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
   '@vercel/analytics@2.0.1(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     optionalDependencies:
       next: 16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -10179,6 +10227,7 @@ snapshots:
   '@vercel/speed-insights@2.0.0(next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     optionalDependencies:
       next: 16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+<<<<<<< HEAD
 =======
   '@vercel/analytics@2.0.1(next@16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     optionalDependencies:
@@ -10189,6 +10238,8 @@ snapshots:
     optionalDependencies:
       next: 16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       react: 19.2.8
 
   '@vitest/coverage-v8@4.1.10(vitest@4.1.10)':
@@ -12369,7 +12420,7 @@ snapshots:
 
   jose@6.1.3: {}
 
-  jose@6.2.5: {}
+  jose@6.2.12: {}
 
   js-md5@0.8.3: {}
 
@@ -12766,6 +12817,7 @@ snapshots:
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)):
 =======
   minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28)):
@@ -12773,6 +12825,9 @@ snapshots:
 =======
   minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)):
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)):
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
@@ -12780,8 +12835,11 @@ snapshots:
       terser: 5.50.0
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)
     optionalDependencies:
       esbuild: 0.28.1
@@ -12886,10 +12944,14 @@ snapshots:
       react-dom: 19.2.8(react@19.2.8)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
 =======
   next@16.2.12(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  next@16.2.12(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@next/env': 16.2.12
       '@swc/helpers': 0.5.15
@@ -12899,10 +12961,14 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 <<<<<<< HEAD
+<<<<<<< HEAD
       styled-jsx: 5.1.6(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.8)
 =======
       styled-jsx: 5.1.6(@babel/core@7.29.0(supports-color@8.1.1))(react@19.2.8)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+      styled-jsx: 5.1.6(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.8)
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     optionalDependencies:
       '@next/swc-darwin-arm64': 16.2.12
       '@next/swc-darwin-x64': 16.2.12
@@ -13890,19 +13956,27 @@ snapshots:
   strnum@2.2.2: {}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   styled-jsx@5.1.6(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.8):
 =======
   styled-jsx@5.1.6(@babel/core@7.29.0(supports-color@8.1.1))(react@19.2.8):
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  styled-jsx@5.1.6(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.8):
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       client-only: 0.0.1
       react: 19.2.8
     optionalDependencies:
 <<<<<<< HEAD
+<<<<<<< HEAD
       '@babel/core': 7.29.7(supports-color@8.1.1)
 =======
       '@babel/core': 7.29.0(supports-color@8.1.1)
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+      '@babel/core': 7.29.7(supports-color@8.1.1)
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
 
   sumchecker@3.0.1(supports-color@8.1.1):
     dependencies:
@@ -13910,19 +13984,19 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  supabase@2.111.0:
+  supabase@2.117.0:
     dependencies:
       eciesjs: 0.5.0
-      jose: 6.2.5
+      jose: 6.2.12
     optionalDependencies:
-      '@supabase/cli-darwin-arm64': 2.111.0
-      '@supabase/cli-darwin-x64': 2.111.0
-      '@supabase/cli-linux-arm64': 2.111.0
-      '@supabase/cli-linux-arm64-musl': 2.111.0
-      '@supabase/cli-linux-x64': 2.111.0
-      '@supabase/cli-linux-x64-musl': 2.111.0
-      '@supabase/cli-windows-arm64': 2.111.0
-      '@supabase/cli-windows-x64': 2.111.0
+      '@supabase/cli-darwin-arm64': 2.117.0
+      '@supabase/cli-darwin-x64': 2.117.0
+      '@supabase/cli-linux-arm64': 2.117.0
+      '@supabase/cli-linux-arm64-musl': 2.117.0
+      '@supabase/cli-linux-x64': 2.117.0
+      '@supabase/cli-linux-x64-musl': 2.117.0
+      '@supabase/cli-windows-arm64': 2.117.0
+      '@supabase/cli-windows-x64': 2.117.0
 
   supports-color@7.2.0:
     dependencies:
@@ -14378,6 +14452,7 @@ snapshots:
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26):
 =======
   webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28):
@@ -14385,6 +14460,9 @@ snapshots:
 =======
   webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26):
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+  webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26):
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
@@ -14404,6 +14482,7 @@ snapshots:
       mime-db: 1.54.0
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
       minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
 =======
       minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.28))
@@ -14411,6 +14490,9 @@ snapshots:
 =======
       minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
 >>>>>>> origin/dependabot/npm_and_yarn/sentry-6b1ad41df8
+=======
+      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26))
+>>>>>>> origin/dependabot/npm_and_yarn/supabase-2.117.0
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
