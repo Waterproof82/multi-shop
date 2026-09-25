@@ -8,7 +8,7 @@ import { JsonLd } from "@/components/json-ld";
 import { shouldBypassLanding } from "@/lib/landing/should-bypass-landing";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { cookies } from "next/headers";
-import { buildTenantPageMetadata } from "@/lib/seo/tenant-seo";
+import { buildTenantPageMetadata, debeDesindexar } from "@/lib/seo/tenant-seo";
 import { t } from "@/lib/translations";
 import type { Metadata } from "next";
 import type { LandingSeccion } from "@/core/domain/entities/types";
@@ -24,16 +24,14 @@ export async function generateMetadata({ searchParams }: Readonly<HomeProps>): P
   const { empresa, isPedidos } = await resolverEmpresaPublica(await getDomainFromHeaders());
   if (!empresa) return {};
 
-  const hasMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
-  // Con `?mesa=` la home sirve la carta de UNA mesa (sesion de comensal):
-  // URL efimera, no debe indexarse. En el subdominio de pedidos, `/` es la
-  // carta: se titula como tal.
+  // `?mesa=` / `?carrito=` son URLs efimeras (ver debeDesindexar). En el
+  // subdominio de pedidos, `/` es la carta: se titula como tal.
   return buildTenantPageMetadata({
     empresa,
     path: "/",
     langParam: resolvedParams.lang,
     titulo: isPedidos ? (lang) => t("nuestraCarta", lang) : undefined,
-    noIndex: hasMesaParam,
+    noIndex: debeDesindexar(resolvedParams),
   });
 }
 

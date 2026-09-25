@@ -48,9 +48,18 @@
 - **Un solo `<main>` por pagina, y lo pone la pagina/layout de seccion**, no el
   layout raiz (ver `landing-page.tsx`, `client-menu-page.tsx`). Si el raiz lo
   pone, header/footer quedan dentro y dejan de ser landmarks banner/contentinfo.
+- **Un unico `<h1>` en la carta, sea cual sea el banner.** Lo garantiza
+  `BannerCarta` (`src/components/banner-carta.tsx`): el `SliderBanner` no pinta
+  titulo y el `HeroBanner` solo lo pinta si el admin rellena `titulo`; en esos
+  casos va un `<h1 class="sr-only">` con el nombre del negocio. Antes la carta
+  podia quedarse sin ningun `<h1>`. Test: `tests/ui/banner-carta.test.tsx`.
+- **URLs efimeras = robots.txt + `noindex`**: `debeDesindexar()` (en
+  `tenant-seo.ts`) marca `?mesa=` y `?carrito=` en `/` y `/carta`. El robots
+  evita el rastreo; el `noindex` cubre que se indexen igualmente por enlaces
+  externos.
 - **FAB del carrito (`?carrito=abierto`)**: es estado de UI, no una pagina.
-  Enlace con `rel="nofollow"`, excluido en robots.ts y su canonical es
-  `/carta`. Los botones del carrito usan `etiquetaAbrirCarrito()` para que el
+  Enlace con `rel="nofollow"`, excluido en robots.ts, `noindex` y su canonical
+  es `/carta`. Los botones del carrito usan `etiquetaAbrirCarrito()` para que el
   `aria-label` incluya el contador (el badge va `aria-hidden`).
 - **Enlaces `target="_blank"`** en la landing: `<AvisoNuevaPestana>` (sr-only,
   WCAG 3.2.5). Test: `tests/ui/landing-accesibilidad.test.tsx`.

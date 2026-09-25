@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   buildAlternates,
   buildTenantPageMetadata,
+  debeDesindexar,
   getDescriptionForLang,
   parseLangParam,
   recortarDescripcion,
@@ -68,6 +69,27 @@ describe('buildAlternates', () => {
 
   it('con un solo idioma no emite hreflang', () => {
     expect(buildAlternates('/', ['es'], 'es', 'es').languages).toEqual({});
+  });
+});
+
+describe('debeDesindexar', () => {
+  it('URL limpia o solo con ?lang= → indexable', () => {
+    expect(debeDesindexar({})).toBe(false);
+    expect(debeDesindexar({ lang: 'en' })).toBe(false);
+  });
+
+  it('?mesa= (carta de una mesa) → noindex', () => {
+    expect(debeDesindexar({ mesa: 'm-1' })).toBe(true);
+  });
+
+  it('?carrito=abierto (FAB de la landing, estado de UI) → noindex', () => {
+    expect(debeDesindexar({ carrito: 'abierto' })).toBe(true);
+    expect(debeDesindexar({ carrito: 'abierto', lang: 'en' })).toBe(true);
+  });
+
+  it('parametro vacio no cuenta; repetido si', () => {
+    expect(debeDesindexar({ mesa: '', carrito: '' })).toBe(false);
+    expect(debeDesindexar({ carrito: ['abierto', 'abierto'] })).toBe(true);
   });
 });
 

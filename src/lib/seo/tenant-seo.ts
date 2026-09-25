@@ -96,6 +96,20 @@ export function resolverIdiomaPagina(
   return primaryLang;
 }
 
+function paramPresente(value: string | string[] | undefined): boolean {
+  return Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.length > 0;
+}
+
+/**
+ * URLs efimeras que no deben indexarse: `?mesa=` (carta de UNA mesa) y
+ * `?carrito=` (el FAB de la landing abriendo el carrito: estado de UI). Mismas
+ * que bloquea robots.ts; el noindex cubre el caso de que se indexen igualmente
+ * por enlaces externos sin haberse rastreado.
+ */
+export function debeDesindexar(params: Record<string, string | string[] | undefined>): boolean {
+  return paramPresente(params.mesa) || paramPresente(params.carrito);
+}
+
 export interface Alternates {
   canonical: string;
   languages: Record<string, string>;
