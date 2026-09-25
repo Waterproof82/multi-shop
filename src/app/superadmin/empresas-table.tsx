@@ -5,6 +5,8 @@ import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Globe, MapPin, Image as ImageIcon, FileText, Share2, ExternalLink, FileSearch, ChevronDown, ChevronRight } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';
+import type { LandingSeccionTipo } from '@/core/domain/entities/types';
+import { LandingSwitches } from './landing-switches';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -43,6 +45,7 @@ interface EmpresaRow {
     hasInstagram: boolean;
     hasMetaDescription: boolean;
   };
+  landingActivas: LandingSeccionTipo[];
 }
 
 interface ModuloSwitchProps {
@@ -424,6 +427,9 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
       <td className="px-4 py-4">
         <GoogleReviewsField empresaId={empresa.id} initialValue={empresa.googleReviewsUrl} />
       </td>
+      <td className="px-4 py-4">
+        <LandingSwitches empresaId={empresa.id} empresaNombre={empresa.nombre} activas={empresa.landingActivas} />
+      </td>
       <td className="px-4 py-4 text-center">
         <SeoCell seoStatus={empresa.seoStatus} dominio={empresa.dominio} expanded={seoExpanded} />
       </td>
@@ -483,6 +489,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                 </span>
               </th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Google Reviews</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Landing</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <button
                   type="button"
