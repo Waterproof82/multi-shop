@@ -66,6 +66,12 @@
   --color-footer-bg: var(--footer-bg);
   --color-footer-fg: var(--footer-fg);
 
+  --color-whatsapp-strip: var(--whatsapp-strip);
+  --color-whatsapp-strip-2: var(--whatsapp-strip-2);
+  --color-whatsapp-ink: var(--whatsapp-ink);
+
+  --animate-landing-marquee: landing-marquee 42s linear infinite;
+
   --color-status-pending-bg: var(--status-pending-bg);
   --color-status-pending-text: var(--status-pending-text);
   --color-status-pending-hover: var(--status-pending-hover);
@@ -157,6 +163,12 @@
   --switch-inactive: #d4d4d8;
   --footer-bg: var(--foreground);
   --footer-fg: var(--background);
+  /* Colores de marca de WhatsApp (terceros, no del tenant). ink = verde
+     oscurecido para contraste AA sobre fondos claros; strip = franja con texto
+     blanco (el --whatsapp brillante no da AA con blanco). */
+  --whatsapp-strip: #128c4a;
+  --whatsapp-strip-2: #1aa85a;
+  --whatsapp-ink: #0d6e3a;
   --status-pending-bg: #FEF3C7;
   --status-pending-text: #92400E;
   --status-pending-hover: #FDE68A;
@@ -227,6 +239,7 @@
   --sidebar-ring: #D4D4D8;
   --whatsapp: #25D366;
   --whatsapp-hover: #20BD5A;
+  --whatsapp-ink: #4ADE80;
   --overlay: rgba(0, 0, 0, 0.5);
   --chart-orange: #F97316;
   --chart-blue: #3B82F6;
@@ -601,4 +614,11 @@
   .text-slate-accent {
     @apply text-cyan-300;
   }
+}
+
+/* Cinta de platos de la landing: la pista lleva el contenido duplicado, asi
+   que desplazar -50% deja la segunda copia justo donde empezaba la primera. */
+@keyframes landing-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }

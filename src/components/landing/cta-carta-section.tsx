@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
-import { Eyebrow } from "@/components/landing/landing-ui";
+import { Eyebrow, TituloResaltado } from "@/components/landing/landing-ui";
 
 interface CtaCartaSectionProps {
   contenido: Record<string, unknown>;
@@ -34,7 +34,7 @@ export function CtaCartaSection({ contenido }: Readonly<CtaCartaSectionProps>) {
         {kicker && <Eyebrow className="justify-center !text-background/80">{kicker}</Eyebrow>}
         {titulo && (
           <h2 className="mb-7 font-serif text-[clamp(40px,7vw,96px)] font-bold leading-[1.05] tracking-[-0.01em]">
-            {titulo}
+            <TituloResaltado texto={titulo} acentoClassName="italic text-background/70" />
           </h2>
         )}
         {descripcion && (
