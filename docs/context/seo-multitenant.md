@@ -13,6 +13,23 @@
 | `src/app/not-found.tsx` | 404 noindex |
 | `src/components/json-ld.tsx` | Serializa el `@graph` de `src/lib/seo/json-ld.ts` |
 
+## GEO (asistentes de IA: ChatGPT, Perplexity, Claude, Gemini)
+
+| Archivo | Responsabilidad |
+|---|---|
+| `src/app/llms.txt/route.ts` + `src/lib/seo/llms-txt.ts` | `/llms.txt` por tenant (formato llmstxt.org): resumen, direccion, telefono, horario, idiomas, paginas y carta con precios (max 300 productos) |
+| `src/lib/seo/crawlers-ia.ts` | Bots de IA con grupo propio en robots.txt |
+| `src/lib/seo/json-ld.ts` | `hasMap`, `currenciesAccepted` y `priceRange` (calculado de la carta real) |
+
+- **Grupo propio en robots.txt = reemplaza al de `*`.** Cada bot de IA debe
+  llevar el MISMO `disallow` o podria rastrear /admin/, /api/, URLs de mesa.
+  Test: `tests/compliance/geo-llms-txt.test.ts`.
+- Para cortar los bots de ENTRENAMIENTO sin perder los de busqueda: sacar
+  `CRAWLERS_IA_ENTRENAMIENTO` del grupo permitido y darles `disallow: "/"`.
+- `llms.txt` solo publica lo que YA es publico; nunca `emailNotification`.
+  No afirma IVA/IGIC (depende del tenant).
+- Google NO usa `llms.txt` para posicionar: es para asistentes de IA.
+
 ## Trampas criticas
 
 - **NUNCA `alternates`/`canonical` en el layout raiz.** Se hereda en TODAS las

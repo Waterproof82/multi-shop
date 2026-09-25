@@ -2,6 +2,7 @@ import type { EmpresaPublic } from "@/core/domain/entities/types";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
 import { getAvailableLangs, getPrimaryLang } from "@/lib/seo/tenant-seo";
 import { t } from "@/lib/translations";
+import { mapsSearchUrl } from "@/components/landing/landing-ui";
 
 // Datos estructurados schema.org por tenant, en un unico @graph enlazado por
 // @id (negocio ↔ web ↔ carta). Funciones puras; tests en
@@ -79,10 +80,32 @@ function menuId(baseUrl: string): string {
   return `${baseUrl}/carta#menu`;
 }
 
+/**
+ * `priceRange` a partir de la carta real ("5,00 € – 24,00 €"): un dato
+ * factual que los asistentes citan al responder "¿es caro?". Sin precios
+ * validos, null (no se inventa).
+ */
+export function rangoDePrecios(menuData: MenuCategoryVM[], moneda: string): string | null {
+  const precios = menuData
+    .flatMap((c) => c.items.map((i) => i.price))
+    .filter((p) => Number.isFinite(p) && p > 0);
+  if (precios.length === 0) return null;
+  let fmt: Intl.NumberFormat;
+  try {
+    fmt = new Intl.NumberFormat("es-ES", { style: "currency", currency: moneda });
+  } catch {
+    return null;
+  }
+  const min = fmt.format(Math.min(...precios));
+  const max = fmt.format(Math.max(...precios));
+  return min === max ? min : `${min} – ${max}`;
+}
+
 export function buildBusinessNode(
   empresa: EmpresaPublic,
   baseUrl: string,
-  conMenu: boolean
+  conMenu: boolean,
+  menuData: MenuCategoryVM[] = []
 ): Record<string, unknown> {
   const esTienda = empresa.tipo === "tienda";
   const lang = getPrimaryLang(empresa);
@@ -107,6 +130,13 @@ export function buildBusinessNode(
 
   const geo = parseGeoFromUrl(empresa.urlMapa);
   if (geo) node.geo = { "@type": "GeoCoordinates", ...geo };
+  const mapa = mapsSearchUrl(empresa.direccion, empresa.nombre);
+  if (mapa) node.hasMap = mapa;
+
+  const moneda = empresa.moneda || "EUR";
+  node.currenciesAccepted = moneda;
+  const rango = rangoDePrecios(menuData, moneda);
+  if (rango) node.priceRange = rango;
 
   const sameAs = [empresa.fb, empresa.instagram].map(urlAbsoluta).filter((u): u is string => u !== null);
   if (sameAs.length > 0) node.sameAs = sameAs;
@@ -164,7 +194,7 @@ export function buildJsonLdGraph(
   baseUrl: string
 ): Record<string, unknown> {
   const conMenu = empresa.tipo !== "tienda" && menuData.length > 0;
-  const graph = [buildBusinessNode(empresa, baseUrl, conMenu), buildWebSiteNode(empresa, baseUrl)];
+  const graph = [buildBusinessNode(empresa, baseUrl, conMenu, menuData), buildWebSiteNode(empresa, baseUrl)];
   if (conMenu) graph.push(buildMenuNode(empresa, menuData, baseUrl));
   return { "@context": "https://schema.org", "@graph": graph };
 }
