@@ -65,6 +65,9 @@ export const upsertLandingSeccionSchema = z.object({
   contenido: z.record(z.string(), z.unknown()),
 });
 
+// strict: los switches del superadmin solo togglean; un campo extra no puede colarse y pisar orden/contenido.
+export const setActivoLandingSeccionSchema = z.object({ activo: z.boolean() }).strict();
+
 export type UpsertLandingSeccionDTO = z.infer<typeof upsertLandingSeccionSchema>;
 
 // DESVIACIÓN respecto al código dado en la tarea (`z.ZodType` genérico sin

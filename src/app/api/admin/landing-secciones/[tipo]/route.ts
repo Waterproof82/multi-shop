@@ -1,6 +1,10 @@
 import { type NextRequest } from 'next/server';
 import { getLandingSeccionUseCase } from '@/core/infrastructure/database';
-import { upsertLandingSeccionSchema, parseContenidoPorTipo } from '@/core/application/dtos/landing-seccion.dto';
+import {
+  upsertLandingSeccionSchema,
+  setActivoLandingSeccionSchema,
+  parseContenidoPorTipo,
+} from '@/core/application/dtos/landing-seccion.dto';
 import { LANDING_SECCION_TIPOS, type LandingSeccionTipo } from '@/core/domain/entities/types';
 import { resolveAdminContextWithEmpresa, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
@@ -49,5 +53,31 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // z.object(), cuyo output siempre es un objeto plano.
     contenido: parsedContenido.data as Record<string, unknown>,
   });
+  return handleResultWithStatus(result);
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const ctx = await resolveAdminContextWithEmpresa(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
+
+  const { tipo } = await params;
+  if (!isLandingSeccionTipo(tipo)) {
+    return validationErrorResponse('Tipo de sección inválido');
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('JSON inválido');
+  }
+
+  const parsed = setActivoLandingSeccionSchema.safeParse(body);
+  if (!parsed.success) {
+    return validationErrorResponse(parsed.error.issues[0].message);
+  }
+
+  const result = await getLandingSeccionUseCase().setActivo(empresaId, tipo, parsed.data.activo);
   return handleResultWithStatus(result);
 }

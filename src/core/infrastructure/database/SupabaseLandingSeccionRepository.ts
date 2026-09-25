@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ILandingSeccionRepository,
+  LandingSeccionActiva,
   UpsertLandingSeccionData,
 } from '@/core/domain/repositories/ILandingSeccionRepository';
 import type { LandingSeccion, LandingSeccionTipo, Result } from '@/core/domain/entities/types';
@@ -65,6 +66,49 @@ export class SupabaseLandingSeccionRepository implements ILandingSeccionReposito
       return { success: true, data: this.mapRow(upserted as Record<string, unknown>) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseLandingSeccionRepository.upsertByTipo', { empresaId, details: { tipo } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findAllActivas(): Promise<Result<LandingSeccionActiva[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('empresa_landing_secciones')
+        .select('empresa_id, tipo')
+        .eq('activo', true)
+        .order('orden', { ascending: true });
+
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabaseLandingSeccionRepository.findAllActivas');
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener secciones de landing activas', module: 'repository', method: 'findAllActivas' } };
+      }
+
+      const filas = (data ?? []) as { empresa_id: string; tipo: LandingSeccionTipo }[];
+      return { success: true, data: filas.map(f => ({ empresaId: f.empresa_id, tipo: f.tipo })) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseLandingSeccionRepository.findAllActivas');
+      return { success: false, error: appError };
+    }
+  }
+
+  async setActivo(empresaId: string, tipo: LandingSeccionTipo, activo: boolean): Promise<Result<LandingSeccion>> {
+    try {
+      // Upsert con merge-duplicates solo actualiza las columnas enviadas: orden y contenido quedan intactos
+      // si la fila existe, y toman el DEFAULT de la tabla si se crea.
+      const { data: upserted, error } = await this.supabase
+        .from('empresa_landing_secciones')
+        .upsert({ empresa_id: empresaId, tipo, activo }, { onConflict: 'empresa_id,tipo' })
+        .select()
+        .single();
+
+      if (error || !upserted) {
+        await logger.logAndReturnError('DB_UPSERT_ERROR', error?.message ?? 'No data returned', 'repository', 'SupabaseLandingSeccionRepository.setActivo', { empresaId, details: { tipo } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al cambiar el estado de la sección de landing', module: 'repository', method: 'setActivo' } };
+      }
+
+      return { success: true, data: this.mapRow(upserted as Record<string, unknown>) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseLandingSeccionRepository.setActivo', { empresaId, details: { tipo } });
       return { success: false, error: appError };
     }
   }
