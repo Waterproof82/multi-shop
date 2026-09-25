@@ -1,6 +1,7 @@
 "use client";
 
-import { ShoppingCart, BellRing } from "lucide-react";
+import Link from "next/link";
+import { ShoppingCart, BellRing, ArrowLeft } from "lucide-react";
 import { ImagenSubida as Image } from './ui/imagen-subida';
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
@@ -17,9 +18,10 @@ const SCROLL_OFFSET_PX = 140;
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
   readonly empresa?: EmpresaPublic | null;
+  readonly mostrarVolverLanding?: boolean;
 }
 
-export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = false }: SiteHeaderClientProps) {
   const { openCart, totalItems } = useCart();
   const { language } = useLanguage();
   const [animate, setAnimate] = useState(false);
@@ -88,6 +90,17 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
       )}
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:h-20 md:px-6">
+        <div className="flex items-center gap-1 md:gap-3">
+        {mostrarVolverLanding && (
+          <Link
+            href="/"
+            aria-label={t("landingBackToHomeAria", language)}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-2 text-sm font-semibold text-foreground/80 transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:px-3"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            <span>{t("landingBackToHome", language)}</span>
+          </Link>
+        )}
         <button type="button" onClick={scrollToFirstCategory} className="flex items-center gap-2 cursor-pointer hover:scale-105 motion-reduce:hover:scale-100 transition-transform duration-200" aria-label={t("scrollToMenu", language)}>
           {logoUrl && (
             <div className="relative h-12 w-24 md:h-16 md:w-32 transition-transform duration-200 hover:scale-105 motion-reduce:hover:scale-100">
@@ -102,6 +115,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
             </div>
           )}
         </button>
+        </div>
         <div className="flex items-center gap-1">
           <LanguageSelector />
           {showCart && !waiterActive && mesaId && (

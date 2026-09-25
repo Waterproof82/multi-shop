@@ -1,6 +1,7 @@
 "use client";
 
 import { LandingHeader } from "@/components/landing-header";
+import { SiteFooter } from "@/components/site-footer";
 import { HeroSection } from "@/components/landing/hero-section";
 import { NosotrosSection } from "@/components/landing/nosotros-section";
 import { CtaCartaSection } from "@/components/landing/cta-carta-section";
@@ -10,7 +11,6 @@ import { VisitanosSection } from "@/components/landing/visitanos-section";
 import { WhatsappStrip } from "@/components/landing/whatsapp-strip";
 import { WhatsappFab } from "@/components/landing/whatsapp-fab";
 import { Marquee } from "@/components/landing/marquee";
-import { LandingFooter } from "@/components/landing/landing-footer";
 import { whatsappUrl } from "@/components/landing/landing-ui";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
@@ -100,12 +100,8 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
         {restoDeSecciones.map((seccion) => renderSeccion(seccion, { empresa, whatsappHref, showDondeEstamos }))}
       </main>
 
-      <LandingFooter
-        empresa={empresa}
-        whatsappHref={whatsappHref}
-        showNosotros={showNosotros}
-        showDondeEstamos={showDondeEstamos}
-      />
+      {/* Mismo pie que la carta; su mapa se omite si Visítanos ya pinta uno. */}
+      <SiteFooter empresa={empresa} hideMap={showDondeEstamos} />
       {whatsappHref && <WhatsappFab href={whatsappHref} />}
     </div>
   );
