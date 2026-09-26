@@ -235,7 +235,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     fb, instagram, url_mapa,
     direccion, telefono_whatsapp, email_notification, nif, razon_social,
     descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion,
-    mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado, envio_domicilio_habilitado
+    mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado, envio_domicilio_habilitado,
+    landing_habilitada
   `;
 
   private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
@@ -297,6 +298,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       pagosPickupHabilitados: (data.pagos_pickup_habilitados as boolean) ?? false,
       deliveryHabilitado: (data.delivery_habilitado as boolean) ?? false,
       envioDomicilioHabilitado: (data.envio_domicilio_habilitado as boolean) ?? false,
+      landingHabilitada: (data.landing_habilitada as boolean) ?? true,
     };
   }
 

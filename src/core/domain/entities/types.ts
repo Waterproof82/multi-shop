@@ -197,6 +197,7 @@ export interface EmpresaPublic {
   pagosPickupHabilitados?: boolean;
   deliveryHabilitado: boolean;
   envioDomicilioHabilitado: boolean;
+  landingHabilitada: boolean;
 }
 
 export interface Cliente {

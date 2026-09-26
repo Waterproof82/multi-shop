@@ -40,6 +40,7 @@ const baseEmpresa: EmpresaPublic = {
   pagosPickupHabilitados: false,
   deliveryHabilitado: false,
   envioDomicilioHabilitado: false,
+  landingHabilitada: true,
 };
 
 function renderHeader(props: {

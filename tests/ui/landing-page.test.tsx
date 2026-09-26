@@ -40,6 +40,7 @@ const baseEmpresa: EmpresaPublic = {
   pagosPickupHabilitados: false,
   deliveryHabilitado: false,
   envioDomicilioHabilitado: false,
+  landingHabilitada: true,
 };
 
 function seccion(overrides: Partial<LandingSeccion> & Pick<LandingSeccion, 'id' | 'tipo'>): LandingSeccion {

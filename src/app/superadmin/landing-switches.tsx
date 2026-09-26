@@ -3,25 +3,14 @@
 import { useState } from 'react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';
-import { LANDING_SECCION_TIPOS, type LandingSeccionTipo } from '@/core/domain/entities/types';
 
-const TIPO_LABELS: Record<LandingSeccionTipo, string> = {
-  hero: 'Hero',
-  nosotros: 'Nosotros',
-  cta_carta: 'Carta',
-  testimonio: 'Testimonio',
-  galeria: 'Galería',
-  visitanos: 'Visítanos',
-};
-
-interface SeccionSwitchProps {
+interface LandingSwitchProps {
   readonly empresaId: string;
   readonly empresaNombre: string;
-  readonly tipo: LandingSeccionTipo;
   readonly initialChecked: boolean;
 }
 
-function SeccionSwitch({ empresaId, empresaNombre, tipo, initialChecked }: Readonly<SeccionSwitchProps>) {
+export function LandingSwitches({ empresaId, empresaNombre, initialChecked }: Readonly<LandingSwitchProps>) {
   const [checked, setChecked] = useState(initialChecked);
   const [saving, setSaving] = useState(false);
 
@@ -31,11 +20,10 @@ function SeccionSwitch({ empresaId, empresaNombre, tipo, initialChecked }: Reado
     setChecked(next);
     setSaving(true);
     try {
-      // Solo `activo`: el contenido lo edita el admin del tenant en /admin/landing.
-      const res = await fetchWithCsrf(`/api/admin/landing-secciones/${tipo}?empresaId=${empresaId}`, {
+      const res = await fetchWithCsrf(`/api/admin/empresas/${empresaId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activo: next }),
+        body: JSON.stringify({ landing_habilitada: next }),
       });
       if (!res.ok) setChecked(!next);
     } catch {
@@ -47,36 +35,14 @@ function SeccionSwitch({ empresaId, empresaNombre, tipo, initialChecked }: Reado
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-slate-300">{TIPO_LABELS[tipo]}</span>
+      <span className="text-xs text-slate-300">Página de Inicio</span>
       <PillSwitch
         checked={checked}
         disabled={saving}
         onChange={() => void handleToggle()}
-        ariaLabel={`Sección ${TIPO_LABELS[tipo]} de ${empresaNombre}`}
+        ariaLabel={`Página de Inicio de ${empresaNombre}`}
         size="sm"
       />
-    </div>
-  );
-}
-
-interface LandingSwitchesProps {
-  readonly empresaId: string;
-  readonly empresaNombre: string;
-  readonly activas: readonly LandingSeccionTipo[];
-}
-
-export function LandingSwitches({ empresaId, empresaNombre, activas }: Readonly<LandingSwitchesProps>) {
-  return (
-    <div className="grid w-36 grid-cols-1 gap-1" role="group" aria-label={`Secciones de landing de ${empresaNombre}`}>
-      {LANDING_SECCION_TIPOS.map((tipo) => (
-        <SeccionSwitch
-          key={tipo}
-          empresaId={empresaId}
-          empresaNombre={empresaNombre}
-          tipo={tipo}
-          initialChecked={activas.includes(tipo)}
-        />
-      ))}
     </div>
   );
 }

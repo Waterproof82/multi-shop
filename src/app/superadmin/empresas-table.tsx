@@ -5,7 +5,6 @@ import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Globe, MapPin, Image as ImageIcon, FileText, Share2, ExternalLink, FileSearch, ChevronDown, ChevronRight } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';
-import type { LandingSeccionTipo } from '@/core/domain/entities/types';
 import { LandingSwitches } from './landing-switches';
 
 interface EmpresaStats {
@@ -45,7 +44,7 @@ interface EmpresaRow {
     hasInstagram: boolean;
     hasMetaDescription: boolean;
   };
-  landingActivas: LandingSeccionTipo[];
+  landingHabilitada: boolean;
 }
 
 interface ModuloSwitchProps {
@@ -428,7 +427,7 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
         <GoogleReviewsField empresaId={empresa.id} initialValue={empresa.googleReviewsUrl} />
       </td>
       <td className="px-4 py-4">
-        <LandingSwitches empresaId={empresa.id} empresaNombre={empresa.nombre} activas={empresa.landingActivas} />
+        <LandingSwitches empresaId={empresa.id} empresaNombre={empresa.nombre} initialChecked={empresa.landingHabilitada} />
       </td>
       <td className="px-4 py-4 text-center">
         <SeoCell seoStatus={empresa.seoStatus} dominio={empresa.dominio} expanded={seoExpanded} />
