@@ -41,6 +41,7 @@ const baseEmpresa: EmpresaPublic = {
   deliveryHabilitado: false,
   envioDomicilioHabilitado: false,
   landingHabilitada: true,
+  googleReviewsUrl: null,
 };
 
 function seccion(overrides: Partial<LandingSeccion> & Pick<LandingSeccion, 'id' | 'tipo'>): LandingSeccion {

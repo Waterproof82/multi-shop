@@ -47,6 +47,7 @@ const DEBEN_USAR_ENVOLTORIO = [
   'src/components/landing/galeria-section.tsx',
   'src/components/landing/marquee.tsx',
   'src/components/google-reviews-widget.tsx',
+  'src/components/site-footer.tsx',
   'src/components/mesa-orders-client.tsx',
   'src/components/ui/image-uploader.tsx',
   'src/app/not-found.tsx',
