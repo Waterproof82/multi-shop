@@ -110,6 +110,16 @@ function compararCategoriasPorActivoYOrden(a: Category, b: Category): number {
   return a.orden - b.orden;
 }
 
+function mensajeListaVacia(isSearching: boolean, filtradas: number, padres: number, language: Language): string | null {
+  if (isSearching) return filtradas === 0 ? t("noCategoriesFound", language) : null;
+  return padres === 0 ? t("noCategoriesYet", language) : null;
+}
+
+function textosDialogo(editingId: string | null, language: Language): { titulo: string; descripcion: string } {
+  if (editingId === null) return { titulo: t("newCategory", language), descripcion: t("newCategoryDesc", language) };
+  return { titulo: t("editCategory", language), descripcion: t("editCategoryDesc", language) };
+}
+
 const emptyForm: CategoryFormData = {
   nombre_es: '',
   nombre_en: '',
@@ -720,6 +730,8 @@ export default function CategoriasPage() {
   }
 
   const subcategoriasCount = categorias.filter(cat => cat.categoria_padre_id !== null).length;
+  const mensajeVacio = mensajeListaVacia(isSearching, filteredCategorias.length, padresCombinados.length, language);
+  const dialogo = textosDialogo(editingId, language);
 
   return (
     <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -895,10 +907,10 @@ export default function CategoriasPage() {
                   </SortableContext>
                 </DndContext>
               )}
-              {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
+              {mensajeVacio && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
-                    {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
+                    {mensajeVacio}
                   </td>
                 </tr>
               )}
@@ -1003,9 +1015,9 @@ export default function CategoriasPage() {
               </SortableContext>
             </DndContext>
           )}
-          {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
+          {mensajeVacio && (
             <div className="p-8 text-center text-slate-400">
-              {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
+              {mensajeVacio}
             </div>
           )}
         </div>
@@ -1015,10 +1027,10 @@ export default function CategoriasPage() {
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? t("editCategory", language) : t("newCategory", language)}
+              {dialogo.titulo}
             </DialogTitle>
             <DialogDescription>
-              {editingId ? t("editCategoryDesc", language) : t("newCategoryDesc", language)}
+              {dialogo.descripcion}
             </DialogDescription>
           </DialogHeader>
 
