@@ -20,10 +20,18 @@ function pistaPalabras(palabras: string[], copia: number) {
 }
 
 // Iconos/logos subidos por el admin (ya a 480px WebP): alto fijo, ancho libre.
+// Tarjeta con `bg-background` para que cada logo tenga un fondo propio y sólido:
+// sin ella, un logo con SVG transparente deja ver directamente el rayado
+// decorativo del fondo de la cinta, que se lee como "rayas" sueltas.
 function pistaImagenes(imagenes: string[], copia: number) {
   return imagenes.map((url, idx) => (
-    <span key={`${copia}-i-${idx}`} className="relative block h-[clamp(40px,4.6vw,72px)] w-[clamp(64px,7vw,120px)]">
-      <Image src={url} alt="" fill sizes="120px" className="object-contain" />
+    <span
+      key={`${copia}-i-${idx}`}
+      className="block h-[clamp(52px,5.8vw,84px)] w-[clamp(88px,9vw,144px)] rounded-xl bg-background p-3 shadow-sm"
+    >
+      <span className="relative block h-full w-full">
+        <Image src={url} alt="" fill sizes="144px" className="object-contain" />
+      </span>
     </span>
   ));
 }
