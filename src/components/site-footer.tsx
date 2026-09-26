@@ -122,14 +122,14 @@ export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
                 href={empresa.googleReviewsUrl ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg"
+                className="inline-flex items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg"
                 aria-label={`${t("googleReviews", language)} ${t("opensInNewTab", language)}`}
               >
                 <ImagenSubida
                   src={GOOGLE_REVIEWS_BADGE_URL}
                   alt={t("googleReviews", language)}
-                  width={88}
-                  height={88}
+                  width={180}
+                  height={72}
                   className="object-contain"
                 />
               </a>
