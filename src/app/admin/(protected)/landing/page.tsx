@@ -10,12 +10,10 @@ import { useLanguage } from "@/lib/language-context";
 import { useAdmin } from "@/lib/admin-context";
 import { t } from "@/lib/translations";
 import { TranslatableField, type TranslatableTextValue } from "@/components/admin/landing/translatable-field";
-import {
-  ADMIN_INPUT_CLASS,
-  ADMIN_LABEL_CLASS as LABEL_CLASS,
-  ADMIN_OUTLINE_BUTTON_CLASS as OUTLINE_BUTTON_CLASS,
-} from "@/components/admin/admin-styles";
+import { ADMIN_INPUT_CLASS, ADMIN_LABEL_CLASS as LABEL_CLASS } from "@/components/admin/admin-styles";
 import { SECCION_CAMPOS, type CampoConfig } from "@/components/admin/landing/seccion-campos";
+import { CintaCampo } from "@/components/admin/landing/cinta-campo";
+import { ListaImagenesCampo, UPLOADER_WRAPPER_CLASS } from "@/components/admin/landing/lista-imagenes-campo";
 import { LANDING_SECCION_TIPOS, type LandingSeccionTipo } from "@/core/domain/entities/types";
 
 interface LandingSeccionApi {
@@ -41,9 +39,6 @@ const TIPO_LABELS: Record<LandingSeccionTipo, string> = {
   galeria: "Galería",
   visitanos: "Visítanos",
 };
-
-// ImageUploader es compartido y usa tokens del tema; aca lo aclaramos solo dentro de este fondo oscuro.
-const UPLOADER_WRAPPER_CLASS = "[&_label]:text-white [&_span]:text-slate-300";
 
 function tabClass(activa: boolean): string {
   if (activa) return "bg-cyan-500/20 text-cyan-300";
@@ -178,44 +173,24 @@ export default function LandingAdminPage() {
       );
     }
 
-    const imagenes = (valor as string[] | undefined) ?? [];
+    if (campo.kind === "cinta") {
+      return (
+        <CintaCampo
+          key={campo.key}
+          label={campo.label}
+          contenido={seccionActual.contenido}
+          onChange={actualizarCampo}
+        />
+      );
+    }
+
     return (
-      <div key={campo.key} className="space-y-2">
-        <span className={LABEL_CLASS}>{campo.label}</span>
-        <div className="space-y-3">
-          {imagenes.map((url, idx) => (
-            <div key={idx} className={`flex items-start gap-2 ${UPLOADER_WRAPPER_CLASS}`}>
-              <ImageUploader
-                value={url}
-                onChange={(nuevaUrl) => {
-                  const next = [...imagenes];
-                  next[idx] = nuevaUrl;
-                  actualizarCampo("imagenes", next);
-                }}
-                label={`${campo.label} ${idx + 1}`}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className={OUTLINE_BUTTON_CLASS}
-                onClick={() => actualizarCampo("imagenes", imagenes.filter((_, i) => i !== idx))}
-              >
-                {t("remove", language)}
-              </Button>
-            </div>
-          ))}
-          {imagenes.length < 20 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className={OUTLINE_BUTTON_CLASS}
-              onClick={() => actualizarCampo("imagenes", [...imagenes, ""])}
-            >
-              + {t("landingSeccionAgregarImagen", language)}
-            </Button>
-          )}
-        </div>
-      </div>
+      <ListaImagenesCampo
+        key={campo.key}
+        label={campo.label}
+        imagenes={(valor as string[] | undefined) ?? []}
+        onChange={(next) => actualizarCampo("imagenes", next)}
+      />
     );
   }
 

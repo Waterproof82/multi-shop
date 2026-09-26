@@ -49,6 +49,27 @@ describe('parseContenidoPorTipo', () => {
     expect(result.success).toBe(false);
   });
 
+  it('hero: acepta la cinta en modo imágenes con su lista de imágenes', () => {
+    const result = parseContenidoPorTipo('hero', {
+      marqueeModo: 'imagenes',
+      marqueeImagenes: ['https://cdn.example.com/logo1.webp', 'https://cdn.example.com/logo2.webp'],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.marqueeImagenes).toHaveLength(2);
+  });
+
+  it('hero: rechaza un modo de cinta desconocido', () => {
+    const result = parseContenidoPorTipo('hero', { marqueeModo: 'video' });
+    expect(result.success).toBe(false);
+  });
+
+  it('hero: rechaza más de 20 imágenes en la cinta', () => {
+    const result = parseContenidoPorTipo('hero', {
+      marqueeImagenes: Array.from({ length: 21 }, (_, i) => `https://cdn.example.com/${i}.webp`),
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('nosotros: acepta kicker/titulo/descripcion/imagenUrl', () => {
     const result = parseContenidoPorTipo('nosotros', {
       titulo: { es: 'Nosotros' },

@@ -180,6 +180,34 @@ describe('LandingPage', () => {
     expect(cinta?.children).toHaveLength(12);
   });
 
+  it('la cinta en modo imágenes pinta las imágenes (dos copias) y no las palabras', () => {
+    const { container } = renderLanding([
+      seccion({
+        id: 's-hero',
+        tipo: 'hero',
+        contenido: {
+          marquee: { es: 'Tandoori, Biryani' },
+          marqueeModo: 'imagenes',
+          marqueeImagenes: ['https://cdn.example.com/a.webp', '', 'https://cdn.example.com/b.webp'],
+        },
+      }),
+    ]);
+    const cinta = container.querySelector('.animate-landing-marquee') as HTMLElement;
+    expect(cinta).not.toBeNull();
+    // 2 imágenes (la vacía se descarta) por 2 copias; decorativas → alt vacío
+    const imgs = cinta.querySelectorAll('img');
+    expect(imgs).toHaveLength(4);
+    expect(imgs[0]).toHaveAttribute('alt', '');
+    expect(within(cinta).queryByText('Biryani')).toBeNull();
+  });
+
+  it('la cinta en modo imágenes sin imágenes no se pinta', () => {
+    const { container } = renderLanding([
+      seccion({ id: 's-hero', tipo: 'hero', contenido: { marquee: { es: 'Naan' }, marqueeModo: 'imagenes' } }),
+    ]);
+    expect(container.querySelector('.animate-landing-marquee')).toBeNull();
+  });
+
   it('usa el mismo pie de página que la carta (SiteFooter)', () => {
     renderLanding([], { direccion: 'Calle Falsa 123' });
     const footer = screen.getByRole('contentinfo');

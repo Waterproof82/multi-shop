@@ -45,6 +45,7 @@ const DEBEN_USAR_ENVOLTORIO = [
   'src/components/landing/hero-section.tsx',
   'src/components/landing/nosotros-section.tsx',
   'src/components/landing/galeria-section.tsx',
+  'src/components/landing/marquee.tsx',
   'src/components/google-reviews-widget.tsx',
   'src/components/mesa-orders-client.tsx',
   'src/components/ui/image-uploader.tsx',

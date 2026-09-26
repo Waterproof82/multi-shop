@@ -11,9 +11,9 @@ import { VisitanosSection } from "@/components/landing/visitanos-section";
 import { WhatsappStrip } from "@/components/landing/whatsapp-strip";
 import { WhatsappFab } from "@/components/landing/whatsapp-fab";
 import { CartFab } from "@/components/landing/cart-fab";
-import { Marquee } from "@/components/landing/marquee";
+import { Marquee, type MarqueeModo } from "@/components/landing/marquee";
 import { whatsappUrl } from "@/components/landing/landing-ui";
-import { useLanguage } from "@/lib/language-context";
+import { useLanguage, type Language } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import type { EmpresaPublic, LandingSeccion } from "@/core/domain/entities/types";
 
@@ -62,6 +62,19 @@ function palabrasMarquee(texto: string | null): string[] {
     .filter((p) => p.length > 0);
 }
 
+function imagenesMarquee(valor: unknown): string[] {
+  if (!Array.isArray(valor)) return [];
+  return valor.filter((url): url is string => typeof url === "string" && url.length > 0);
+}
+
+// Sin `marqueeModo` (filas anteriores al modo) la cinta sigue siendo de palabras.
+function cintaDelHero(contenido: Record<string, unknown>, language: Language): { modo: MarqueeModo; items: string[] } {
+  if (contenido.marqueeModo === "imagenes") {
+    return { modo: "imagenes", items: imagenesMarquee(contenido.marqueeImagenes) };
+  }
+  return { modo: "palabras", items: palabrasMarquee(readTranslatable(contenido, "marquee", language)) };
+}
+
 // Brillos radiales muy suaves sobre el fondo (".body" de la referencia),
 // derivados de los colores del tenant.
 const FONDO_BRILLOS = {
@@ -83,7 +96,7 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
   // Misma regla que carta-route para el visitante normal: sin esto el FAB
   // llevaria a una carta sin carrito.
   const mostrarCarrito = empresa.mostrarCarrito && empresa.tipo !== "restaurante";
-  const marquee = palabrasMarquee(readTranslatable(heroContenido, "marquee", language));
+  const cinta = cintaDelHero(heroContenido, language);
 
   return (
     <div className="relative isolate flex min-h-screen flex-col bg-background">
@@ -98,7 +111,7 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
           telefono={empresa.telefono}
         />
         {whatsappHref && <WhatsappStrip href={whatsappHref} />}
-        <Marquee palabras={marquee} />
+        <Marquee modo={cinta.modo} items={cinta.items} />
 
         {restoDeSecciones.map((seccion) => renderSeccion(seccion, { empresa, whatsappHref, showDondeEstamos }))}
       </main>
