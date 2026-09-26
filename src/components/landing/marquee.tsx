@@ -10,10 +10,10 @@ interface MarqueeProps {
 
 function pistaPalabras(palabras: string[], copia: number) {
   return palabras.flatMap((palabra, idx) => [
-    <span key={`${copia}-p-${idx}`} className="text-foreground">
+    <span key={`${copia}-p-${idx}`} className="text-neutral-900">
       {palabra}
     </span>,
-    <span key={`${copia}-s-${idx}`} className="text-foreground/40">
+    <span key={`${copia}-s-${idx}`} className="text-neutral-900/40">
       ·
     </span>,
   ]);
@@ -30,15 +30,16 @@ function pistaImagenes(imagenes: string[], copia: number) {
 
 // Cinta en movimiento (".marquee" de la referencia): palabras o imágenes.
 // Decorativa: oculta a lectores de pantalla y quieta con prefers-reduced-motion.
-// Fondo blanco (`bg-background` del tenant) en vez de `bg-foreground` oscuro:
-// así los logos con SVG transparente no necesitan una tarjeta propia detrás.
+// Fondo blanco fijo (no `bg-background`): ese token seguía el modo claro/oscuro
+// del SISTEMA (next-themes, ver `theme-provider.tsx`), no el tenant, así que con
+// el SO en modo oscuro se volvía casi negro. Esta cinta debe verse igual siempre.
 export function Marquee({ modo, items }: Readonly<MarqueeProps>) {
   if (items.length === 0) return null;
 
   const pista = modo === "imagenes" ? pistaImagenes : pistaPalabras;
 
   return (
-    <div aria-hidden="true" className="relative overflow-hidden border-y border-primary bg-background py-7">
+    <div aria-hidden="true" className="relative overflow-hidden border-y border-primary bg-white py-7">
       <div className="flex w-max animate-landing-marquee items-center gap-12 whitespace-nowrap font-serif text-[clamp(28px,3.4vw,52px)] font-light italic tracking-[-0.01em] motion-reduce:animate-none">
         {pista(items, 0)}
         {pista(items, 1)}
