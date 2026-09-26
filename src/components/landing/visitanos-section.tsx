@@ -48,13 +48,12 @@ const socialPillClass =
 
 interface RedesProps {
   empresa: EmpresaPublic;
-  whatsappHref: string | null;
   etiqueta: string;
   nuevaPestana: string;
 }
 
-function Redes({ empresa, whatsappHref, etiqueta, nuevaPestana }: Readonly<RedesProps>) {
-  if (!empresa.instagram && !empresa.fb && !whatsappHref) return null;
+function Redes({ empresa, etiqueta, nuevaPestana }: Readonly<Omit<RedesProps, 'whatsappHref'>>) {
+  if (!empresa.instagram && !empresa.fb) return null;
   return (
     <div className="mt-9 border-t border-border pt-7">
       <Eyebrow solo className="!mb-4">
@@ -75,15 +74,6 @@ function Redes({ empresa, whatsappHref, etiqueta, nuevaPestana }: Readonly<Redes
             <a href={empresa.fb} target="_blank" rel="noopener noreferrer me" className={socialPillClass}>
               <FacebookIcon className="size-5 text-primary" />
               <span>Facebook</span>
-              <AvisoNuevaPestana texto={nuevaPestana} />
-            </a>
-          </li>
-        )}
-        {whatsappHref && (
-          <li>
-            <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={socialPillClass}>
-              <WhatsAppIcon className="size-5 text-primary" />
-              <span>WhatsApp</span>
               <AvisoNuevaPestana texto={nuevaPestana} />
             </a>
           </li>
@@ -167,7 +157,6 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
 
           <Redes
             empresa={empresa}
-            whatsappHref={whatsappHref}
             etiqueta={t("landingFollowUs", language)}
             nuevaPestana={nuevaPestana}
           />
