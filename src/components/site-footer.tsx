@@ -14,7 +14,9 @@ interface SiteFooterProps {
 }
 
 // Badge compartido por todas las empresas — subido una única vez a R2, no pasa por ImageUploader.
-const GOOGLE_REVIEWS_BADGE_URL = `${process.env.NEXT_PUBLIC_R2_DOMAIN ?? ''}/shared/google-reviews-badge.png`;
+// El sufijo es el hash del contenido: al cambiar la imagen cambia la URL, así que
+// no depende de purgar la caché de borde de Cloudflare (bloqueada desde este entorno).
+const GOOGLE_REVIEWS_BADGE_URL = `${process.env.NEXT_PUBLIC_R2_DOMAIN ?? ''}/shared/google-reviews-badge-4c4187e8.png`;
 
 function footerGridColsClass(columnasVisibles: number): string {
   if (columnasVisibles >= 4) return "lg:grid-cols-4";
