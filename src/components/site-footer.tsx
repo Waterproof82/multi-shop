@@ -1,7 +1,8 @@
 "use client"
 
-import { MapPin, Mail, Globe, Phone, Settings, Camera } from "lucide-react"
+import { MapPin, Mail, Globe, Phone, Settings } from "lucide-react"
 import { FacebookIcon } from "@/components/ui/facebook-icon"
+import { InstagramIcon } from "@/components/ui/instagram-icon"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
@@ -29,7 +30,7 @@ export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
               {empresa.instagram && (
                 <li>
                   <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-footer-fg/85 hover:text-footer-fg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg rounded-sm"                   aria-label={`${t("instagram", language)} ${t("opensInNewTab", language)}`}>
-                    <Camera className="w-5 h-5" />
+                    <InstagramIcon className="w-5 h-5" />
                   </a>
                 </li>
               )}
