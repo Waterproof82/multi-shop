@@ -112,6 +112,13 @@ export function telHref(telefono: string): string {
   return `tel:${telefono.replaceAll(/[^\d+]/g, "")}`;
 }
 
+/** Muestra el teléfono sin el prefijo del país (ej: 34601396419 → 601396419). */
+export function displayPhoneNumber(telefono: string): string {
+  const digitos = telefono.replaceAll(/\D/g, "");
+  if (digitos.startsWith("34")) return digitos.slice(2);
+  return digitos;
+}
+
 export function mapsSearchUrl(direccion: string | null | undefined, nombre: string): string | null {
   if (!direccion) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${nombre} ${direccion}`)}`;

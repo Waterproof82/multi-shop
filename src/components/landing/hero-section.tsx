@@ -11,6 +11,7 @@ import {
   AvisoNuevaPestana,
   Eyebrow,
   TituloResaltado,
+  displayPhoneNumber,
   landingBtnGhost,
   landingBtnOscuro,
   landingShadowSoft,
@@ -104,7 +105,7 @@ export function HeroSection({ contenido, empresaNombre, telefono }: Readonly<Her
             {telefono && (
               <Meta etiqueta={t("phone", language)}>
                 <a href={telHref(telefono)} className="transition-colors hover:text-primary">
-                  {telefono}
+                  {displayPhoneNumber(telefono)}
                 </a>
               </Meta>
             )}

@@ -12,6 +12,7 @@ import {
   AvisoNuevaPestana,
   Eyebrow,
   TituloResaltado,
+  displayPhoneNumber,
   landingBtnOscuro,
   landingBtnWhatsapp,
   landingH2,
@@ -138,7 +139,7 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
                   href={telHref(empresa.telefono)}
                   className="transition-colors hover:text-primary"
                 >
-                  {empresa.telefono}
+                  {displayPhoneNumber(empresa.telefono)}
                 </a>
               </InfoBlock>
             )}
