@@ -153,12 +153,13 @@ describe('LandingPage', () => {
     expect(within(heading).getByText('de verdad').tagName).toBe('EM');
   });
 
-  it('con teléfono muestra los accesos a WhatsApp (hero, franja, visítanos y botón flotante)', () => {
+  // 'Síguenos' ya no incluye WhatsApp (10f92040): quedan 3 accesos.
+  it('con teléfono muestra los accesos a WhatsApp', () => {
     renderLanding([seccion({ id: 's-visit', tipo: 'visitanos' })], { telefono: '+34 600 11 22 33' });
     const enlaces = screen
       .getAllByRole('link')
       .filter((a) => a.getAttribute('href') === 'https://wa.me/34600112233');
-    expect(enlaces.length).toBeGreaterThanOrEqual(4);
+    expect(enlaces.length).toBeGreaterThanOrEqual(3);
   });
 
   it('sin teléfono no pinta ningún enlace de WhatsApp', () => {
