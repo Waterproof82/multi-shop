@@ -4,8 +4,7 @@ import { ReactNode, useState, useMemo, useEffect, useCallback } from "react"
 import { createClient } from "@supabase/supabase-js"
 import dynamic from "next/dynamic"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
-import { HeroBanner } from "@/components/hero-banner"
-import { SliderBanner } from "@/components/slider-banner"
+import { BannerCarta } from "@/components/banner-carta"
 import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
@@ -20,6 +19,7 @@ import { useCart } from "@/lib/cart-context"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
+import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -57,7 +57,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'empty' {
 
 export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false, modalidadesEntrega }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
-  const { clearCart, closeCart, isCartOpen } = useCart();
+  const { clearCart, closeCart, openCart, isCartOpen } = useCart();
   const mesaId = useMesaId();
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
@@ -82,6 +82,17 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     if (!mesaId) return;
     void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/activate`, { method: 'POST' });
   }, [isWaiterMode, mesaId]);
+
+  // El FAB de la landing llega con ?carrito=abierto. Se limpia la URL ANTES de
+  // abrir: openCart() apila una entrada de historial con el href actual.
+  useEffect(() => {
+    if (!showCart) return;
+    const url = new URL(globalThis.location.href);
+    if (url.searchParams.get(PARAM_ABRIR_CARRITO) !== VALOR_ABRIR_CARRITO) return;
+    url.searchParams.delete(PARAM_ABRIR_CARRITO);
+    globalThis.history.replaceState(globalThis.history.state, '', url.toString());
+    openCart();
+  }, [showCart, openCart]);
 
   // Close search when cart opens in waiter mode
   useEffect(() => {
@@ -344,11 +355,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         <>
           {header === undefined ? null : header}
           <PromoNotification />
-          {empresa?.tipoBanner === "slider" ? (
-            <SliderBanner slides={empresa.bannerSlides} empresaNombre={empresa.nombre} />
-          ) : (
-            <HeroBanner empresa={empresa} bannerFit={empresa?.bannerFit ?? "contain"} />
-          )}
+          <BannerCarta empresa={empresa} />
           <div className="w-full bg-background border-b border-border">
             <div className="max-w-2xl mx-auto px-4 py-3">
               <div className="relative">
@@ -367,7 +374,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         </>
       )}
 
-      <div className="flex-1">
+      <main id="main-content" className="flex-1">
         {menuData.length > 0 ? (
           <>
             {!searchResultsCategory && (
@@ -402,7 +409,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
             </div>
           </div>
         )}
-      </div>
+      </main>
       <SiteFooter empresa={empresa} />
       {/* Welcome discount popup - shows after 30 seconds for empresas with feature enabled */}
       {showCart && !isWaiterMode && empresa?.descuentoBienvenidaActivo && (

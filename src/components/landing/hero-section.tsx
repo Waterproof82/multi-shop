@@ -1,25 +1,26 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
-import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
 import {
+  AvisoNuevaPestana,
   Eyebrow,
   TituloResaltado,
   landingBtnGhost,
-  landingBtnPrimary,
+  landingBtnOscuro,
   landingShadowSoft,
+  telHref,
 } from "@/components/landing/landing-ui";
 
 interface HeroSectionProps {
   contenido: Record<string, unknown>;
   empresaNombre: string;
   telefono: string | null;
-  whatsappHref: string | null;
 }
 
 function gridClass(conImagen: boolean): string {
@@ -32,16 +33,17 @@ interface MetaProps {
   children: ReactNode;
 }
 
+// Par etiqueta/valor de una lista de descripcion (<dl>): "Horario" → "...".
 function Meta({ etiqueta, children }: Readonly<MetaProps>) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">{etiqueta}</span>
-      <em className="not-italic">{children}</em>
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">{etiqueta}</dt>
+      <dd className="whitespace-pre-line">{children}</dd>
     </div>
   );
 }
 
-export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }: Readonly<HeroSectionProps>) {
+export function HeroSection({ contenido, empresaNombre, telefono }: Readonly<HeroSectionProps>) {
   const { language } = useLanguage();
   const kicker = readTranslatable(contenido, "kicker", language);
   const titulo = readTranslatable(contenido, "titulo", language) ?? empresaNombre;
@@ -51,9 +53,12 @@ export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }
   const ctaSecundariaUrl =
     typeof contenido.ctaSecundariaUrl === "string" && contenido.ctaSecundariaUrl ? contenido.ctaSecundariaUrl : null;
   const horario = readTranslatable(contenido, "horario", language);
+  const tituloId = useId();
+  const nuevaPestana = t("opensInNewTab", language);
 
   return (
     <section
+      aria-labelledby={tituloId}
       className={`grid w-full items-stretch gap-[clamp(16px,2.4vw,30px)] p-[clamp(16px,2.4vw,30px)] ${gridClass(imagenUrl !== null)}`}
     >
       {imagenUrl && (
@@ -62,7 +67,7 @@ export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }
         >
           <Image
             src={imagenUrl}
-            alt=""
+            alt={empresaNombre}
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-cover object-[center_55%] saturate-[1.05]"
@@ -73,7 +78,7 @@ export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }
 
       <div className="flex flex-col justify-center p-[clamp(24px,4vw,60px)]">
         {kicker && <Eyebrow>{kicker}</Eyebrow>}
-        <h1 className="mb-7 font-serif text-[clamp(40px,6.4vw,96px)] font-bold leading-[1.05] tracking-[-0.01em] text-foreground">
+        <h1 id={tituloId} className="mb-7 font-serif text-[clamp(40px,6.4vw,96px)] font-bold leading-[1.05] tracking-[-0.01em] text-foreground">
           <TituloResaltado texto={titulo} />
         </h1>
         {descripcion && (
@@ -81,34 +86,29 @@ export function HeroSection({ contenido, empresaNombre, telefono, whatsappHref }
             {descripcion}
           </p>
         )}
-        <div className="mb-6 flex flex-wrap gap-3">
-          <Link href="/carta" className={landingBtnPrimary}>
+        <div className="mb-10 flex flex-wrap gap-3">
+          <Link href="/carta" className={`${landingBtnOscuro} px-[30px] py-3 text-[15px]`}>
+            <ShoppingBag className="size-5 shrink-0" aria-hidden="true" />
             {t("viewMenu", language)}
           </Link>
           {ctaSecundariaTexto && ctaSecundariaUrl && (
             <a href={ctaSecundariaUrl} target="_blank" rel="noopener noreferrer" className={landingBtnGhost}>
               {ctaSecundariaTexto}
+              <AvisoNuevaPestana texto={nuevaPestana} />
             </a>
           )}
         </div>
-        {whatsappHref && (
-          <p className="mb-10 text-sm">
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-[44px] items-center gap-2 border-b border-transparent font-semibold text-whatsapp-ink transition-colors hover:border-whatsapp-ink"
-            >
-              <WhatsAppIcon className="size-[18px] shrink-0" />
-              <span>{t("landingHeroWhatsappHint", language)}</span>
-            </a>
-          </p>
-        )}
         {(horario || telefono) && (
-          <div className="grid grid-cols-1 gap-6 border-t border-border pt-8 text-sm text-muted-foreground sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-6 border-t border-border pt-8 text-sm text-muted-foreground sm:grid-cols-2">
             {horario && <Meta etiqueta={t("landingHours", language)}>{horario}</Meta>}
-            {telefono && <Meta etiqueta={t("phone", language)}>{telefono}</Meta>}
-          </div>
+            {telefono && (
+              <Meta etiqueta={t("phone", language)}>
+                <a href={telHref(telefono)} className="transition-colors hover:text-primary">
+                  {telefono}
+                </a>
+              </Meta>
+            )}
+          </dl>
         )}
       </div>
     </section>

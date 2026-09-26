@@ -16,7 +16,7 @@ export default function WaiterLayout({ children }: Readonly<{ children: React.Re
     <WaiterCatalogProvider>
       <PushRegistrar />
       <OfflineBanner />
-      {children}
+      <main id="main-content">{children}</main>
     </WaiterCatalogProvider>
   );
 }

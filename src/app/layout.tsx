@@ -15,7 +15,8 @@ import { ExitConfirmation } from "@/components/exit-confirmation";
 import { SwRegistrar } from "@/components/sw-registrar";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
-import type { EmpresaPublic } from "@/core/domain/entities/types";
+import { getDescriptionForLang, getPrimaryLang, LOCALE_MAP } from "@/lib/seo/tenant-seo";
+import { t } from "@/lib/translations";
 import * as Sentry from '@sentry/nextjs';
 import { SentryProvider } from '@/components/sentry-provider';
 import { AnaliticaVercel } from '@/components/analitica-vercel';
@@ -26,42 +27,6 @@ const playfair = Playfair_Display({
   variable: "--font-playfair",
   display: "swap",
 });
-
-// Multi-language fallback descriptions for SEO
-const FALLBACK_DESCRIPTIONS: Record<string, string> = {
-  es: "Carta digital y pedidos - Consulta nuestro menú online, pide a domicilio o para recoger",
-  en: "Digital menu and online ordering - Browse our menu, order for delivery or pickup",
-  fr: "Menu numérique et commandes en ligne - Consultez notre menu, commandez pour livraison",
-  it: "Menu digitale e ordini online - Consulta il nostro menu, ordina per consegna",
-  de: "Digitales Menü und Online-Bestellung - Durchsuchen Sie unser Menü, bestellen Sie",
-};
-
-const LOCALE_MAP: Record<string, string> = {
-  es: "es_ES", en: "en_US", fr: "fr_FR", it: "it_IT", de: "de_DE",
-};
-
-type LangKey = "es" | "en" | "fr" | "it" | "de";
-const LANG_KEYS: LangKey[] = ["es", "en", "fr", "it", "de"];
-
-function getPrimaryLang(empresa: EmpresaPublic | null): LangKey {
-  if (!empresa?.descripcion) return "es";
-  for (const lang of LANG_KEYS) {
-    if (empresa.descripcion[lang]) return lang;
-  }
-  return "es";
-}
-
-function getAvailableLangs(empresa: EmpresaPublic | null): LangKey[] {
-  if (!empresa?.descripcion) return ["es"];
-  const available = LANG_KEYS.filter(l => empresa.descripcion?.[l]);
-  return available.length > 0 ? available : ["es"];
-}
-
-function getDescriptionForLang(empresa: EmpresaPublic | null, lang: LangKey): string {
-  return empresa?.descripcion?.[lang]?.substring(0, 160)
-    ?? FALLBACK_DESCRIPTIONS[lang]
-    ?? FALLBACK_DESCRIPTIONS.es;
-}
 
 function getMimeType(url: string): string {
   if (!url || url === '/favicon.ico') return 'image/x-icon';
@@ -87,47 +52,31 @@ export async function generateMetadata(): Promise<Metadata> {
   const isDefaultFavicon = faviconUrl === '/favicon.ico';
 
   const title = empresa?.nombre || "Mermelada de Tomate";
-
   const primaryLang = getPrimaryLang(empresa);
-  const availableLangs = getAvailableLangs(empresa);
-
   const description = getDescriptionForLang(empresa, primaryLang);
-
   const ogImage = empresa?.urlImage || empresa?.logoUrl || undefined;
-  const primaryLocale = LOCALE_MAP[primaryLang] ?? "es_ES";
-  const alternateLocales = availableLangs
-    .filter(l => l !== primaryLang)
-    .map(l => LOCALE_MAP[l])
-    .filter(Boolean);
 
-  const hreflangMap: Record<string, string> = { [primaryLang]: "/" };
-  for (const lang of availableLangs) {
-    if (lang !== primaryLang) hreflangMap[lang] = `/?lang=${lang}`;
-  }
-
+  // Valores POR DEFECTO para todo el arbol. Sin `alternates` a proposito: el
+  // canonical y el hreflang los declara cada pagina indexable (ver
+  // src/lib/seo/tenant-seo.ts). Uno aqui se heredaria en /carta, /privacidad...
+  // apuntando todos a "/".
   return {
-    title,
+    title: { default: title, template: `%s | ${title}` },
     description,
+    applicationName: title,
     metadataBase: new URL(baseUrl),
-    robots: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large" as const,
-      "max-snippet": -1,
-    },
-    alternates: {
-      canonical: "/",
-      languages: hreflangMap,
-    },
+    formatDetection: { telephone: false, email: false, address: false },
+    // Dominio sin empresa: pagina de error, no debe indexarse.
+    robots: empresa
+      ? { index: true, follow: true, "max-image-preview": "large" as const, "max-snippet": -1 }
+      : { index: false, follow: false },
     openGraph: {
       title,
       description,
-      url: baseUrl,
       siteName: title,
       type: "website",
-      locale: primaryLocale,
-      alternateLocale: alternateLocales,
-      ...(ogImage ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] } : {}),
+      locale: LOCALE_MAP[primaryLang],
+      ...(ogImage ? { images: [{ url: ogImage, alt: title }] } : {}),
     },
     twitter: {
       card: ogImage ? "summary_large_image" : "summary",
@@ -184,16 +133,20 @@ export default async function RootLayout({
                   href="#main-content"
                   className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
-                  Saltar al contenido principal
+                  {t("skipToContent", lang)}
                 </a>
                 {debeMontarseWaiterBanner(empresa?.tipo) && (
                   <Suspense>
                     <WaiterBanner />
                   </Suspense>
                 )}
-                <main id="main-content">
-                  {children}
-                </main>
+                {/* Sin main aqui: cada pagina/layout pone el suyo
+                    (main#main-content). Envolver todo en un main
+                    metia el header/footer de la landing y la carta
+                    DENTRO de main —dejaban de ser landmarks banner/
+                    contentinfo— y anidaba el main de admin, superadmin,
+                    TPV y tracking dentro de otro. */}
+                {children}
                 <Toaster />
                 <LazyPromoToast />
                 <LazyTgtgReservaPopup />

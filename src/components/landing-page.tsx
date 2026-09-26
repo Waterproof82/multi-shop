@@ -10,6 +10,7 @@ import { GaleriaSection } from "@/components/landing/galeria-section";
 import { VisitanosSection } from "@/components/landing/visitanos-section";
 import { WhatsappStrip } from "@/components/landing/whatsapp-strip";
 import { WhatsappFab } from "@/components/landing/whatsapp-fab";
+import { CartFab } from "@/components/landing/cart-fab";
 import { Marquee } from "@/components/landing/marquee";
 import { whatsappUrl } from "@/components/landing/landing-ui";
 import { useLanguage } from "@/lib/language-context";
@@ -38,7 +39,7 @@ function renderSeccion(seccion: LandingSeccion, ctx: RenderContext) {
     case "testimonio":
       return <TestimonioSection key={seccion.id} contenido={seccion.contenido} />;
     case "galeria":
-      return <GaleriaSection key={seccion.id} contenido={seccion.contenido} />;
+      return <GaleriaSection key={seccion.id} contenido={seccion.contenido} empresaNombre={ctx.empresa.nombre} />;
     case "visitanos":
       return (
         <VisitanosSection
@@ -79,6 +80,9 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
   const showDondeEstamos = sections.some((s) => s.tipo === "visitanos");
   const restoDeSecciones = sections.filter((s) => s.tipo !== "hero");
   const whatsappHref = whatsappUrl(empresa.telefono);
+  // Misma regla que carta-route para el visitante normal: sin esto el FAB
+  // llevaria a una carta sin carrito.
+  const mostrarCarrito = empresa.mostrarCarrito && empresa.tipo !== "restaurante";
   const marquee = palabrasMarquee(readTranslatable(heroContenido, "marquee", language));
 
   return (
@@ -87,12 +91,11 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
 
       <LandingHeader empresa={empresa} showNosotros={showNosotros} showDondeEstamos={showDondeEstamos} />
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <HeroSection
           contenido={heroContenido}
           empresaNombre={empresa.nombre}
           telefono={empresa.telefono}
-          whatsappHref={whatsappHref}
         />
         {whatsappHref && <WhatsappStrip href={whatsappHref} />}
         <Marquee palabras={marquee} />
@@ -102,7 +105,8 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
 
       {/* Mismo pie que la carta; su mapa se omite si Visítanos ya pinta uno. */}
       <SiteFooter empresa={empresa} hideMap={showDondeEstamos} />
-      {whatsappHref && <WhatsappFab href={whatsappHref} />}
+      {mostrarCarrito && <CartFab />}
+      {whatsappHref && <WhatsappFab href={whatsappHref} conCarrito={mostrarCarrito} />}
     </div>
   );
 }

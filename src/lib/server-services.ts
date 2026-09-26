@@ -1,5 +1,6 @@
 import "server-only"; // Ensures this never reaches the client
 import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 import { catalogTag } from '@/lib/cache-tags';
 import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-client";
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
@@ -22,7 +23,7 @@ export function getMenuUseCase(): GetMenuUseCase {
 }
 
 // DO NOT cache empresa - changes must be visible immediately
-export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {
+async function fetchEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {
   const mainDomain = parseMainDomain(domain);
   const result = await getEmpresaPublicRepository().findByDomainPublic(mainDomain);
   if (!result.success) {
@@ -37,6 +38,11 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic 
   return result.data;
 }
 
+// `cache` de React memoiza SOLO dentro de una misma peticion (layout,
+// generateMetadata y pagina piden la misma empresa); no cachea entre
+// peticiones, asi que los cambios siguen siendo visibles al instante.
+export const getEmpresaByDomain = cache(fetchEmpresaByDomain);
+
 export function isPedidosSubdomain(currentDomain: string, subdomainConfig: string | null): boolean {
   if (!subdomainConfig) return false;
   const config = subdomainConfig.split('.')[0]; // "pedidos.localhost" -> "pedidos"
@@ -50,6 +56,22 @@ export function extractMainDomain(fullDomain: string, subdomainConfig: string | 
     return fullDomain.substring(subdomainConfig.length + 1);
   }
   return fullDomain;
+}
+
+/**
+ * Empresa de la peticion, incluido el subdominio de pedidos
+ * (`pedidos.midominio.com` → empresa de `midominio.com`).
+ */
+export async function resolverEmpresaPublica(
+  fullDomain: string
+): Promise<{ empresa: EmpresaPublic | null; isPedidos: boolean }> {
+  let empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
+  const subdomainConfig = empresa?.subdomainPedidos ?? 'pedidos';
+  const isPedidos = isPedidosSubdomain(fullDomain, subdomainConfig);
+  if (!empresa && isPedidos) {
+    empresa = await getEmpresaByDomain(extractMainDomain(fullDomain, subdomainConfig));
+  }
+  return { empresa, isPedidos };
 }
 
 /**

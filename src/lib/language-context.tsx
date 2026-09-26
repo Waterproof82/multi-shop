@@ -21,25 +21,53 @@ const LANGUAGE_TO_HTML: Record<Language, string> = {
 
 const STORAGE_KEY = "preferred-language"
 
+function isLanguage(value: string | null): value is Language {
+  // Object.hasOwn, no `in`: "constructor" o "toString" tambien estan "in".
+  return value !== null && Object.hasOwn(LANGUAGE_TO_HTML, value)
+}
+
+// `?lang=xx` gana a la preferencia guardada: es la URL que Google indexa por
+// idioma (hreflang, ver src/lib/seo/tenant-seo.ts) y la que llega en los
+// enlaces de email. Se persiste para que la navegacion siguiente la conserve.
+function getUrlLanguage(): Language | null {
+  if (typeof window === "undefined") return null
+  const lang = new URLSearchParams(window.location.search).get("lang")
+  return isLanguage(lang) ? lang : null
+}
+
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "es"
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored && stored in LANGUAGE_TO_HTML) return stored as Language
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (isLanguage(stored)) return stored
+  } catch {
+    // localStorage bloqueado (modo privado estricto, WebView sin storage)
+  }
   return "es"
+}
+
+function persistLanguage(lang: Language) {
+  try {
+    localStorage.setItem(STORAGE_KEY, lang)
+  } catch {
+    // sin storage: el idioma dura lo que la pestana
+  }
 }
 
 export function LanguageProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [language, setLanguageState] = useState<Language>("es")
 
   useEffect(() => {
-    const stored = getStoredLanguage()
-    setLanguageState(stored)
-    document.documentElement.lang = LANGUAGE_TO_HTML[stored]
+    const fromUrl = getUrlLanguage()
+    if (fromUrl) persistLanguage(fromUrl)
+    const initial = fromUrl ?? getStoredLanguage()
+    setLanguageState(initial)
+    document.documentElement.lang = LANGUAGE_TO_HTML[initial]
   }, [])
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang)
-    localStorage.setItem(STORAGE_KEY, lang)
+    persistLanguage(lang)
     if (typeof document !== "undefined") {
       document.documentElement.lang = LANGUAGE_TO_HTML[lang]
     }

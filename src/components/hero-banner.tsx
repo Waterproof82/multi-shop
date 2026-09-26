@@ -82,6 +82,8 @@ export function HeroBanner({ empresa, bannerFit }: HeroBannerProps) {
             {titulo}
           </h1>
         )}
+        {/* Sin titulo configurado la carta se quedaba sin ningun <h1> (SEO). Oculto: no cambia el diseno. */}
+        {!showTitulo && empresa?.nombre && <h1 className="sr-only">{empresa.nombre}</h1>}
         {showSubtitulo && (
           <p className="mt-2 font-serif text-xl italic text-primary-foreground/80 md:text-2xl">
             {subtitulo}

@@ -6,6 +6,16 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 
 ## ¿Qué puede hacer este sistema?
 
+### 🎨 Landing Page — sitio de marca, catálogo aparte
+
+Cada empresa tiene, además de la carta, una **landing configurable** en `/`: un sitio de marca completo con sus propias secciones, independiente del catálogo de productos (`/carta`). La home vende el negocio; la carta vende los productos — no se pisan entre sí.
+
+- **Secciones editables desde el admin**: hero, "Nosotros", CTA a la carta, testimonios, galería y "Visítanos" (mapa + horario). Cada tenant activa las que necesita y decide su orden.
+- **Multi-idioma en cada bloque**: los textos de la landing (no solo la carta) son traducibles en los 5 idiomas de la plataforma.
+- **Theming derivado del tenant**: fondo con degradados radiales calculados con `color-mix()` sobre las variables `--primary`/`--accent` de la empresa — nunca colores hardcodeados.
+- **Puente a la carta**: CTA dedicada, FAB de carrito flotante (si aplica) y FAB/franja de WhatsApp con `aria-label`s propios para que un visitante no confunda ambos botones. `/carta` ofrece "Volver a la landing" al visitante normal; esa navegación intermedia se omite en sesiones de mesa, modo camarero o subdominio de pedidos, donde `/` sirve la carta directamente.
+- **Mismo pie y mapa que la carta**: ambas comparten pie de página; si la sección "Visítanos" ya pinta un mapa, el del pie se omite para no duplicarlo.
+
 ### 🛍️ Modo Tienda
 
 - **Carta digital** con categorías, productos, imágenes y precios gestionables desde el panel admin.
@@ -271,23 +281,24 @@ Toda la lógica de negocio usa `Result<T, AppError>`. Los repositorios devuelven
 
 ## SEO & GEO (Generative Engine Optimization)
 
-### SEO tradicional (implementado)
+### SEO tradicional
 
-- **Metadata dinámica por empresa**: `title`, `description`, `og:*` generados por tenant en SSR.
-- **hreflang**: 5 idiomas (es / en / fr / it / de) en todas las páginas públicas.
-- **Sitemap y robots dinámicos**: generados por tenant, excluyen rutas privadas.
-- **Schema.org estructurado**: `Restaurant`, `Menu`, `MenuItem`, `FAQPage`. Las coordenadas geográficas se parsean automáticamente desde la URL de Google Maps del negocio.
+- **Metadata dinámica por empresa**: `title`, `description`, `og:*` generados por tenant en SSR, con canonical propio en cada página — nunca heredado del layout raíz, para que `/carta` y `/privacidad` no se traten como duplicados de la home.
+- **hreflang**: 5 idiomas (es / en / fr / it / de) en todas las páginas públicas. Cada variante `?lang=xx` es canonical de sí misma y todas se enlazan entre sí con `x-default`; solo se emiten los idiomas con `descripcion` propia del tenant.
+- **Sitemap y robots dinámicos**: generados por tenant, excluyen rutas privadas (paneles internos, API, sesión de mesa, tracking) y estados de UI efímeros (`?mesa=`, `?carrito=abierto`).
+- **Schema.org estructurado en un único `@graph`**: `Restaurant`/`Store` + `WebSite` + `Menu`/`MenuItem`, enlazados entre sí por `@id`. Las coordenadas geográficas se parsean automáticamente desde la URL de "Insertar un mapa" de Google Maps del negocio; `priceRange` y `currenciesAccepted` se calculan a partir de la carta real, nunca inventados. Sin `FAQPage` a propósito: Google exige que el marcado describa contenido visible en la página, y unas FAQ genéricas afirmarían cosas (como el pago en efectivo) que no son ciertas para todos los tenants — riesgo de acción manual por "structured data spam".
 - **JSON-LD en SSR**: sanitizado contra inyección (`<`, `>`, `&` escapados).
 - **404 con meta tags**: evita que las páginas de error se indexen erróneamente.
 
-### GEO — optimización para motores de IA (pendiente)
+### GEO — optimización para motores de IA
 
-Los motores de búsqueda de IA (ChatGPT, Perplexity, Claude, Gemini, Copilot) están adoptando `/llms.txt` como señal explícita de qué contenido de un dominio puede crawlear una IA y cuál no. Esta plataforma no tiene `/llms.txt` aún.
+Los asistentes de IA (ChatGPT, Perplexity, Claude, Gemini, Copilot) están adoptando `/llms.txt` ([llmstxt.org](https://llmstxt.org)) como señal explícita de qué contenido de un dominio pueden citar en sus respuestas. La plataforma sirve este fichero por tenant y declara explícitamente qué bots de IA pueden leerlo.
 
-El Schema.org `Restaurant` + `Menu` + `MenuItem` ya es una base sólida para respuestas generativas (los LLMs extraen bien datos estructurados), pero podría complementarse con:
+- **`/llms.txt` dinámico por tenant**: Markdown con nombre, dirección, teléfono, horario, idiomas disponibles, enlaces a las páginas públicas y la carta con precios (tope de 300 productos, para que el fichero quepa holgado en el contexto de un LLM). Publica solo lo que ya es público en la web — nunca datos de clientes — y no afirma un régimen de IVA/IGIC, porque depende de cada tenant. Un fallo al leer secciones o carta degrada el fichero (sin horario, sin carta) en vez de tumbarlo.
+- **Grupo propio para bots de IA en `robots.txt`**: bots de búsqueda conversacional (`OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`) y de entrenamiento (`GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`) reciben permiso explícito sobre `/` y `/llms.txt`, con las mismas rutas privadas bloqueadas que el grupo `*` — declarar el acceso deliberadamente es lo que varios proveedores piden para citar la web en sus respuestas. Un test de compliance verifica que ningún bot de IA queda con acceso más permisivo que el resto.
+- **Schema.org como base factual**: el mismo `@graph` de `Restaurant`/`Menu`/`MenuItem` de la sección anterior es la fuente que los LLMs citan al responder "¿cuánto cuesta X?" o "¿tiene delivery?".
 
-- **`/llms.txt`**: índice legible por IA con descripción del negocio, menú, horarios y política de datos.
-- **Descripciones semánticas densas**: los campos `descripcion` de productos y empresas son los que los LLMs usan para construir respuestas. Cuanto más específicos, mejor posicionamiento en respuestas generativas.
+Detalle completo, trampas y checklist de campos de BBDD en [`docs/context/seo-multitenant.md`](docs/context/seo-multitenant.md).
 
 ---
 
@@ -428,4 +439,4 @@ WAITER_PIN_PEPPER=
 | [`docs/context/sentry-monitoring.md`](docs/context/sentry-monitoring.md) | Sentry: integración, Session Replay, CSP |
 | [`docs/context/pwa-offline-system.md`](docs/context/pwa-offline-system.md) | Service Worker PWA: estrategias, offline, camarero |
 | [`docs/context/admin-api-patterns.md`](docs/context/admin-api-patterns.md) | Patrones API admin: resolveAdminContext, handleResult |
-| [`docs/context/seo-multitenant.md`](docs/context/seo-multitenant.md) | SEO multi-tenant: metadata, hreflang, Schema.org, sitemap |
+| [`docs/context/seo-multitenant.md`](docs/context/seo-multitenant.md) | SEO multi-tenant: metadata, hreflang, Schema.org, sitemap, GEO (`llms.txt`, bots de IA) |

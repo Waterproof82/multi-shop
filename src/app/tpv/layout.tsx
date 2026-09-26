@@ -50,7 +50,7 @@ export default async function TpvLayout({ children }: { readonly children: React
   // /tpv/legal es pública — inspectores de Hacienda acceden sin credenciales (Art. 12 RD 1007/2023)
   const FRAMELESS_PATHS = ['/tpv/login', '/tpv/turno/abrir', '/tpv/turno/espera', '/tpv/audit/inspector', '/tpv/legal'];
   if (FRAMELESS_PATHS.includes(pathname)) {
-    return <>{children}</>;
+    return <main id="main-content">{children}</main>;
   }
 
   const cookieStore = await cookies();
@@ -119,7 +119,7 @@ export default async function TpvLayout({ children }: { readonly children: React
           <TpvSwRegistrar />
           <div className="flex flex-col h-screen bg-[#f1f5f9] text-[#0f172a] overflow-hidden">
             <TpvHeader empresaNombre={empresaNombre} />
-            <main className="flex flex-1 overflow-hidden">
+            <main id="main-content" className="flex flex-1 overflow-hidden">
               {children}
               <AccionesPanel />
             </main>

@@ -19,7 +19,7 @@ export default async function PagoKoPage({ searchParams }: Props) {
   const tx = translations[language];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <main id="main-content" className="min-h-screen flex items-center justify-center bg-background px-4">
       {token && <PaymentKoCleaner token={token} />}
       <div className="max-w-sm w-full text-center space-y-4">
         <XCircle className="mx-auto h-16 w-16 text-destructive" />
@@ -32,6 +32,6 @@ export default async function PagoKoPage({ searchParams }: Props) {
           {tx.trackingBackToHome}
         </Link>
       </div>
-    </div>
+    </main>
   );
 }

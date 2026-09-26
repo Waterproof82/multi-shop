@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { MapPin } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
@@ -8,12 +9,14 @@ import { FacebookIcon } from "@/components/ui/facebook-icon";
 import { InstagramIcon } from "@/components/ui/instagram-icon";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import {
+  AvisoNuevaPestana,
   Eyebrow,
   TituloResaltado,
-  landingBtnGhost,
-  landingBtnPrimary,
+  landingBtnOscuro,
+  landingBtnWhatsapp,
   landingH2,
   mapsSearchUrl,
+  telHref,
 } from "@/components/landing/landing-ui";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
@@ -28,11 +31,13 @@ interface InfoBlockProps {
   children: ReactNode;
 }
 
+// Par etiqueta/valor dentro de un <dl>: "Dirección" → "C/ ...". Son datos,
+// no apartados del documento, asi que no van como <h3>.
 function InfoBlock({ etiqueta, children }: Readonly<InfoBlockProps>) {
   return (
     <div>
-      <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-primary">{etiqueta}</h3>
-      <div className="whitespace-pre-line text-[15px] leading-[1.6] text-muted-foreground">{children}</div>
+      <dt className="mb-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-primary">{etiqueta}</dt>
+      <dd className="whitespace-pre-line text-[15px] leading-[1.6] text-muted-foreground">{children}</dd>
     </div>
   );
 }
@@ -44,35 +49,45 @@ interface RedesProps {
   empresa: EmpresaPublic;
   whatsappHref: string | null;
   etiqueta: string;
+  nuevaPestana: string;
 }
 
-function Redes({ empresa, whatsappHref, etiqueta }: Readonly<RedesProps>) {
+function Redes({ empresa, whatsappHref, etiqueta, nuevaPestana }: Readonly<RedesProps>) {
   if (!empresa.instagram && !empresa.fb && !whatsappHref) return null;
   return (
     <div className="mt-9 border-t border-border pt-7">
       <Eyebrow solo className="!mb-4">
         {etiqueta}
       </Eyebrow>
-      <div className="flex flex-wrap gap-2">
+      <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
         {empresa.instagram && (
-          <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className={socialPillClass}>
-            <InstagramIcon className="size-5 text-primary" />
-            <span>Instagram</span>
-          </a>
+          <li>
+            <a href={empresa.instagram} target="_blank" rel="noopener noreferrer me" className={socialPillClass}>
+              <InstagramIcon className="size-5 text-primary" />
+              <span>Instagram</span>
+              <AvisoNuevaPestana texto={nuevaPestana} />
+            </a>
+          </li>
         )}
         {empresa.fb && (
-          <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className={socialPillClass}>
-            <FacebookIcon className="size-5 text-primary" />
-            <span>Facebook</span>
-          </a>
+          <li>
+            <a href={empresa.fb} target="_blank" rel="noopener noreferrer me" className={socialPillClass}>
+              <FacebookIcon className="size-5 text-primary" />
+              <span>Facebook</span>
+              <AvisoNuevaPestana texto={nuevaPestana} />
+            </a>
+          </li>
         )}
         {whatsappHref && (
-          <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={socialPillClass}>
-            <WhatsAppIcon className="size-5 text-primary" />
-            <span>WhatsApp</span>
-          </a>
+          <li>
+            <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={socialPillClass}>
+              <WhatsAppIcon className="size-5 text-primary" />
+              <span>WhatsApp</span>
+              <AvisoNuevaPestana texto={nuevaPestana} />
+            </a>
+          </li>
         )}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -88,9 +103,11 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
   const titulo = readTranslatable(contenido, "titulo", language) ?? t("landingNavWhereWeAre", language);
   const horario = readTranslatable(contenido, "horario", language);
   const mapsHref = mapsSearchUrl(empresa.direccion, empresa.nombre);
+  const tituloId = useId();
+  const nuevaPestana = t("opensInNewTab", language);
 
   return (
-    <section id="donde-estamos" className="w-full scroll-mt-20 px-[clamp(20px,4vw,64px)] py-[clamp(80px,10vw,140px)]">
+    <section id="donde-estamos" aria-labelledby={tituloId} className="w-full scroll-mt-20 px-[clamp(20px,4vw,64px)] py-[clamp(80px,10vw,140px)]">
       <div
         className={`mx-auto grid max-w-7xl items-stretch gap-[clamp(40px,6vw,80px)] ${gridClass(Boolean(empresa.urlMapa))}`}
       >
@@ -109,16 +126,16 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
 
         <div className="py-4">
           {kicker && <Eyebrow>{kicker}</Eyebrow>}
-          <h2 className={landingH2}>
+          <h2 id={tituloId} className={landingH2}>
             <TituloResaltado texto={titulo} />
           </h2>
 
-          <div className="mb-10 mt-8 grid grid-cols-1 gap-x-10 gap-y-8 border-t border-border pt-8 sm:grid-cols-2">
+          <dl className="mb-10 mt-8 grid grid-cols-1 gap-x-10 gap-y-8 border-t border-border pt-8 sm:grid-cols-2">
             {empresa.direccion && <InfoBlock etiqueta={t("address", language)}>{empresa.direccion}</InfoBlock>}
             {empresa.telefono && (
               <InfoBlock etiqueta={t("phone", language)}>
                 <a
-                  href={`tel:${empresa.telefono.replaceAll(/\s/g, "")}`}
+                  href={telHref(empresa.telefono)}
                   className="transition-colors hover:text-primary"
                 >
                   {empresa.telefono}
@@ -126,25 +143,33 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
               </InfoBlock>
             )}
             {horario && <InfoBlock etiqueta={t("landingHours", language)}>{horario}</InfoBlock>}
-          </div>
+          </dl>
 
           {(mapsHref || whatsappHref) && (
             <div className="flex flex-wrap gap-3">
               {mapsHref && (
-                <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={landingBtnPrimary}>
+                <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={`${landingBtnOscuro} px-[30px] py-3 text-[15px]`}>
+                  <MapPin className="size-[18px] shrink-0" aria-hidden="true" />
                   {t("landingOpenInMaps", language)}
+                  <AvisoNuevaPestana texto={nuevaPestana} />
                 </a>
               )}
               {whatsappHref && (
-                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={landingBtnGhost}>
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={landingBtnWhatsapp}>
                   <WhatsAppIcon className="size-[18px]" />
                   WhatsApp
+                  <AvisoNuevaPestana texto={nuevaPestana} />
                 </a>
               )}
             </div>
           )}
 
-          <Redes empresa={empresa} whatsappHref={whatsappHref} etiqueta={t("landingFollowUs", language)} />
+          <Redes
+            empresa={empresa}
+            whatsappHref={whatsappHref}
+            etiqueta={t("landingFollowUs", language)}
+            nuevaPestana={nuevaPestana}
+          />
         </div>
       </div>
     </section>
