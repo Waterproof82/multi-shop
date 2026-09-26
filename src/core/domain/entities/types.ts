@@ -198,6 +198,7 @@ export interface EmpresaPublic {
   deliveryHabilitado: boolean;
   envioDomicilioHabilitado: boolean;
   landingHabilitada: boolean;
+  googleReviewsUrl: string | null;
 }
 
 export interface Cliente {

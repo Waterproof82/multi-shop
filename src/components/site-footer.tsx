@@ -3,6 +3,7 @@
 import { MapPin, Mail, Globe, Phone, Settings } from "lucide-react"
 import { FacebookIcon } from "@/components/ui/facebook-icon"
 import { InstagramIcon } from "@/components/ui/instagram-icon"
+import { ImagenSubida } from "@/components/ui/imagen-subida"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
@@ -12,16 +13,29 @@ interface SiteFooterProps {
   readonly hideMap?: boolean;
 }
 
+// Badge compartido por todas las empresas — subido una única vez a R2, no pasa por ImageUploader.
+const GOOGLE_REVIEWS_BADGE_URL = `${process.env.NEXT_PUBLIC_R2_DOMAIN ?? ''}/shared/google-reviews-badge.png`;
+
+function footerGridColsClass(columnasVisibles: number): string {
+  if (columnasVisibles >= 4) return "lg:grid-cols-4";
+  if (columnasVisibles === 3) return "lg:grid-cols-3";
+  return "lg:grid-cols-2";
+}
+
 export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
   const { language } = useLanguage()
   const currentYear = new Date().getFullYear()
 
   if (!empresa) return null
 
+  const mostrarMapa = Boolean(empresa.urlMapa) && !hideMap
+  const mostrarResenas = Boolean(empresa.googleReviewsUrl)
+  const columnasVisibles = 2 + (mostrarMapa ? 1 : 0) + (mostrarResenas ? 1 : 0)
+
   return (
     <footer className="w-full bg-footer-bg text-footer-fg mt-12 border-t border-footer-bg/10">
       <div className="max-w-[90rem] mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${footerGridColsClass(columnasVisibles)} gap-10`}>
 
           {/* Columna 1: Redes Sociales */}
           <div className="space-y-4">
@@ -82,7 +96,7 @@ export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
           </div>
 
           {/* Columna 3: Mapa */}
-          {empresa.urlMapa && !hideMap && (
+          {mostrarMapa && (
             <div className="space-y-4">
               <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("location", language)}</h3>
               <div className="rounded-lg overflow-hidden border border-background/10 h-48 w-full">
@@ -94,9 +108,31 @@ export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
                   loading="lazy"
                   allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
-                  src={empresa.urlMapa}
+                  src={empresa.urlMapa ?? undefined}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Columna 4: Google Reviews */}
+          {mostrarResenas && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("googleReviews", language)}</h3>
+              <a
+                href={empresa.googleReviewsUrl ?? undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg"
+                aria-label={`${t("googleReviews", language)} ${t("opensInNewTab", language)}`}
+              >
+                <ImagenSubida
+                  src={GOOGLE_REVIEWS_BADGE_URL}
+                  alt={t("googleReviews", language)}
+                  width={88}
+                  height={88}
+                  className="object-contain"
+                />
+              </a>
             </div>
           )}
         </div>
