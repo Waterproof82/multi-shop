@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useLanguage } from "@/lib/language-context";
+import { useAdmin } from "@/lib/admin-context";
 import { t } from "@/lib/translations";
 import { TranslatableField, type TranslatableTextValue } from "@/components/admin/landing/translatable-field";
 import {
@@ -61,6 +62,9 @@ function seccionesIniciales(): Record<LandingSeccionTipo, SeccionState> {
 
 export default function LandingAdminPage() {
   const { language } = useLanguage();
+  // Superadmin no tiene empresaId en el JWT: la API exige ?empresaId= (si no, 400).
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [secciones, setSecciones] = useState<Record<LandingSeccionTipo, SeccionState>>(seccionesIniciales);
   const [loading, setLoading] = useState(true);
   const [tipoActivo, setTipoActivo] = useState<LandingSeccionTipo>("hero");
@@ -68,7 +72,8 @@ export default function LandingAdminPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void fetch("/api/admin/landing-secciones")
+    if (!effectiveEmpresaId) return;
+    void fetch(`/api/admin/landing-secciones?empresaId=${effectiveEmpresaId}`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data: LandingSeccionApi[]) => {
         setSecciones((prev) => {
@@ -80,7 +85,7 @@ export default function LandingAdminPage() {
         });
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const seccionActual = secciones[tipoActivo];
   const campos = SECCION_CAMPOS[tipoActivo];
@@ -107,7 +112,7 @@ export default function LandingAdminPage() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetchWithCsrf(`/api/admin/landing-secciones/${tipoActivo}`, {
+      const res = await fetchWithCsrf(`/api/admin/landing-secciones/${tipoActivo}?empresaId=${effectiveEmpresaId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(seccionActual),
