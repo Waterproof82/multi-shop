@@ -94,24 +94,26 @@ export function GaleriaSection({ contenido, empresaNombre }: Readonly<GaleriaSec
 
   return (
     <section id="galeria" aria-labelledby={tituloId} className={`mx-auto w-full max-w-7xl py-[clamp(56px,8vw,110px)] ${landingPadX}`}>
-      <div className="mb-[38px] max-w-[46ch]">
-        {kicker && <Eyebrow solo>{kicker}</Eyebrow>}
+      <div className="mb-8 max-w-[46ch]">
+        {kicker && <Eyebrow>{kicker}</Eyebrow>}
         <h2 id={tituloId} className={landingH2}>
           <TituloResaltado texto={titulo} />
         </h2>
       </div>
-      <ul className={`m-0 grid list-none gap-3.5 p-0 ${gridGaleriaClass(imagenes.length)}`}>
+      {/* Hoja de contactos: separacion minima, sin esquinas ni sombras; el
+          borde de cada foto es el unico separador. */}
+      <ul className={`m-0 grid list-none gap-1 p-0 sm:gap-1.5 ${gridGaleriaClass(imagenes.length)}`}>
         {imagenes.map((url, idx) => (
           <li
             key={`${url}-${idx}`}
-            className={`group relative overflow-hidden rounded-[26px] bg-muted shadow-[0_2px_10px_color-mix(in_oklch,var(--foreground)_8%,transparent)] ${itemGaleriaClass(imagenes.length, idx)}`}
+            className={`relative overflow-hidden bg-muted ${itemGaleriaClass(imagenes.length, idx)}`}
           >
             <Image
               src={url}
               alt={altGaleria(titulo, empresaNombre, idx, imagenes.length)}
               fill
               sizes={sizesGaleria(imagenes.length, idx)}
-              className="object-cover transition-transform duration-[600ms] ease-out group-hover:scale-105 motion-reduce:transition-none"
+              className="object-cover"
               loading="lazy"
             />
           </li>

@@ -19,13 +19,13 @@ export function LandingHeader({ empresa, showNosotros, showDondeEstamos }: Reado
   const { language } = useLanguage();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 md:h-20 md:px-6">
+    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-[clamp(16px,4vw,64px)] md:h-20">
         {/* Nombre accesible = texto o `alt` del logo; con aria-label ademas se
             duplicaba. `/` (no "#"): enlace real a la home, rastreable. */}
         <Link href="/" className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           {!empresa.logoUrl && (
-            <span className="line-clamp-2 font-serif text-lg font-bold leading-tight tracking-[-0.01em] text-foreground md:text-2xl">
+            <span className="line-clamp-2 font-serif text-lg font-normal leading-tight tracking-[-0.02em] text-foreground md:text-2xl">
               {empresa.nombre}
             </span>
           )}
@@ -46,7 +46,7 @@ export function LandingHeader({ empresa, showNosotros, showDondeEstamos }: Reado
           {showNosotros && (
             <a
               href="#nosotros"
-              className="hidden min-h-[44px] items-center px-2 text-[15px] font-bold text-foreground/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex md:px-3"
+              className="hidden min-h-[44px] items-center whitespace-nowrap px-2 text-sm font-semibold text-foreground/75 underline-offset-[6px] transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex md:px-3"
             >
               {t("landingNavAboutUs", language)}
             </a>
@@ -54,7 +54,7 @@ export function LandingHeader({ empresa, showNosotros, showDondeEstamos }: Reado
           {showDondeEstamos && (
             <a
               href="#donde-estamos"
-              className="hidden min-h-[44px] items-center px-2 text-[15px] font-bold text-foreground/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex md:px-3"
+              className="hidden min-h-[44px] items-center whitespace-nowrap px-2 text-sm font-semibold text-foreground/75 underline-offset-[6px] transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex md:px-3"
             >
               {t("landingNavWhereWeAre", language)}
             </a>

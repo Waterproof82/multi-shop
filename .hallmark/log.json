@@ -1,0 +1,22 @@
+[
+  {
+    "date": "2026-09-27",
+    "macrostructure": "Catalogue",
+    "theme": "tenant (runtime --primary/--accent, no catalog theme)",
+    "genre": "editorial",
+    "scope": "app — mismo sistema que la landing (consistencia, no rotacion)",
+    "nav": "categorias subrayadas",
+    "enrichment": "none",
+    "brief": "Carta /carta multi-tenant · mismo lenguaje que la landing Photographic"
+  },
+  {
+    "date": "2026-09-27",
+    "macrostructure": "Photographic",
+    "theme": "tenant (runtime --primary/--accent, no catalog theme)",
+    "genre": "editorial",
+    "nav": "N1a",
+    "footer": "SiteFooter (shared, untouched)",
+    "enrichment": "none",
+    "brief": "Landing publica multi-tenant (hosteleria/tiendas) · redesign desde 'meson calido' redondeado"
+  }
+]
