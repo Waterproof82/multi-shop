@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { getItemKey } from "./cart-utils"
+import type { LineaRestaurada } from "./carrito-guardado"
 
 type PaseKey = 'primer' | 'segundo' | 'postre';
 
@@ -53,6 +54,7 @@ interface CartContextType {
   updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
   toggleDeferred: (cartId: string) => void
+  restaurarItems: (lineas: readonly LineaRestaurada[]) => void
   totalItems: number
   totalPrice: number
   isCartOpen: boolean
@@ -166,6 +168,23 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     setItems(prev => prev.map(ci => ci.cartId === cartId ? { ...ci, deferred: !ci.deferred } : ci));
   }, [])
 
+  // Carrito guardado (useCarritoGuardado): solo repone si el de memoria esta
+  // vacio — si el cliente viene navegando con items vivos, esos mandan. Sin
+  // lastAddedItem ni justAdded: no es un "añadido" y no debe sonar a toast.
+  const restaurarItems = useCallback((lineas: readonly LineaRestaurada[]) => {
+    if (lineas.length === 0) return;
+    setItems((prev) => {
+      if (prev.length > 0) return prev;
+      return lineas.map((l) => ({
+        cartId: newCartId(),
+        item: l.item,
+        quantity: l.cantidad,
+        selectedComplements: l.complementos,
+        note: l.nota,
+      }));
+    });
+  }, [])
+
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0)
   const totalPrice = items.reduce((sum, ci) => {
     const complementPrice = ci.selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
@@ -179,13 +198,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     updateQuantity,
     clearCart,
     toggleDeferred,
+    restaurarItems,
     totalItems,
     totalPrice,
     isCartOpen,
     openCart,
     closeCart,
     lastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, toggleDeferred, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
+  }), [items, addItem, removeItem, updateQuantity, clearCart, toggleDeferred, restaurarItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
 
   return (
     <CartContext.Provider value={contextValue}>

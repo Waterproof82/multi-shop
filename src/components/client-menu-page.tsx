@@ -20,6 +20,7 @@ import { useCart } from "@/lib/cart-context"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
+import { useCarritoGuardado } from "@/lib/use-carrito-guardado"
 import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
 
 // Lazy load cart components - only needed when showCart is true
@@ -228,6 +229,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     }
     return [...byId.values()];
   }, [menuData]);
+
+  useCarritoGuardado({ empresaId, productos: allProducts, showCart, isWaiterMode, mesaId });
 
   const productSearchQuery = productSearch.trim().toLowerCase();
   const searchResultsCategory = useMemo<MenuCategoryVM | null>(() => {
