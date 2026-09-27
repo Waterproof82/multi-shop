@@ -477,31 +477,6 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async delete(id: string, empresaId: string): Promise<Result<void>> {
-    try {
-      const { error } = await this.supabase
-        .from('pedidos')
-        .delete()
-        .eq("id", id)
-        .eq("empresa_id", empresaId);
-
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_DELETE_ERROR',
-          error.message,
-          'repository',
-          'SupabasePedidoRepository.delete',
-          { empresaId, details: { code: error.code, pedidoId: id } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al eliminar pedido', module: 'repository', method: 'delete' } };
-      }
-      return { success: true, data: undefined };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.delete', { empresaId });
-      return { success: false, error: appError };
-    }
-  }
-
   async findById(id: string, empresaId: string): Promise<Result<Pedido | null>> {
     try {
       const { data, error } = await this.supabase

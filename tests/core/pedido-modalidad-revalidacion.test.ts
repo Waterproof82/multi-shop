@@ -62,7 +62,6 @@ function buildPedidoRepoMock(): { repo: IPedidoRepository; create: ReturnType<ty
     findAllByTenant: vi.fn(),
     findAllByTenantAndMonth: vi.fn(),
     updateStatus: vi.fn(),
-    delete: vi.fn(),
     findById: vi.fn(),
     findByTrackingToken: vi.fn(),
     createMesaOrder: vi.fn(),
