@@ -30,7 +30,7 @@ function linea(item: MenuItemVM, over: Partial<CartItem> = {}): CartItem {
 }
 
 describe('debePersistirCarrito — solo la tienda publica', () => {
-  const base = { showCart: true, isWaiterMode: false, mesaId: null, search: '' };
+  const base = { showCart: true, isWaiterMode: false, esRestaurante: false, mesaId: null, search: '' };
 
   it('tienda normal con carrito: si', () => {
     expect(debePersistirCarrito(base)).toBe(true);
@@ -38,6 +38,12 @@ describe('debePersistirCarrito — solo la tienda publica', () => {
 
   it('sin carrito (carta solo informativa): no', () => {
     expect(debePersistirCarrito({ ...base, showCart: false })).toBe(false);
+  });
+
+  // En un restaurante el pedido se hace en el momento (mesa, barra, recogida):
+  // resucitar un carrito de otro dia no tiene sentido (decision del usuario).
+  it('empresa restaurante: NUNCA, aunque no haya mesa', () => {
+    expect(debePersistirCarrito({ ...base, esRestaurante: true })).toBe(false);
   });
 
   it('camarero: NUNCA (el carrito es de una mesa; resucitarlo lo llevaria a otra)', () => {

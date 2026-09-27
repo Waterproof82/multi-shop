@@ -230,7 +230,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     return [...byId.values()];
   }, [menuData]);
 
-  useCarritoGuardado({ empresaId, productos: allProducts, showCart, isWaiterMode, mesaId });
+  useCarritoGuardado({ empresaId, productos: allProducts, showCart, isWaiterMode, esRestaurante: empresa?.tipo === 'restaurante', mesaId });
 
   const productSearchQuery = productSearch.trim().toLowerCase();
   const searchResultsCategory = useMemo<MenuCategoryVM | null>(() => {

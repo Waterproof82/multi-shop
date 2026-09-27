@@ -24,16 +24,17 @@ export function useCarritoGuardado(opts: Readonly<{
   productos: readonly MenuItemVM[];
   showCart: boolean;
   isWaiterMode: boolean;
+  esRestaurante: boolean;
   mesaId: string | null;
 }>): void {
-  const { empresaId, productos, showCart, isWaiterMode, mesaId } = opts;
+  const { empresaId, productos, showCart, isWaiterMode, esRestaurante, mesaId } = opts;
   const { items, restaurarItems } = useCart();
   const [activo, setActivo] = useState(false);
   const restauradoRef = useRef(false);
 
   useEffect(() => {
     const aplica = !!empresaId && debePersistirCarrito({
-      showCart, isWaiterMode, mesaId, search: globalThis.location.search,
+      showCart, isWaiterMode, esRestaurante, mesaId, search: globalThis.location.search,
     });
     if (!aplica) {
       setActivo(false);
@@ -49,7 +50,7 @@ export function useCarritoGuardado(opts: Readonly<{
       }
     }
     setActivo(true);
-  }, [empresaId, productos, showCart, isWaiterMode, mesaId, restaurarItems]);
+  }, [empresaId, productos, showCart, isWaiterMode, esRestaurante, mesaId, restaurarItems]);
 
   // Corre en el render SIGUIENTE a la restauracion (activo pasa a true a la
   // vez que llegan los items restaurados), asi que nunca guarda el vacio

@@ -9,8 +9,9 @@ import type { CartItem, Complement } from "@/lib/cart-context";
  * ACTUAL al volver: guardar el MenuItemVM entero resucitaria precios, nombres
  * o productos que el admin ya cambio o desactivo.
  *
- * Nunca en modo mesa ni camarero: ahi el carrito pertenece a una mesa
- * (ver useCarritoPorMesa) y resucitarlo lo colaria en otra.
+ * Solo en empresas tipo tienda. Nunca en restaurante (el pedido es del
+ * momento: mesa, barra o recogida) ni en modo mesa o camarero: ahi el carrito
+ * pertenece a una mesa (ver useCarritoPorMesa) y resucitarlo lo colaria en otra.
  */
 
 export const CADUCIDAD_CARRITO_MS = 7 * 24 * 60 * 60 * 1000;
@@ -24,10 +25,11 @@ export function claveCarritoGuardado(empresaId: string): string {
 export function debePersistirCarrito(ctx: Readonly<{
   showCart: boolean;
   isWaiterMode: boolean;
+  esRestaurante: boolean;
   mesaId: string | null;
   search: string;
 }>): boolean {
-  if (!ctx.showCart || ctx.isWaiterMode || ctx.mesaId !== null) return false;
+  if (!ctx.showCart || ctx.esRestaurante || ctx.isWaiterMode || ctx.mesaId !== null) return false;
   // useMesaId lee ?mesa= en un efecto (null en el primer render): se mira
   // la URL directamente para no confundir una mesa con la tienda.
   return !new URLSearchParams(ctx.search).has("mesa");
