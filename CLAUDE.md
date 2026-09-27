@@ -281,6 +281,8 @@ Tras CADA `supabase db push` o `supabase migration up`:
 
 ## Panel Superadmin — Trampas Criticas
 
+> Ver doc completo: `docs/context/superadmin.md`
+
 - **`delivery_habilitado`** en `empresas` (DEFAULT `false`): activa "Zona de entrega" en sidebar. Controlable desde superadmin.
 - Mesas / Pagos Mesa / Validacion solo se muestran para `tipo === 'restaurante'`.
 

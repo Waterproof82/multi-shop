@@ -1,6 +1,6 @@
 # TooGoodToGo — Documentación del subsistema
 
-> Ver también: [context.md](./context.md) | [bbdd.md](./bbdd.md) | [security.md](./security.md)
+> Ver también: [security.md](./security.md)
 
 ## Qué es
 
