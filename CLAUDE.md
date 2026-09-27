@@ -163,6 +163,7 @@ de dar el fix por cerrado.
 - **Tokens:** NUNCA hardcodear colores. Usar variables CSS del tenant.
 - **Accesibilidad:** Touch targets min 44px. Focus rings estandar. `aria-labels` traducidos.
 - **I18n:** Usar `t()` de `@/lib/translations` para TODO el texto de UI.
+- **Castellano de España, con tuteo — NUNCA voseo.** `Elige`, `Introduce`, `Inténtalo`, `Puedes`, `Escribe`, `Selecciona`, `Bórrala`; no `Elegí`, `Ingresá`, `Intentá`, `Podés`, `Escribí`, `Seleccioná`, `Borrala`. Aplica a `translations.ts` (bloque `es`), textos escritos en componentes, mensajes de API y `www/index.html`. Se cuela porque la conversación con el usuario es en rioplatense: la conversación puede serlo, la UI no. Para auditar, buscar **palabra a palabra** (`rg -o "\b[a-zA-Záéíóúñ]+(á|é|í|ás|és|ís)\b" | sort -u`), nunca descartando líneas enteras: un filtro por línea ("menú", "después") ocultó 2 textos (2026-09-27).
 - **Imagenes:** Usar `ImageUploader` (auto-optimiza WebP). `object-contain` por defecto.
 - **Z-index de overlays:** `Dialog` (`dialog.tsx`) usa `z-[210]`; `Select`/`DropdownMenu` (`select.tsx`/`dropdown-menu.tsx`) usan `z-[220]` — a proposito, MAS ALTO. Un popover de Radix (Select, DropdownMenu) montado DENTRO de un Dialog debe pintarse encima de el, no detras. Con un z-index menor, el listbox monta igual (`aria-expanded=true`, opciones reales en el DOM) pero queda pintado detras del fondo opaco del modal — visualmente indistinguible de "no se despliega, sin elementos". Paso de verdad: el selector de categoria de `ProductFormDialog` (2026-09-11). Si se agrega un overlay nuevo, verificar contra estos dos valores antes de elegir su z-index.
 
@@ -176,6 +177,21 @@ de dar el fix por cerrado.
 - **Se pierde en silencio**: el autocompletado ofrece `next/image` primero, y reintroducirlo no rompe nada visible — solo la factura. Lo cubre `tests/compliance/imagenes-sin-doble-optimizacion.test.ts` (29 casos). **Si creas una pantalla nueva que pinta subidas, anadela a esa lista.**
 - **Excepcion**: imagenes que NO pasan por `ImageUploader` (terceros, APIs externas, originales grandes) si deben usar `next/image` normal.
 - El banner se pinta como `backgroundImage` en CSS (`hero-banner.tsx`), no con `next/image` — no aplica.
+- **Imagen que se pinta a sangre o a media pantalla → `isBannerImage` en su `ImageUploader`** (1920 px). A 480 px (`optimizeImage`) sale borrosa. Los campos de imagen única de `/admin/landing` ya lo usan; las fotos subidas ANTES siguen a 480 px hasta que se resuban.
+
+## Rediseño Editorial Público (landing, carta, carrito) — Trampas Criticas
+
+> Ver doc completo: `docs/context/rediseno-editorial.md` (sistema, cambios por pantalla y tabla de errores E1–E14)
+
+- **Un solo lenguaje visual** en landing, `/carta` y sus pop-ups: fotos a sangre, filetes `border-foreground/10–15` en vez de tarjetas con sombra, `rounded-[3px]`, Playfair **400 romana**, botón principal oscuro (`bg-foreground text-background`) — NO el `primary` del tenant (si es verde se confunde con WhatsApp). Colores solo de tokens del tenant.
+- **Prohibido en esta zona:** cursiva en titulares (el `*énfasis*` de `TituloResaltado` es `<em>` en redonda), fundidos al hacer scroll, `hover:scale` sobre bloques con texto, emojis como iconos, brillos radiales de fondo.
+- **Cifras en Playfair:** usa cifras antiguas por defecto — en nombres de producto con códigos (ES290, 25Ah) poner `[font-variant-numeric:lining-nums]`.
+- **No tocar `ui/dialog.tsx` para rediseñar pop-ups públicos:** lo comparte el admin. Estilar cada diálogo por `className`.
+- **Borde sobre una imagen `fill`:** un `border`/`ring` del contenedor queda tapado por la imagen — pintarlo en un `::after` por encima (`marcoFotoClass` en `menu-section.tsx`).
+- **Tailwind v4 `scale-*` usa la propiedad CSS `scale`, no `transform`:** para verificar un zoom, `getComputedStyle(el).scale` (el `transform` sale `none`).
+- **Fila con botones dentro (`−`, `+`, papelera) nunca es un `<button>` entero:** botón transparente superpuesto solo sobre la zona informativa (`CartItemResumen`, cards de la carta).
+- **Tests: afirmar señal semántica, no clases de color** (`aria-current`, `aria-pressed`). Excepción fijada a propósito: el precio de envío va en pastilla `rounded-full` (`tienda-fulfillment-selector.test.tsx`).
+- **Ediciones por script en Windows:** `open(p,'w')` de Python convierte LF→CRLF y el diff muestra el fichero entero. Editar en binario o con `newline=''` y comparar cada fichero con SU `HEAD` contando bytes (no con `rg -c $'\r'`, que miente en Git Bash). **`cart-drawer.tsx` es CRLF en el repo**; el resto, LF.
 
 ## Comandos Utiles
 - Dev: `pnpm dev`
