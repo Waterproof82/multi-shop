@@ -102,7 +102,7 @@ export function TicketPanel({
       <div className="flex-1 overflow-y-auto py-2">
         {existingOrders.length === 0 && (
           <p className="px-4 py-8 text-center text-sm text-[#94a3b8]">
-            {mesaId ? 'Sin pedidos enviados aún' : 'Seleccioná una mesa para ver el ticket'}
+            {mesaId ? 'Sin pedidos enviados aún' : 'Selecciona una mesa para ver el ticket'}
           </p>
         )}
 

@@ -216,7 +216,7 @@
     var password = document.getElementById('password').value;
 
     if (!domain || !email || !password) {
-      showError('Completá todos los campos');
+      showError('Completa todos los campos');
       return;
     }
 
@@ -247,7 +247,7 @@
       await navigateToPanel(domain, selectedRole, null);
     } catch (e) {
       var detail = (e instanceof Error) ? e.message : String(e);
-      showError('No se pudo conectar. Verificá el dominio e intentá de nuevo. (' + detail + ')');
+      showError('No se pudo conectar. Verifica el dominio e inténtalo de nuevo. (' + detail + ')');
     } finally {
       document.getElementById('submit-btn').disabled = false;
       document.getElementById('loading-msg').style.display = 'none';

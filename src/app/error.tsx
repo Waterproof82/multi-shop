@@ -13,7 +13,7 @@ export default function Error({ reset }: Readonly<ErrorPageProps>) {
         Algo salió mal
       </h2>
       <p className="mb-4 text-sm text-muted-foreground max-w-md">
-        Ha ocurrido un error inesperado. Por favor, intentá de nuevo o recargá la página.
+        Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo o recarga la página.
       </p>
       <button
         type="button"

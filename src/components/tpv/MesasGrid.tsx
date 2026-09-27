@@ -200,7 +200,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
           </span>
           {closeError && (
             <span role="alert" className="text-[10px] font-medium text-center leading-tight" style={{ color: '#dc2626' }}>
-              No se pudo cerrar la mesa. Probá de nuevo.
+              No se pudo cerrar la mesa. Inténtalo de nuevo.
             </span>
           )}
           <button
