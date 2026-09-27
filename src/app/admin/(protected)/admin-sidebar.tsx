@@ -213,7 +213,7 @@ const LINK_BASE =
 const ACTIVE_STYLE =
   'bg-gradient-to-r from-cyan-500/30 to-teal-600/30 text-white border border-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]';
 const INACTIVE_STYLE =
-  'text-slate-300 hover:bg-white/5 hover:text-white hover:border hover:border-white/10';
+  'text-slate-300 border border-transparent hover:bg-white/5 hover:text-white hover:border-white/10';
 
 // ── NavFlatItem ───────────────────────────────────────────────────────────────
 
