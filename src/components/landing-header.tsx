@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
 import { landingBtnOscuro } from "@/components/landing/landing-ui";
@@ -15,28 +16,40 @@ interface LandingHeaderProps {
   showDondeEstamos: boolean;
 }
 
+// Ya en la home, el logo no navega (seria un no-op): sube al inicio. Sin
+// animacion si el usuario pidio reducir movimiento.
+function subirAlInicio(e: React.MouseEvent<HTMLAnchorElement>, pathname: string | null) {
+  if (pathname !== "/") return;
+  e.preventDefault();
+  const reducir = globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  globalThis.scrollTo({ top: 0, behavior: reducir ? "auto" : "smooth" });
+}
+
 export function LandingHeader({ empresa, showNosotros, showDondeEstamos }: Readonly<LandingHeaderProps>) {
   const { language } = useLanguage();
+  const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-[clamp(16px,4vw,64px)] md:h-20">
         {/* Nombre accesible = texto o `alt` del logo; con aria-label ademas se
             duplicaba. `/` (no "#"): enlace real a la home, rastreable. */}
-        <Link href="/" className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <Link href="/" onClick={(e) => subirAlInicio(e, pathname)} className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           {!empresa.logoUrl && (
             <span className="line-clamp-2 font-serif text-lg font-normal leading-tight tracking-[-0.02em] text-foreground md:text-2xl">
               {empresa.nombre}
             </span>
           )}
           {empresa.logoUrl && (
-            <div className="relative h-12 w-24 md:h-16 md:w-32">
+            // Logos de rotulo muy apaisados (p. ej. 260x40): el alto de la
+            // cabecera manda y el ancho cede solo si no cabe (flex-1 del Link).
+            <div className="relative h-8 w-full max-w-[260px] md:h-10">
               <Image
                 src={empresa.logoUrl}
                 alt={empresa.nombre || t("companyLogo", language)}
                 fill
-                sizes="(max-width: 768px) 96px, 128px"
-                className="object-contain"
+                sizes="(max-width: 768px) 60vw, 260px"
+                className="object-contain object-left"
                 loading="eager"
               />
             </div>
