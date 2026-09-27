@@ -50,7 +50,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
   const handleOpenCart = () => {
     openCart();
   };
- 
+
   const prevTotalItemsRef = useRef(totalItems);
 
   useEffect(() => {
@@ -89,12 +89,18 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
           </span>
         </div>
       )}
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:h-20 md:px-6">
+    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-[clamp(16px,4vw,64px)] md:h-20">
         <div className="flex items-center gap-1 md:gap-3">
-        <button type="button" onClick={scrollToFirstCategory} className="flex items-center gap-2 cursor-pointer hover:scale-105 motion-reduce:hover:scale-100 transition-transform duration-200" aria-label={t("scrollToMenu", language)}>
+        <button type="button" onClick={scrollToFirstCategory} className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={t("scrollToMenu", language)}>
+          {/* Sin logo, el nombre (como en la landing): antes el boton quedaba vacio. */}
+          {!logoUrl && empresa?.nombre && (
+            <span aria-hidden="true" className="line-clamp-2 font-serif text-lg font-normal leading-tight tracking-[-0.02em] text-foreground md:text-2xl">
+              {empresa.nombre}
+            </span>
+          )}
           {logoUrl && (
-            <div className="relative h-12 w-24 md:h-16 md:w-32 transition-transform duration-200 hover:scale-105 motion-reduce:hover:scale-100">
+            <div className="relative h-12 w-24 md:h-16 md:w-32">
               <Image
                 src={logoUrl}
                 alt={empresa?.nombre ?? t("companyLogo", language)}
@@ -123,7 +129,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
             <Button
               variant="ghost"
               size="icon"
-              className="relative min-h-[44px] min-w-[44px] transition-all duration-200"
+              className="relative min-h-[44px] min-w-[44px] transition-colors duration-200"
               onClick={() => { void handleCallWaiter(); }}
               disabled={calling || called}
               aria-label="Llamar al camarero"
@@ -136,16 +142,16 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
             <Button
               variant="ghost"
               size="icon"
-              className="relative min-h-[44px] min-w-[44px] hover:bg-muted/50 hover:scale-105 motion-reduce:hover:scale-100 transition-all duration-200"
+              className="relative min-h-[44px] min-w-[44px] transition-colors duration-200 hover:bg-muted/50"
               onClick={handleOpenCart}
               aria-label={etiquetaAbrirCarrito(totalItems, language)}
             >
-              <ShoppingCart aria-hidden="true" className="size-5 transition-transform duration-200 hover:scale-110" />
+              <ShoppingCart aria-hidden="true" className="size-5" />
               {totalItems > 0 && (
                 <span
                   aria-hidden="true"
                   key={totalItems}
-                  className={`absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop motion-reduce:animate-none' : ''} hover:scale-110 motion-reduce:hover:scale-100 transition-transform duration-200`}
+                  className={`absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop motion-reduce:animate-none' : ''}`}
                 >
                   {totalItems}
                 </span>
