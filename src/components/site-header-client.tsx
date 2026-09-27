@@ -133,7 +133,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
               onClick={() => { void handleCallWaiter(); }}
               disabled={calling || called}
               aria-label="Llamar al camarero"
-              style={called ? { color: 'var(--color-primary)', opacity: 0.7 } : undefined}
+              style={called ? { color: 'var(--primary)', opacity: 0.7 } : undefined}
             >
               <BellRing className={`size-5 ${called ? 'animate-pulse' : ''}`} />
             </Button>

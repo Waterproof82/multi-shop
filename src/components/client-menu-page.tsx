@@ -329,7 +329,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                         <button
                           type="button"
                           onClick={() => { setWaiterSelectedItem(product); setWaiterDialogOpen(true); }}
-                          className="min-h-[36px] px-3 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
+                          className="min-h-[36px] px-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold shrink-0"
                         >
                           +
                         </button>

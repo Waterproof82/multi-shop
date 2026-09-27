@@ -490,7 +490,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                     className="flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-all"
                     style={{
                       background: isSelected ? pc.bg : `color-mix(in oklch, ${pc.bg} 35%, transparent)`,
-                      color: isSelected ? pc.text : `color-mix(in oklch, ${pc.text} 70%, var(--color-muted-foreground))`,
+                      color: isSelected ? pc.text : `color-mix(in oklch, ${pc.text} 70%, var(--muted-foreground))`,
                       borderColor: isSelected ? pc.border : `color-mix(in oklch, ${pc.border} 50%, transparent)`,
                     }}
                   >
