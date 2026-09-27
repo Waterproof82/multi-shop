@@ -2,7 +2,6 @@
 
 import { useState, memo, useCallback, useEffect, useRef } from "react"
 import { ImagenSubida as Image } from './ui/imagen-subida';
-import { motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -23,22 +22,9 @@ import { ImageZoomDialog } from "@/components/image-zoom-dialog"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
-// Static variants to avoid hydration mismatch - always use same initial state
-const staticContainerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.06, delayChildren: 0 } },
-};
-
-const staticItemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-};
-
-// Disabled variants for reduced motion or server-side
-const disabledVariants = {
-  hidden: {},
-  visible: {},
-};
+// Rejilla de productos: sin fundido escalonado al hacer scroll (la carta se
+// lee, no se "revela"). `minmax(0,1fr)` para que un nombre largo no desborde.
+const GRID_PRODUCTOS = "grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))]";
 
 function getComplementCategoryDisplay(
   lang: LanguageKey | undefined,
@@ -63,22 +49,6 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<MenuItemVM | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  
-  // Only use reduced motion after client hydration to avoid mismatch
-  const [shouldReduceMotion, setShouldReduceMotion] = useState(false);
-  const motionRef = useRef(false);
-  
-  useEffect(() => {
-    if (!motionRef.current) {
-      motionRef.current = true;
-      const prefersReducedMotion = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      setShouldReduceMotion(prefersReducedMotion);
-    }
-  }, []);
-
-  // Use static variants on server, client variants after hydration
-  const containerVariants = shouldReduceMotion ? disabledVariants : staticContainerVariants;
-  const itemVariants = shouldReduceMotion ? disabledVariants : staticItemVariants;
 
   const handleItemClick = useCallback((item: MenuItemVM) => {
     setSelectedItem(item);
@@ -102,18 +72,17 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
 
   return (
     <section id={category.id} className="scroll-mt-20 sm:scroll-mt-32">
-      <div className="mb-5 flex items-center gap-4 overflow-hidden">
-        <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
+      {/* Filete fino encima del titular: el corte entre categorias es la linea, no una tarjeta. */}
+      <div className="mb-8 border-t border-foreground/15 pt-6">
+        <h2 className="min-w-0 font-serif text-[clamp(30px,4vw,52px)] font-normal leading-[1.05] tracking-[-0.02em] text-foreground [overflow-wrap:anywhere]">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
         </h2>
-        <div className="h-px flex-1 bg-border shrink-0" />
+        {displayDescripcion && (
+          <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-muted-foreground">
+            {displayDescripcion}
+          </p>
+        )}
       </div>
-
-      {displayDescripcion && (
-        <p className="mb-6 text-sm text-muted-foreground leading-relaxed border-l-2 border-primary/30 pl-4">
-          {displayDescripcion}
-        </p>
-      )}
 
       {isCategoryWithComplements && category.complementoDeId && (
         <p className="mb-4 text-sm text-muted-foreground">
@@ -122,7 +91,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
       )}
 
       {subcategoriasVisibles.length > 0 ? (
-        <div className="space-y-8">
+        <div className="space-y-14">
           {subcategoriasVisibles.map((subcat, subIndex) => (
             <SubcategorySection
               key={subcat.id}
@@ -131,7 +100,6 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               onItemClick={handleItemClick}
               onDetailClick={handleDetailClick}
               showCart={showCart}
-              shouldReduceMotion={shouldReduceMotion}
               complementCategoryName={category.complementCategoryName}
               complementCategoryTranslations={category.complementCategoryTranslations}
               hideImages={hideImages}
@@ -140,19 +108,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
           ))}
         </div>
       ) : (
-        <motion.div
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-40px" }}
-        >
+        <div className={GRID_PRODUCTOS}>
           {category.items.map((item, index) => (
-            <motion.div
-              key={item.id}
-              variants={itemVariants}
-              className="h-full min-w-0"
-            >
+            <div key={item.id} className="h-full min-w-0">
               <MenuItemCard
                 item={item}
                 language={translationLang}
@@ -164,9 +122,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
                 complementCategoryTranslations={category.complementCategoryTranslations}
                 hideImages={hideImages}
               />
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       )}
 
       <QuantitySelectorDialog
@@ -193,56 +151,32 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   onItemClick: (item: MenuItemVM) => void;
   onDetailClick: (item: MenuItemVM) => void;
   showCart?: boolean;
-  shouldReduceMotion?: boolean;
   complementCategoryName?: string;
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
   hideImages?: boolean;
   priority?: boolean;
 }>) {
-  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, shouldReduceMotion = false, complementCategoryName, complementCategoryTranslations, hideImages = false, priority = false } = props;
-
-  const subContainerVariants = shouldReduceMotion
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: {},
-        visible: { transition: { staggerChildren: 0.06 } },
-      };
-
-  const subVariants = shouldReduceMotion
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: { opacity: 0, y: 16 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-      };
+  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, complementCategoryName, complementCategoryTranslations, hideImages = false, priority = false } = props;
 
   const displayDescripcion = translationLang && subcategory.descripcionTranslations?.[translationLang]
     ? subcategory.descripcionTranslations[translationLang]
     : subcategory.descripcion;
 
   return (
-    <div id={subcategory.id} className="space-y-3 scroll-mt-20 sm:scroll-mt-32">
-      <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
-        <span className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
-        <span className="min-w-0 break-words">{(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}</span>
-      </h3>
-      {displayDescripcion && (
-        <p className="text-sm text-muted-foreground border-l-2 border-primary/20 pl-3">
-          {displayDescripcion}
-        </p>
-      )}
-      <motion.div
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        variants={subContainerVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: "-40px" }}
-      >
+    <div id={subcategory.id} className="scroll-mt-20 sm:scroll-mt-32">
+      <div className="mb-6">
+        <h3 className="min-w-0 font-serif text-[clamp(22px,2.4vw,30px)] font-normal leading-tight tracking-[-0.015em] text-foreground [overflow-wrap:anywhere]">
+          {(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}
+        </h3>
+        {displayDescripcion && (
+          <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
+            {displayDescripcion}
+          </p>
+        )}
+      </div>
+      <div className={GRID_PRODUCTOS}>
         {subcategory.products.map((item, index) => (
-          <motion.div
-            key={item.id}
-            variants={subVariants}
-            className="h-full min-w-0"
-          >
+          <div key={item.id} className="h-full min-w-0">
             <MenuItemCard
               item={item}
               language={translationLang}
@@ -254,9 +188,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
               complementCategoryTranslations={complementCategoryTranslations}
               hideImages={hideImages}
             />
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 })
@@ -292,7 +226,7 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
         muted
         playsInline
         poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23f3f4f6'/%3E%3Cstop offset='100%25' stop-color='%23d1d5db'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='320' height='180'/%3E%3Ccircle cx='160' cy='90' r='30' fill='%239ca3af' opacity='0.5'/%3E%3Cpath d='M150 75 L185 90 L150 105 Z' fill='%23fff' opacity='0.7'/%3E%3C/svg%3E"
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
+        className="absolute inset-0 w-full h-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:ease-out motion-safe:md:group-hover:scale-105"
         onError={onError}
         aria-label={displayName}
       />
@@ -304,12 +238,28 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
       src={item.image!}
       alt={displayName}
       fill
-      className={`object-${objectFit} transition-transform duration-300 md:group-hover:scale-105`}
+      className={`object-${objectFit} motion-safe:transition-transform motion-safe:duration-500 motion-safe:ease-out motion-safe:md:group-hover:scale-105`}
       loading={priority ? "eager" : "lazy"}
       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}
     />
   );
+}
+
+// Card con borde y sombra al pasar el raton (decision del usuario, 2026-09-27:
+// preferia el marco + sombreado a los filetes sueltos del rediseño). Sin
+// `hover:scale`: escalar un bloque con texto lo emborrona en la transicion.
+// Sin `overflow-hidden` en la card: recortaria el focus ring del boton
+// superpuesto (`ring-offset-4`).
+// Card "especial" (item.highlight): borde en el color del tenant para que
+// destaque en la rejilla, y al pasar el raton se intensifica en vez de
+// apagarse al gris de las demas.
+function cardClass(clicable: boolean | undefined, destacada: boolean | undefined): string {
+  const borde = destacada ? "border-primary/60 ring-1 ring-primary/20" : "border-foreground/15";
+  const base = `group relative flex h-full flex-col rounded-[3px] border bg-card ${borde}`;
+  if (!clicable) return base;
+  const bordeHover = destacada ? "hover:border-primary" : "hover:border-foreground/25";
+  return `${base} cursor-pointer transition-[box-shadow,transform,border-color] duration-300 ease-out hover:-translate-y-0.5 ${bordeHover} hover:shadow-elegant-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0`;
 }
 
 const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
@@ -328,11 +278,11 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
   const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
-  
+
   // Use static value initially, check on client only after mount
   const [shouldReduceMotionCard, setShouldReduceMotionCard] = useState(false);
   const cardMotionRef = useRef(false);
-  
+
   useEffect(() => {
     if (!cardMotionRef.current) {
       cardMotionRef.current = true;
@@ -340,7 +290,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       setShouldReduceMotionCard(prefersReducedMotion);
     }
   }, []);
-  
+
   const hasComplements = (item.complements && item.complements.length > 0) || (item.complementGroups && item.complementGroups.length > 0);
   const isClickable = showCart || hasComplements;
 
@@ -362,19 +312,13 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
     }
   };
 
-  const borderClass = item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border";
-
   return (
-    <div
-      className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-all duration-300 ${
-        isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 hover:border-primary/20 cursor-pointer hover:scale-[1.02]" : ""
-      } ${borderClass}`}
-    >
+    <div className={cardClass(isClickable, item.highlight)}>
       {isClickable && (
         <button
           type="button"
           aria-label={getCardAriaLabel(showCart, safeLanguage, displayName)}
-          className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg"
+          className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
           onClick={handleClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -385,7 +329,10 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         />
       )}
       {item.image && !imageError && !hideImages && (
-        <div className="relative aspect-[16/10] w-full overflow-hidden">
+        // bg-white fijo, no token (decision del usuario, 2026-09-27): las fotos de
+        // producto suelen venir sobre blanco; con `object-contain` las bandas
+        // laterales deben fundirse con la foto, tambien en modo oscuro.
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-[2px] bg-white">
           <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
           {!item.image.endsWith(".mp4") && (
             <button
@@ -401,30 +348,28 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <h3 className="font-serif text-lg font-semibold text-foreground leading-snug truncate flex-1 min-w-0 group-hover:text-primary transition-colors duration-200">
-            {displayName}
-          </h3>
-          {item.highlight && (
-            <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] shrink-0">
-              {t("especial", safeLanguage)}
-            </Badge>
-          )}
-        </div>
+        {item.highlight && (
+          <Badge variant="secondary" className="mb-2.5 w-fit rounded-[3px] border border-primary bg-transparent px-2 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-[0.18em] text-primary shadow-none">
+            {t("especial", safeLanguage)}
+          </Badge>
+        )}
+        <h3 className="mb-1.5 min-w-0 [font-variant-numeric:lining-nums] font-serif text-[clamp(20px,1.8vw,24px)] font-normal leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">
+          {displayName}
+        </h3>
         {displayDescription && (
           <p className="mb-3 text-sm leading-relaxed text-muted-foreground line-clamp-3">
             {displayDescription}
           </p>
         )}
         <AllergenBadges alergenos={item.alergenos} language={safeLanguage} className="mb-2" />
-        <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border/50">
-          <span className="text-lg font-bold text-foreground tabular-nums group-hover:text-primary transition-colors duration-200">
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-foreground/15 pt-3">
+          <span className="text-base font-semibold tabular-nums text-foreground">
             {formatPrice(item.price, 'EUR', safeLanguage)}
           </span>
           {showCart && (
             <button
               type="button"
-              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all duration-200 min-h-[44px] shrink-0 whitespace-nowrap shadow-sm hover:shadow-md"
+              className="relative z-20 min-h-[44px] shrink-0 whitespace-nowrap rounded-[3px] border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background outline-none transition-[background-color,transform] duration-150 ease-out hover:bg-foreground/85 active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
@@ -436,7 +381,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           )}
         </div>
         {!showCart && hasComplements && (
-          <div className="flex items-center justify-between gap-2 mt-3 p-2.5 rounded-md bg-muted/50 group-hover:bg-muted transition-all duration-200 group-hover:shadow-sm">
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-foreground/10 pt-3">
             <span className="text-sm text-muted-foreground min-w-0">
               <span className="break-words">{complementLabel}</span>
               {minComplementPrice > 0 && (
@@ -445,7 +390,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
                 </span>
               )}
             </span>
-            <ChevronRight className="w-4 h-4 text-primary shrink-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:scale-110" />
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-primary" />
           </div>
         )}
       </div>
@@ -484,12 +429,12 @@ function ItemDetailDialog(props: Readonly<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange} modal>
       <DialogContent
-        className="sm:max-w-[425px] flex flex-col max-h-[calc(100dvh-2rem)]"
+        className="sm:max-w-[425px] flex flex-col max-h-[calc(100dvh-2rem)] rounded-[3px] shadow-none"
         onPointerDownOutside={() => onOpenChange(false)}
         onEscapeKeyDown={() => onOpenChange(false)}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] pr-8">{title}</DialogTitle>
           <DialogDescription>
             {complements.length} {complements.length === 1
               ? t("optionSingular", safeLanguage)
@@ -510,7 +455,7 @@ function ItemDetailDialog(props: Readonly<{
               return (
                 <div
                   key={comp.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border"
+                  className="flex items-center justify-between border-b border-foreground/10 py-3 last:border-0"
                 >
                   <div className="text-left min-w-0">
                     <p className="font-medium text-sm">{compName}</p>
@@ -518,7 +463,7 @@ function ItemDetailDialog(props: Readonly<{
                       <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{compDesc}</p>
                     )}
                   </div>
-                  <span className="font-semibold text-sm shrink-0 ml-3">
+                  <span className="font-semibold text-sm tabular-nums shrink-0 ml-3">
                     +{formatPrice(comp.price, 'EUR', safeLanguage)}
                   </span>
                 </div>

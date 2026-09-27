@@ -824,7 +824,7 @@ export function WaiterBanner() {
               Pago en curso
             </DialogTitle>
             <DialogDescription className="pt-2">
-              Hay un pago en proceso en esta mesa. Esperá a que se complete o desbloqueá el pago antes de cerrarla.
+              Hay un pago en proceso en esta mesa. Espera a que se complete o desbloquea el pago antes de cerrarla.
             </DialogDescription>
           </DialogHeader>
           <Button className="w-full mt-2" onClick={() => setCloseDialog(null)}>Entendido</Button>

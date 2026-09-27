@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useState, useMemo, useEffect, useCallback } from "react"
+import { Search } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import dynamic from "next/dynamic"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
@@ -19,6 +20,7 @@ import { useCart } from "@/lib/cart-context"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
+import { useCarritoGuardado } from "@/lib/use-carrito-guardado"
 import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
 
 // Lazy load cart components - only needed when showCart is true
@@ -228,6 +230,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     return [...byId.values()];
   }, [menuData]);
 
+  useCarritoGuardado({ empresaId, productos: allProducts, showCart, isWaiterMode, esRestaurante: empresa?.tipo === 'restaurante', mesaId });
+
   const productSearchQuery = productSearch.trim().toLowerCase();
   const searchResultsCategory = useMemo<MenuCategoryVM | null>(() => {
     if (!productSearchQuery) return null;
@@ -328,7 +332,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                         <button
                           type="button"
                           onClick={() => { setWaiterSelectedItem(product); setWaiterDialogOpen(true); }}
-                          className="min-h-[36px] px-3 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
+                          className="min-h-[36px] px-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold shrink-0"
                         >
                           +
                         </button>
@@ -356,17 +360,17 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           {header === undefined ? null : header}
           <PromoNotification />
           <BannerCarta empresa={empresa} />
-          <div className="w-full bg-background border-b border-border">
-            <div className="max-w-2xl mx-auto px-4 py-3">
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base" aria-hidden="true">🔍</span>
+          <div className="w-full bg-background">
+            <div className="mx-auto max-w-7xl px-[clamp(16px,4vw,64px)] py-4">
+              <div className="relative max-w-xl">
+                <Search className="pointer-events-none absolute left-0 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <input
                   type="search"
                   value={productSearch}
                   onChange={e => setProductSearch(e.target.value)}
                   placeholder={t("searchProductsPlaceholder", language)}
                   aria-label={t("searchProductsPlaceholder", language)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="min-h-[44px] w-full border-0 border-b border-foreground/25 bg-transparent py-2.5 pl-8 pr-2 text-[15px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
               </div>
             </div>
@@ -386,8 +390,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                 isWaiterMode={showWaiterSearch}
               />
             )}
-            <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
-              <div className="space-y-12 md:space-y-16">
+            <div id="menu-content" className="mx-auto w-full max-w-7xl px-[clamp(16px,4vw,64px)] py-[clamp(32px,5vw,64px)]">
+              <div className="space-y-[clamp(56px,8vw,112px)]">
                 {searchResultsCategory ? (
                   searchResultsCategory.items.length > 0 ? (
                     <MenuSection category={searchResultsCategory} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority hideImages={showWaiterSearch} />

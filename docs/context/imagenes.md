@@ -19,7 +19,13 @@ imagen**, antes de que salga a la red.
 | Función | Se usa para | Reescala a | Formato | Calidad |
 |---|---|---|---|---|
 | `optimizeImage()` | fotos de producto, logos, promociones, TGTG | **480×480** máx. | WebP | 0.8 |
-| `optimizeBannerImage()` | banner de empresa | 1920×1080 máx. | WebP | 0.92 |
+| `optimizeBannerImage()` | banner de empresa; imágenes únicas de la landing (hero, nosotros — desde 2026-09-27) | 1920×1080 máx. | WebP | 0.92 |
+
+> **Landing (2026-09-27):** el rediseño editorial pinta la foto del hero a
+> sangre, así que los campos de imagen única de `/admin/landing` pasan
+> `isBannerImage`. Las fotos subidas antes siguen a 480 px (borrosas a pantalla
+> completa) hasta que el tenant las resuba. La galería sigue en `optimizeImage`.
+> Ver `docs/context/rediseno-editorial.md`.
 
 `ImageUploader` (`src/components/ui/image-uploader.tsx`) llama a una u otra
 según `isBannerImage`, y sube el resultado a R2. **En la base de datos y en R2 no

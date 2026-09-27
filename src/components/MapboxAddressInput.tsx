@@ -20,12 +20,14 @@ export interface SelectedAddress {
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
 interface MapboxAddressInputProps {
+  /** Para asociar un `<label htmlFor>` externo (el placeholder no es etiqueta). */
+  id?: string;
   onSelect: (address: SelectedAddress) => void;
   onInputChange?: (value: string) => void;
   disabled?: boolean;
 }
 
-export function MapboxAddressInput({ onSelect, onInputChange, disabled }: Readonly<MapboxAddressInputProps>) {
+export function MapboxAddressInput({ id, onSelect, onInputChange, disabled }: Readonly<MapboxAddressInputProps>) {
   const { language } = useLanguage();
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<GeocodingFeature[]>([]);
@@ -59,21 +61,22 @@ export function MapboxAddressInput({ onSelect, onInputChange, disabled }: Readon
   return (
     <div className="relative">
       <input
+        id={id}
         type="text"
         value={inputValue}
         onChange={handleInputChange}
         disabled={disabled}
         placeholder={t('deliveryAddressPlaceholder', language)}
-        className="min-h-[44px] w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="min-h-[44px] w-full rounded-[3px] border border-foreground/20 bg-background px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:border-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         autoComplete="off"
       />
       {suggestions.length > 0 && (
-        <ul className="absolute left-0 right-0 top-full mt-1 z-[200] rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
+        <ul className="absolute left-0 right-0 top-full mt-1 z-[200] rounded-[3px] border border-foreground/15 bg-popover overflow-hidden">
           {suggestions.map((s) => (
             <li key={s.place_name}>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors"
+                className="w-full min-h-[44px] border-b border-foreground/10 text-left px-3 py-2 text-sm text-popover-foreground last:border-0 hover:bg-muted transition-colors"
                 onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
               >
                 {s.place_name}

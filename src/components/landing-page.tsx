@@ -75,17 +75,6 @@ function cintaDelHero(contenido: Record<string, unknown>, language: Language): {
   return { modo: "palabras", items: palabrasMarquee(readTranslatable(contenido, "marquee", language)) };
 }
 
-// Brillos radiales muy suaves sobre el fondo (".body" de la referencia),
-// derivados de los colores del tenant.
-const FONDO_BRILLOS = {
-  backgroundImage: [
-    "radial-gradient(at 14% 8%, color-mix(in oklch, var(--primary) 12%, transparent) 0%, transparent 45%)",
-    "radial-gradient(at 86% 10%, color-mix(in oklch, var(--accent) 30%, transparent) 0%, transparent 42%)",
-    "radial-gradient(at 80% 86%, color-mix(in oklch, var(--primary) 7%, transparent) 0%, transparent 46%)",
-    "radial-gradient(at 22% 92%, color-mix(in oklch, var(--accent) 25%, transparent) 0%, transparent 46%)",
-  ].join(", "),
-};
-
 export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
   const { language } = useLanguage();
   const heroContenido = sections.find((s) => s.tipo === "hero")?.contenido ?? {};
@@ -99,9 +88,7 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
   const cinta = cintaDelHero(heroContenido, language);
 
   return (
-    <div className="relative isolate flex min-h-screen flex-col bg-background">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10" style={FONDO_BRILLOS} />
-
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-background">
       <LandingHeader empresa={empresa} showNosotros={showNosotros} showDondeEstamos={showDondeEstamos} />
 
       <main id="main-content" className="flex-1">

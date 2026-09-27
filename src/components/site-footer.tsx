@@ -139,12 +139,12 @@ export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
           )}
         </div>
 
-        <div className="mt-10 pt-6 border-t border-background/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-footer-fg/40">
+        <div className="mt-10 pt-6 border-t border-background/10 flex flex-col items-center gap-2 text-center text-xs text-footer-fg/40">
           <p>© {currentYear} {empresa.nombre}</p>
           <a
             href="/admin/login"
             rel="nofollow"
-            className="text-primary hover:text-primary/80 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg rounded-sm"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-primary hover:text-primary/80 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg rounded-sm"
             aria-label={t("admin", language)}
           >
             <Settings className="w-4 h-4" />

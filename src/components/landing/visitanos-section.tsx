@@ -16,6 +16,7 @@ import {
   landingBtnOscuro,
   landingBtnWhatsapp,
   landingH2,
+  landingPadX,
   mapsSearchUrl,
   telHref,
 } from "@/components/landing/landing-ui";
@@ -37,14 +38,15 @@ interface InfoBlockProps {
 function InfoBlock({ etiqueta, children }: Readonly<InfoBlockProps>) {
   return (
     <div>
-      <dt className="mb-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-primary">{etiqueta}</dt>
-      <dd className="whitespace-pre-line text-[15px] leading-[1.6] text-muted-foreground">{children}</dd>
+      <dt className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{etiqueta}</dt>
+      <dd className="whitespace-pre-line text-[15px] leading-[1.6] text-foreground">{children}</dd>
     </div>
   );
 }
 
-const socialPillClass =
-  "inline-flex min-h-[44px] items-center gap-2.5 rounded-full border border-border bg-background px-4 text-xs font-semibold uppercase tracking-[0.08em] text-foreground transition-all duration-200 hover:-translate-y-px hover:border-foreground hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+// Enlaces de texto con icono, no pastillas: son secundarios frente a Maps/WhatsApp.
+const socialLinkClass =
+  "inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground underline decoration-foreground/30 decoration-1 underline-offset-[6px] transition-[text-decoration-color] duration-200 hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 interface RedesProps {
   empresa: EmpresaPublic;
@@ -55,15 +57,13 @@ interface RedesProps {
 function Redes({ empresa, etiqueta, nuevaPestana }: Readonly<Omit<RedesProps, 'whatsappHref'>>) {
   if (!empresa.instagram && !empresa.fb) return null;
   return (
-    <div className="mt-9 border-t border-border pt-7">
-      <Eyebrow solo className="!mb-4">
-        {etiqueta}
-      </Eyebrow>
-      <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+    <div className="mt-10 border-t border-foreground/15 pt-6">
+      <Eyebrow className="!mb-2">{etiqueta}</Eyebrow>
+      <ul className="m-0 flex list-none flex-wrap gap-x-6 p-0">
         {empresa.instagram && (
           <li>
-            <a href={empresa.instagram} target="_blank" rel="noopener noreferrer me" className={socialPillClass}>
-              <InstagramIcon className="size-5 text-primary" />
+            <a href={empresa.instagram} target="_blank" rel="noopener noreferrer me" className={socialLinkClass}>
+              <InstagramIcon className="size-[18px]" />
               <span>Instagram</span>
               <AvisoNuevaPestana texto={nuevaPestana} />
             </a>
@@ -71,8 +71,8 @@ function Redes({ empresa, etiqueta, nuevaPestana }: Readonly<Omit<RedesProps, 'w
         )}
         {empresa.fb && (
           <li>
-            <a href={empresa.fb} target="_blank" rel="noopener noreferrer me" className={socialPillClass}>
-              <FacebookIcon className="size-5 text-primary" />
+            <a href={empresa.fb} target="_blank" rel="noopener noreferrer me" className={socialLinkClass}>
+              <FacebookIcon className="size-[18px]" />
               <span>Facebook</span>
               <AvisoNuevaPestana texto={nuevaPestana} />
             </a>
@@ -83,9 +83,22 @@ function Redes({ empresa, etiqueta, nuevaPestana }: Readonly<Omit<RedesProps, 'w
   );
 }
 
+// Con mapa: el texto a la izquierda (con su padding) y el mapa pegado al borde
+// derecho de la pantalla, como una foto mas. Sin mapa: solo la columna de texto.
 function gridClass(conMapa: boolean): string {
-  if (conMapa) return "lg:grid-cols-[1.1fr_1fr]";
-  return "max-w-3xl";
+  if (conMapa) return "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]";
+  return "mx-auto max-w-7xl";
+}
+
+// Junto al mapa, el hueco del grid ya separa y el texto se arrima a el.
+function textoPadClass(conMapa: boolean): string {
+  if (conMapa) return "lg:pr-0";
+  return "";
+}
+
+function textoAlineadoClass(conMapa: boolean): string {
+  if (conMapa) return "lg:ml-auto";
+  return "";
 }
 
 export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<VisitanosSectionProps>) {
@@ -98,12 +111,59 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
   const nuevaPestana = t("opensInNewTab", language);
 
   return (
-    <section id="donde-estamos" aria-labelledby={tituloId} className="w-full scroll-mt-20 px-[clamp(20px,4vw,64px)] py-[clamp(80px,10vw,140px)]">
-      <div
-        className={`mx-auto grid max-w-7xl items-stretch gap-[clamp(40px,6vw,80px)] ${gridClass(Boolean(empresa.urlMapa))}`}
-      >
+    <section id="donde-estamos" aria-labelledby={tituloId} className="w-full scroll-mt-20 py-[clamp(64px,10vw,140px)]">
+      <div className={`grid grid-cols-1 items-stretch gap-[clamp(40px,6vw,96px)] ${gridClass(Boolean(empresa.urlMapa))}`}>
+        <div className={`min-w-0 ${landingPadX} ${textoPadClass(Boolean(empresa.urlMapa))}`}>
+          <div className={`max-w-[36rem] ${textoAlineadoClass(Boolean(empresa.urlMapa))}`}>
+            {kicker && <Eyebrow>{kicker}</Eyebrow>}
+            <h2 id={tituloId} className={landingH2}>
+              <TituloResaltado texto={titulo} />
+            </h2>
+
+            <dl className="mb-10 mt-8 grid grid-cols-1 gap-x-10 gap-y-6 border-t border-foreground/15 pt-6 sm:grid-cols-2">
+              {empresa.direccion && <InfoBlock etiqueta={t("address", language)}>{empresa.direccion}</InfoBlock>}
+              {empresa.telefono && (
+                <InfoBlock etiqueta={t("phone", language)}>
+                  <a
+                    href={telHref(empresa.telefono)}
+                    className="underline-offset-4 transition-colors hover:text-primary hover:underline"
+                  >
+                    {displayPhoneNumber(empresa.telefono)}
+                  </a>
+                </InfoBlock>
+              )}
+              {horario && <InfoBlock etiqueta={t("landingHours", language)}>{horario}</InfoBlock>}
+            </dl>
+
+            {(mapsHref || whatsappHref) && (
+              <div className="flex flex-wrap gap-3">
+                {mapsHref && (
+                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={`${landingBtnOscuro} px-6 py-3 text-[15px]`}>
+                    <MapPin className="size-[18px] shrink-0" aria-hidden="true" />
+                    {t("landingOpenInMaps", language)}
+                    <AvisoNuevaPestana texto={nuevaPestana} />
+                  </a>
+                )}
+                {whatsappHref && (
+                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={landingBtnWhatsapp}>
+                    <WhatsAppIcon className="size-[18px]" />
+                    WhatsApp
+                    <AvisoNuevaPestana texto={nuevaPestana} />
+                  </a>
+                )}
+              </div>
+            )}
+
+            <Redes
+              empresa={empresa}
+              etiqueta={t("landingFollowUs", language)}
+              nuevaPestana={nuevaPestana}
+            />
+          </div>
+        </div>
+
         {empresa.urlMapa && (
-          <div className="relative min-h-[360px] overflow-hidden rounded-[26px] border border-border bg-muted shadow-[0_30px_60px_-20px_color-mix(in_oklch,var(--foreground)_35%,transparent)] lg:min-h-[540px]">
+          <div className="relative min-h-[360px] overflow-hidden bg-muted lg:min-h-[560px]">
             <iframe
               title={t("locationIframe", language)}
               className="absolute inset-0 h-full w-full border-0"
@@ -114,53 +174,6 @@ export function VisitanosSection({ contenido, empresa, whatsappHref }: Readonly<
             />
           </div>
         )}
-
-        <div className="py-4">
-          {kicker && <Eyebrow>{kicker}</Eyebrow>}
-          <h2 id={tituloId} className={landingH2}>
-            <TituloResaltado texto={titulo} />
-          </h2>
-
-          <dl className="mb-10 mt-8 grid grid-cols-1 gap-x-10 gap-y-8 border-t border-border pt-8 sm:grid-cols-2">
-            {empresa.direccion && <InfoBlock etiqueta={t("address", language)}>{empresa.direccion}</InfoBlock>}
-            {empresa.telefono && (
-              <InfoBlock etiqueta={t("phone", language)}>
-                <a
-                  href={telHref(empresa.telefono)}
-                  className="transition-colors hover:text-primary"
-                >
-                  {displayPhoneNumber(empresa.telefono)}
-                </a>
-              </InfoBlock>
-            )}
-            {horario && <InfoBlock etiqueta={t("landingHours", language)}>{horario}</InfoBlock>}
-          </dl>
-
-          {(mapsHref || whatsappHref) && (
-            <div className="flex flex-wrap gap-3">
-              {mapsHref && (
-                <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={`${landingBtnOscuro} px-[30px] py-3 text-[15px]`}>
-                  <MapPin className="size-[18px] shrink-0" aria-hidden="true" />
-                  {t("landingOpenInMaps", language)}
-                  <AvisoNuevaPestana texto={nuevaPestana} />
-                </a>
-              )}
-              {whatsappHref && (
-                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={landingBtnWhatsapp}>
-                  <WhatsAppIcon className="size-[18px]" />
-                  WhatsApp
-                  <AvisoNuevaPestana texto={nuevaPestana} />
-                </a>
-              )}
-            </div>
-          )}
-
-          <Redes
-            empresa={empresa}
-            etiqueta={t("landingFollowUs", language)}
-            nuevaPestana={nuevaPestana}
-          />
-        </div>
       </div>
     </section>
   );

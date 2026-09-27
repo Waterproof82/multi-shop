@@ -39,8 +39,8 @@ export function Marquee({ modo, items }: Readonly<MarqueeProps>) {
   const pista = modo === "imagenes" ? pistaImagenes : pistaPalabras;
 
   return (
-    <div aria-hidden="true" className="relative overflow-hidden border-y border-primary bg-white py-7">
-      <div className="flex w-max animate-landing-marquee items-center gap-12 whitespace-nowrap font-serif text-[clamp(28px,3.4vw,52px)] font-light italic tracking-[-0.01em] motion-reduce:animate-none">
+    <div aria-hidden="true" className="relative overflow-hidden border-y border-neutral-900/10 bg-white py-6">
+      <div className="flex w-max animate-landing-marquee items-center gap-12 whitespace-nowrap font-serif text-[clamp(28px,3.4vw,52px)] font-normal tracking-[-0.02em] motion-reduce:animate-none">
         {pista(items, 0)}
         {pista(items, 1)}
       </div>

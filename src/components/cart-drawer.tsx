@@ -33,6 +33,7 @@ import { useCart, type CartItem } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { DeliveryMethodSelector } from "@/components/DeliveryMethodSelector"
+import { ImageZoomDialog } from "@/components/image-zoom-dialog"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
@@ -245,20 +246,80 @@ function CartItemThumbnail({ item, alt }: Readonly<{ item: CartItem['item']; alt
   const hasStillImage = !!item.image && !item.image.endsWith('.mp4');
   if (!hasStillImage) {
     return (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center bg-muted">
         <ShoppingBag className="size-5 text-muted-foreground" />
       </div>
     );
   }
   return (
-    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
+    <div className="relative h-14 w-14 shrink-0 overflow-hidden bg-muted">
       <ImagenSubida
         src={item.image!}
         alt={alt}
         fill
-        sizes="48px"
+        sizes="56px"
         className={`object-${item.imageFit || 'cover'}`}
       />
+    </div>
+  );
+}
+
+/** Solo las fotos se amplian: sin imagen o con video no hay zoom. */
+function tieneFotoAmpliable(item: CartItem['item']): boolean {
+  return !!item.image && !item.image.endsWith('.mp4');
+}
+
+/**
+ * Foto + nombre + complementos + precio de un item del carrito. Si tiene foto,
+ * un boton transparente SUPERPUESTO (mismo patron que las cards de la carta)
+ * abre el zoom: asi el lector de pantalla sigue leyendo precio y complementos
+ * como texto, y los botones -, + y papelera quedan FUERA de su area.
+ */
+function CartItemResumen({ ci, nombre, precio, language, onZoom }: Readonly<{
+  ci: CartItem;
+  nombre: string;
+  precio: number;
+  language: Language;
+  onZoom: () => void;
+}>) {
+  const ampliable = tieneFotoAmpliable(ci.item);
+  return (
+    <div className="group relative flex min-w-0 flex-1 items-center gap-3">
+      {ampliable && (
+        <button
+          type="button"
+          onClick={onZoom}
+          aria-label={`${t("viewImage", language)}: ${nombre}`}
+          className="absolute inset-0 z-10 cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        />
+      )}
+      <CartItemThumbnail item={ci.item} alt={nombre} />
+      <div className="flex-1 min-w-0">
+        <p className={`font-serif text-[17px] font-normal leading-snug text-foreground [font-variant-numeric:lining-nums] flex items-center gap-1.5 flex-wrap decoration-primary decoration-1 underline-offset-[4px] ${ampliable ? 'group-hover:underline' : ''}`}>
+          <span className="truncate">{nombre}</span>
+          {ci.pase && (
+            <span
+              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{ background: PASE_BADGE[ci.pase].bg, color: PASE_BADGE[ci.pase].text }}
+            >
+              {PASE_LABEL[ci.pase]}
+            </span>
+          )}
+        </p>
+        {ci.selectedComplements && ci.selectedComplements.length > 0 && (
+          <p className="text-xs text-muted-foreground truncate">
+            + {ci.selectedComplements.map(c => c.name).join(', ')}
+          </p>
+        )}
+        {ci.note && (
+          <p className="text-xs text-muted-foreground italic truncate">
+            {ci.note}
+          </p>
+        )}
+        <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
+          {formatPrice(precio, 'EUR', language)}
+        </p>
+      </div>
     </div>
   );
 }
@@ -433,9 +494,9 @@ function TotalsSection({ language, totalPrice, deliveryFee, modalidadFee, modali
           <span>{formatPrice(modalidadFee, 'EUR', language)}</span>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-        <span className={`text-2xl font-bold tabular-nums animate-price-update ${grandTotalColorClass(discountValid)}`} key={grandTotal}>
+      <div className="flex items-baseline justify-between border-t border-foreground/15 pt-3">
+        <span className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t("total", language)}</span>
+        <span className={`text-2xl font-semibold tabular-nums animate-price-update ${grandTotalColorClass(discountValid)}`} key={grandTotal}>
           {formatPrice(grandTotal, 'EUR', language)}
         </span>
       </div>
@@ -476,7 +537,7 @@ function DiscountSection({
           placeholder={t("discountCodePlaceholder", language)}
           value={code}
           onChange={(e) => onCodeChange(e.target.value.toUpperCase())}
-          className={`h-9 ${discountBorderClass(error, valid)}`}
+          className={`h-11 rounded-[3px] ${discountBorderClass(error, valid)}`}
           disabled={disabled}
           aria-describedby={discountDescribedBy(error, valid)}
           aria-invalid={!!error}
@@ -484,7 +545,7 @@ function DiscountSection({
         <Button
           variant="outline"
           size="sm"
-          className="h-9 min-h-[44px] px-4"
+          className="h-11 min-h-[44px] rounded-[3px] px-4"
           onClick={onApply}
           disabled={disabled}
         >
@@ -1069,11 +1130,11 @@ function OrderToast({ show, language }: Readonly<{ show: boolean; language: Lang
   if (!show) return null;
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
-      <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
-        <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+      <div className="bg-background border border-foreground/15 px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in duration-200">
+        <div className="flex items-center justify-center">
           <Check className="size-8 text-primary" strokeWidth={2.5} />
         </div>
-        <p className="text-base font-bold text-foreground text-center leading-snug">
+        <p className="font-serif text-xl font-normal text-foreground text-center leading-snug">
           {t('mesaOrderConfirmed', language)}
         </p>
       </div>
@@ -1085,11 +1146,11 @@ export function SendingOverlay({ show, language }: Readonly<{ show: boolean; lan
   if (!show) return null;
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
-      <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
-        <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+      <div className="bg-background border border-foreground/15 px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in duration-200">
+        <div className="flex items-center justify-center">
           <Loader2 className="size-8 text-primary animate-spin" strokeWidth={2.5} />
         </div>
-        <p className="text-base font-bold text-foreground text-center leading-snug">
+        <p className="font-serif text-xl font-normal text-foreground text-center leading-snug">
           {t('orderSending', language)}
         </p>
       </div>
@@ -1171,7 +1232,7 @@ function DistintivoDeMesa({ mesaInfo, mesaError, language }: Readonly<{
 }>) {
   return (
     <div className="mb-3">
-      <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2.5 min-h-[44px]">
+      <div className="flex items-center gap-2 border-b border-foreground/15 py-2.5 min-h-[44px]">
         <UtensilsCrossed className="size-4 text-primary shrink-0" aria-hidden="true" />
         <span className="font-semibold text-primary text-sm">
           {mesaBadgeLabel(mesaInfo, mesaError, t('mesaLabel', language))}
@@ -1230,7 +1291,7 @@ export function DatosDelComensal({
             placeholder={t("placeholderName", language)}
             value={nombre}
             onChange={(e) => onNombre(e.target.value)}
-            className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
+            className={`h-11 rounded-[3px] ${errors.nombre ? 'border-destructive' : ''}`}
             maxLength={100}
             autoComplete="name"
             aria-describedby={errors.nombre ? "nombre-error" : undefined}
@@ -1245,7 +1306,7 @@ export function DatosDelComensal({
           <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
           <div className="flex gap-1 flex-1">
             <Select value={countryCode} onValueChange={onCountryCode}>
-              <SelectTrigger id="country-code-select" className="h-9 w-[90px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
+              <SelectTrigger id="country-code-select" className="h-11 w-[90px] shrink-0 rounded-[3px] text-xs px-2" aria-labelledby="country-code-label">
                 <SelectValue />
               </SelectTrigger>
               <span id="country-code-label" className="sr-only">{t("countryCode", language)}</span>
@@ -1266,7 +1327,7 @@ export function DatosDelComensal({
               placeholder={t("phonePlaceholder", language)}
               value={telefono}
               onChange={(e) => onTelefono(e.target.value.replaceAll(/\D/g, '').slice(0, 15))}
-              className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
+              className={`h-11 flex-1 rounded-[3px] ${errors.telefono ? 'border-destructive' : ''}`}
               maxLength={15}
               autoComplete="tel-national"
               aria-describedby={errors.telefono ? "telefono-error" : undefined}
@@ -1286,7 +1347,7 @@ export function DatosDelComensal({
             placeholder={t("placeholderEmail", language)}
             value={email}
             onChange={(e) => onEmail(e.target.value)}
-            className="h-9"
+            className="h-11 rounded-[3px]"
             maxLength={100}
             autoComplete="email"
           />
@@ -1306,6 +1367,8 @@ export function CartDrawer({
   envioDomicilioHabilitado = false,
   modalidadesEntrega = [],
 }: Readonly<CartDrawerProps>) {
+  // Item cuya foto se muestra ampliada (pulsado dentro del carrito).
+  const [zoomItem, setZoomItem] = useState<CartItem['item'] | null>(null);
   const {
     items,
     updateQuantity,
@@ -1548,9 +1611,9 @@ export function CartDrawer({
       )}
 
       <Dialog open={showActiveOrdersDialog} onOpenChange={setShowActiveOrdersDialog}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="rounded-[3px] shadow-none sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{t('activeOrdersDialogTitle', language)}</DialogTitle>
+            <DialogTitle className="font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] pr-8">{t('activeOrdersDialogTitle', language)}</DialogTitle>
             <DialogDescription className="pt-2">
               {getActiveOrdersBodyText(activeOrderTokens.length, language)}
             </DialogDescription>
@@ -1558,13 +1621,13 @@ export function CartDrawer({
           <div className="flex gap-2 mt-2">
             <Button
               variant="outline"
-              className="flex-1"
+              className="flex-1 min-h-[44px] rounded-[3px]"
               onClick={() => setShowActiveOrdersDialog(false)}
             >
               {t('cancel', language)}
             </Button>
             <Button
-              className="flex-1"
+              className="flex-1 min-h-[44px] rounded-[3px] bg-foreground text-background hover:bg-foreground/85"
               onClick={() => {
                 setShowActiveOrdersDialog(false);
                 handleConfirmOrder();
@@ -1577,31 +1640,40 @@ export function CartDrawer({
       </Dialog>
 
       <Dialog open={!!orderSuccess} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md text-center">
+        <DialogContent className="rounded-[3px] shadow-none sm:max-w-md text-center">
           <DialogHeader>
-            <DialogTitle className="flex flex-col items-center justify-center gap-2 text-primary text-2xl">
-              <Check className="w-12 h-12 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-full p-2" />
+            <DialogTitle className="flex flex-col items-center justify-center gap-3 font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] text-3xl">
+              <Check className="size-10 text-primary" aria-hidden="true" />
               {t("orderSuccessTitle", language)}
             </DialogTitle>
             <DialogDescription className="text-base pt-4">
               {t("orderSuccessMessage", language)}
               <br />
-              <strong className="text-xl text-foreground font-bold">
+              <strong className="mt-2 inline-block text-2xl font-semibold tabular-nums text-foreground">
                 #{orderSuccess?.numeroPedido}
               </strong>
             </DialogDescription>
           </DialogHeader>
-          <Button onClick={() => handleDialogClose(false)} className="w-full mt-4">
+          <Button onClick={() => handleDialogClose(false)} className="w-full mt-4 min-h-[44px] rounded-[3px] bg-foreground text-background hover:bg-foreground/85">
             {t("close", language)}
           </Button>
         </DialogContent>
       </Dialog>
 
+      {zoomItem && tieneFotoAmpliable(zoomItem) && (
+        <ImageZoomDialog
+          open
+          onOpenChange={(abierto) => { if (!abierto) setZoomItem(null); }}
+          images={zoomItem.image2 ? [zoomItem.image!, zoomItem.image2] : [zoomItem.image!]}
+          alt={(language !== "es" && zoomItem.translations?.[language]?.name) || zoomItem.name}
+          objectFit={zoomItem.imageFit}
+        />
+      )}
+
       <Sheet open={isCartOpen} onOpenChange={closeCart}>
       <SheetContent side="right" className="flex flex-col w-full sm:max-w-md bg-background h-[100dvh] max-h-[100dvh] p-0">
-        <SheetHeader className="shrink-0 px-4 pt-4 pb-2">
-          <SheetTitle className="flex items-center gap-2 text-foreground">
-            <ShoppingBag className="size-5" />
+        <SheetHeader className="shrink-0 border-b border-foreground/10 px-5 pb-4 pt-5">
+          <SheetTitle className="font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] text-3xl text-foreground">
             {t("yourOrder", language)}
           </SheetTitle>
           <SheetDescription>
@@ -1610,8 +1682,8 @@ export function CartDrawer({
         </SheetHeader>
 
         {showNoPaymentBanner(items, isWaiterMode, deliveryMethod, pagosPickupHabilitados, isRestaurant) && (
-          <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
-            <p className="text-xs text-secondary-foreground font-medium">
+          <div className="shrink-0 mx-5 mt-3 bg-muted px-3 py-2">
+            <p className="text-xs text-foreground font-medium">
               {t("noPaymentRequired", language)}
             </p>
           </div>
@@ -1619,12 +1691,12 @@ export function CartDrawer({
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground px-4">
-            <div className={`relative ${shouldReduceMotion ? '' : 'animate-empty-float'}`}>
+            <div className="relative">
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
             <div className="text-center">
-              <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+              <p className="font-serif text-2xl font-normal text-foreground">{t("emptyCart", language)}</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
             </div>
             <button type="button"
@@ -1632,16 +1704,16 @@ export function CartDrawer({
                 closeCart();
                 document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
               }}
-              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 min-h-[44px]"
+              className="mt-2 px-6 py-3 rounded-[3px] bg-foreground text-background hover:bg-foreground/85 font-semibold transition-colors duration-150 min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {t("viewMenu", language)}
             </button>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 py-2">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-5 py-1">
             {(!usaWizard || step === 'items') && (
             <>
-            <ul className="flex flex-col gap-2 cv-auto" style={{ contentVisibility: 'auto' }}>
+            <ul className="flex flex-col cv-auto" style={{ contentVisibility: 'auto' }}>
               {items.map((ci) => {
                 const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                 const totalItemPrice = ci.item.price + complementPrice;
@@ -1649,44 +1721,21 @@ export function CartDrawer({
                 return (
 <li
                       key={ci.cartId}
-                      className={`flex items-center gap-3 rounded-lg p-3 transition-all duration-200 group ${itemAnimationClass}`}
+                      className={`flex items-center gap-3 border-b border-foreground/10 py-4 ${itemAnimationClass}`}
                     >
-                      <CartItemThumbnail
-                        item={ci.item}
-                        alt={(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
+                      <CartItemResumen
+                        ci={ci}
+                        nombre={(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
+                        precio={totalItemPrice}
+                        language={language}
+                        onZoom={() => setZoomItem(ci.item)}
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-card-foreground text-base group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5 flex-wrap">
-                          <span className="truncate">{(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}</span>
-                          {ci.pase && (
-                            <span
-                              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                              style={{ background: PASE_BADGE[ci.pase].bg, color: PASE_BADGE[ci.pase].text }}
-                            >
-                              {PASE_LABEL[ci.pase]}
-                            </span>
-                          )}
-                        </p>
-                        {ci.selectedComplements && ci.selectedComplements.length > 0 && (
-                          <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
-                            + {ci.selectedComplements.map(c => c.name).join(', ')}
-                          </p>
-                        )}
-                        {ci.note && (
-                          <p className="text-xs text-muted-foreground italic truncate">
-                            {ci.note}
-                          </p>
-                        )}
-                        <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/90 transition-colors duration-200">
-                          {formatPrice(totalItemPrice, 'EUR', language)}
-                        </p>
-                      </div>
 
                       <div className="flex items-center gap-0.5 shrink-0">
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-11 min-w-11 h-11 w-11 rounded-[3px] bg-transparent hover:bg-muted/50 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => {
                             const newQty = ci.quantity - 1;
                             updateQuantity(ci.cartId, newQty);
@@ -1695,13 +1744,13 @@ export function CartDrawer({
                         >
                           <Minus className="size-4" />
                         </RippleButton>
-                        <span className="w-6 text-center font-semibold text-foreground text-base animate-quantity-pulse">
+                        <span className="w-6 text-center font-semibold tabular-nums text-foreground text-base animate-quantity-pulse">
                           {ci.quantity}
                         </span>
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-11 min-w-11 h-11 w-11 rounded-[3px] bg-transparent hover:bg-muted/50 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => {
                             const newQty = ci.quantity + 1;
                             updateQuantity(ci.cartId, newQty);
@@ -1713,7 +1762,7 @@ export function CartDrawer({
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="min-h-11 min-w-11 h-11 w-11 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-11 min-w-11 h-11 w-11 rounded-[3px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => {
                             removeItem(ci.cartId);
                           }}
@@ -1731,7 +1780,7 @@ export function CartDrawer({
                 type="button"
                 onClick={() => setStep('checkout')}
                 disabled={items.length === 0}
-                className="w-full min-h-[44px] mt-3"
+                className="w-full min-h-[48px] mt-4 text-[15px] font-semibold tabular-nums rounded-[3px] bg-foreground text-background hover:bg-foreground/85"
               >
                 {t('continueButton', language)} — {formatPrice(totalPrice, 'EUR', language)}
               </Button>
@@ -1740,18 +1789,18 @@ export function CartDrawer({
             )}
 
             {(!usaWizard || step === 'checkout') && (
-            <div className="mt-auto shrink-0 border-t border-border pt-3 pb-4 bg-background">
+            <div className="mt-auto shrink-0 border-t border-foreground/15 pt-4 pb-5 bg-background">
               {usaWizard && (
                 <button
                   type="button"
                   onClick={() => setStep('items')}
-                  className="w-full flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 mb-3 text-left"
+                  className="w-full min-h-[44px] flex items-center justify-between gap-2 border-b border-foreground/10 pb-3 mb-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <span className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground underline decoration-primary decoration-1 underline-offset-[6px]">
                     <span aria-hidden="true">←</span>
                     <span>{t('cartBackToCartLabel', language)}</span>
                   </span>
-                  <span className="text-xs text-primary shrink-0">
+                  <span className="text-xs tabular-nums text-muted-foreground shrink-0">
                     {items.length} {items.length === 1 ? t('itemSingular', language) : t('itemsPlural', language)} · {formatPrice(totalPrice, 'EUR', language)}
                   </span>
                 </button>
@@ -1866,7 +1915,7 @@ export function CartDrawer({
 
               <div className="flex flex-col gap-2">
                  <Button
-                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
+                   className="w-full rounded-[3px] bg-foreground text-background hover:bg-foreground/85 py-3 text-base font-semibold transition-colors duration-150 min-h-[48px]"
                    size="lg"
                    onClick={handleSendOrder}
                    disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete, ageConfirmed)}
@@ -1876,7 +1925,7 @@ export function CartDrawer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-colors duration-200"
+                  className="min-h-[44px] text-muted-foreground rounded-[3px] py-2 font-medium underline-offset-4 hover:bg-transparent hover:text-foreground hover:underline transition-colors duration-200"
                   onClick={() => { clearCart(); }}
                 >
                   {t("clearCart", language)}

@@ -4,10 +4,6 @@ import { getPedidoUseCase } from '@/core/infrastructure/database';
 import { resolveAdminContextWithEmpresa, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
-const pedidoIdSchema = z.object({
-  id: z.uuid(),
-});
-
 const updatePedidoSchema = z.object({
   id: z.uuid(),
   estado: z.enum(PEDIDO_ESTADOS),
@@ -58,30 +54,6 @@ export async function PATCH(request: NextRequest) {
   }
 
   const result = await getPedidoUseCase().updateStatus(parsed.data.id, empresaId, parsed.data.estado);
-  if (!result.success) {
-    return handleResult(result);
-  }
-  return successResponse({ success: true });
-}
-
-export async function DELETE(request: NextRequest) {
-  const ctx = await resolveAdminContextWithEmpresa(request);
-  if (ctx.error) return ctx.error;
-  const { empresaId } = ctx;
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return validationErrorResponse('Invalid request body');
-  }
-  const parsed = pedidoIdSchema.safeParse({ id: (body as Record<string, unknown>).id });
-
-  if (!parsed.success) {
-    return validationErrorResponse('ID inválido');
-  }
-
-  const result = await getPedidoUseCase().delete(parsed.data.id, empresaId);
   if (!result.success) {
     return handleResult(result);
   }

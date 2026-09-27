@@ -255,7 +255,7 @@ export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Prop
               value={glovoPrivateKey}
               onChange={setGlovoPrivateKey}
               placeholder="-----BEGIN RSA PRIVATE KEY-----"
-              hint="Solo pegá si querés reemplazar la existente."
+              hint="Pégala solo si quieres reemplazar la existente."
               textarea
               isSet={initial.glovo_private_key_set}
             />
@@ -287,7 +287,7 @@ export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Prop
               value={redsysSecretKey}
               onChange={setRedsysSecretKey}
               placeholder="sq7HjrUOBfKmC576ILgskD5srU870gJ7"
-              hint="Solo pegá si querés reemplazar la existente."
+              hint="Pégala solo si quieres reemplazar la existente."
               secret
               isSet={initial.redsys_secret_key_set}
             />

@@ -146,10 +146,13 @@ export default function LandingAdminPage() {
     if (campo.kind === "imagen") {
       return (
         <div key={campo.key} className={UPLOADER_WRAPPER_CLASS}>
+          {/* Resolucion de banner (1920px): la landing pinta estas fotos a sangre
+              o a media pantalla; a 480px (optimizeImage) saldrian borrosas. */}
           <ImageUploader
             value={(valor as string | null | undefined) ?? ""}
             onChange={(url) => actualizarCampo(campo.key, url)}
             label={campo.label}
+            isBannerImage
           />
         </div>
       );
