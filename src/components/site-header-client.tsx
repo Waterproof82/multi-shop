@@ -142,7 +142,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
             <Button
               variant="ghost"
               size="icon"
-              className="relative min-h-[44px] min-w-[44px] transition-colors duration-200 hover:bg-muted/50"
+              className="relative min-h-[44px] min-w-[44px] text-foreground/80 transition-colors duration-200 hover:bg-muted/50 hover:text-foreground"
               onClick={handleOpenCart}
               aria-label={etiquetaAbrirCarrito(totalItems, language)}
             >
