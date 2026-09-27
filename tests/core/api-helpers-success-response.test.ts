@@ -4,7 +4,7 @@
  * en CUALQUIER endpoint admin que devuelve Result<void> — delete, setProductos,
  * addProductos, etc. Nunca se había disparado en vivo hasta que se probó de
  * punta a punta el endpoint POST de asignación masiva de menús virtuales.
- * Ver docs/superpowers/plans/2026-09-16-menus-virtuales.md, Task 21.
+ * Ver docs/context/menus-virtuales.md (gotcha de `successResponse`).
  */
 import { describe, it, expect } from 'vitest';
 import { successResponse, handleResultWithStatus } from '@/core/infrastructure/api/helpers';
