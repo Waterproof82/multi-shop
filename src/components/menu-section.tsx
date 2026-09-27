@@ -329,7 +329,10 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         />
       )}
       {item.image && !imageError && !hideImages && (
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-[2px] bg-muted">
+        // bg-white fijo, no token (decision del usuario, 2026-09-27): las fotos de
+        // producto suelen venir sobre blanco; con `object-contain` las bandas
+        // laterales deben fundirse con la foto, tambien en modo oscuro.
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-[2px] bg-white">
           <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
           {!item.image.endsWith(".mp4") && (
             <button

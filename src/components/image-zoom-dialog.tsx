@@ -25,7 +25,8 @@ interface ImageZoomDialogProps {
 
 /**
  * Ampliacion de la(s) foto(s) de un producto, con el lenguaje editorial de la
- * carta: marco recto sin sombra, la foto sobre un paspartu (`bg-muted`) y el
+ * carta: marco recto sin sombra, la foto sobre fondo blanco fijo (`bg-white`,
+ * no token: igual que las cards, las fotos de producto vienen sobre blanco) y el
  * nombre del producto como pie de foto visible — la foto sola no dice de que
  * producto es. La cruz va en su propio boton opaco de 44px (objetivo tactil
  * minimo) para no heredar el contraste de la foto de fondo.
@@ -50,7 +51,7 @@ export function ImageZoomDialog({
           images={images}
           alt={alt}
           objectFit={objectFit ?? 'contain'}
-          mainImageClassName="relative block aspect-square w-full bg-muted sm:aspect-[4/3]"
+          mainImageClassName="relative block aspect-square w-full bg-white sm:aspect-[4/3]"
           sizes="(max-width: 768px) 100vw, 700px"
           initialIndex={initialIndex}
         />
