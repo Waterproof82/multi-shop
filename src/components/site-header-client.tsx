@@ -14,8 +14,6 @@ import { useMesaId } from "@/lib/mesa/use-mesa-id";
 import { etiquetaAbrirCarrito } from "@/lib/cart-abrir-param";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
-const SCROLL_OFFSET_PX = 140;
-
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
   readonly empresa?: EmpresaPublic | null;
@@ -68,12 +66,11 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
 
   const logoUrl = empresa?.logoUrl ?? null;
 
-  const scrollToFirstCategory = () => {
-    const firstSection = document.querySelector("section[id]");
-    if (firstSection) {
-      const top = firstSection.getBoundingClientRect().top + globalThis.scrollY - SCROLL_OFFSET_PX;
-      globalThis.scrollTo({ top, behavior: "smooth" });
-    }
+  // Igual que el logo de la landing: sube al inicio (sin animacion si el
+  // usuario pidio reducir movimiento).
+  const scrollToTop = () => {
+    const reducir = globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    globalThis.scrollTo({ top: 0, behavior: reducir ? "auto" : "smooth" });
   };
 
   return (
@@ -92,7 +89,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
     <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-[clamp(16px,4vw,64px)] md:h-20">
         <div className="flex items-center gap-1 md:gap-3">
-        <button type="button" onClick={scrollToFirstCategory} className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={t("scrollToMenu", language)}>
+        <button type="button" onClick={scrollToTop} className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={t("scrollToTop", language)}>
           {/* Sin logo, el nombre (como en la landing): antes el boton quedaba vacio. */}
           {!logoUrl && empresa?.nombre && (
             <span aria-hidden="true" className="line-clamp-2 font-serif text-lg font-normal leading-tight tracking-[-0.02em] text-foreground md:text-2xl">
@@ -100,13 +97,13 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
             </span>
           )}
           {logoUrl && (
-            <div className="relative h-12 w-24 md:h-16 md:w-32">
+            <div className="relative h-8 w-[208px] max-w-[45vw] md:h-10 md:w-[260px]">
               <Image
                 src={logoUrl}
                 alt={empresa?.nombre ?? t("companyLogo", language)}
                 fill
-                sizes="(max-width: 768px) 96px, 128px"
-                className="object-contain"
+                sizes="(max-width: 768px) 45vw, 260px"
+                className="object-contain object-left"
                 loading="eager"
               />
             </div>
