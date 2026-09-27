@@ -30,7 +30,7 @@ siendo **los del tenant** (`--primary`, `--accent` en runtime): no hay tema fijo
 | Titulares | Playfair Display **400, romana** (`font-normal`), tracking negativo | clases por componente |
 | Énfasis en titulares | `*palabra*` sigue funcionando: `<em>` **en redonda** + color primario | `TituloResaltado` en `landing-ui.tsx` |
 | Cifras en serif | `[font-variant-numeric:lining-nums]` en nombres de producto (Playfair usa cifras antiguas por defecto) | `menu-section.tsx`, carrito, zoom |
-| Separadores | Filete `border-foreground/10–15`, no tarjetas con sombra | todos |
+| Separadores | Filete `border-foreground/10–15`, no tarjetas con sombra. **Excepción (2026-09-27, decisión del usuario):** las cards de producto de `/carta` llevan borde `border-foreground/15` + `bg-card`, y al pasar el ratón `shadow-elegant-lg` + subida de 2px; el título no se subraya. Sin `hover:scale`. Las **especiales** (`item.highlight`) llevan borde `border-primary/60` + `ring-primary/20` (hover: `border-primary`) y la etiqueta "Especial" es un label con borde `border-primary` | todos |
 | Esquinas | `rounded-[3px]` (botones, inputs, diálogos, opciones) | todos |
 | Botón principal | Oscuro: `bg-foreground text-background`. **No** el `primary` del tenant (si es verde, se confunde con WhatsApp) | `landingBtnOscuro`, carrito, pop-ups |
 | Antetítulo | Versalitas pequeñas **encima** del titular, nunca en columna aparte | `Eyebrow` en `landing-ui.tsx` |

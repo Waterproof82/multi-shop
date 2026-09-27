@@ -183,11 +183,11 @@ de dar el fix por cerrado.
 
 > Ver doc completo: `docs/context/rediseno-editorial.md` (sistema, cambios por pantalla y tabla de errores E1–E14)
 
-- **Un solo lenguaje visual** en landing, `/carta` y sus pop-ups: fotos a sangre, filetes `border-foreground/10–15` en vez de tarjetas con sombra, `rounded-[3px]`, Playfair **400 romana**, botón principal oscuro (`bg-foreground text-background`) — NO el `primary` del tenant (si es verde se confunde con WhatsApp). Colores solo de tokens del tenant.
+- **Un solo lenguaje visual** en landing, `/carta` y sus pop-ups: fotos a sangre, filetes `border-foreground/10–15` en vez de tarjetas con sombra — **excepción decidida por el usuario (2026-09-27): las cards de producto de `/carta` SÍ llevan borde y sombra + subida de 2px al pasar el ratón, y el título NO se subraya** (`cardClass` en `menu-section.tsx`; no "corregirlo" hacia filetes), `rounded-[3px]`, Playfair **400 romana**, botón principal oscuro (`bg-foreground text-background`) — NO el `primary` del tenant (si es verde se confunde con WhatsApp). Colores solo de tokens del tenant.
 - **Prohibido en esta zona:** cursiva en titulares (el `*énfasis*` de `TituloResaltado` es `<em>` en redonda), fundidos al hacer scroll, `hover:scale` sobre bloques con texto, emojis como iconos, brillos radiales de fondo.
 - **Cifras en Playfair:** usa cifras antiguas por defecto — en nombres de producto con códigos (ES290, 25Ah) poner `[font-variant-numeric:lining-nums]`.
 - **No tocar `ui/dialog.tsx` para rediseñar pop-ups públicos:** lo comparte el admin. Estilar cada diálogo por `className`.
-- **Borde sobre una imagen `fill`:** un `border`/`ring` del contenedor queda tapado por la imagen — pintarlo en un `::after` por encima (`marcoFotoClass` en `menu-section.tsx`).
+- **Borde sobre una imagen `fill`:** un `border`/`ring` del contenedor queda tapado por la imagen — pintarlo en un `::after` por encima. (Las cards de `/carta` ya no lo necesitan: el borde va en la card, fuera de la foto.)
 - **Tailwind v4 `scale-*` usa la propiedad CSS `scale`, no `transform`:** para verificar un zoom, `getComputedStyle(el).scale` (el `transform` sale `none`).
 - **Fila con botones dentro (`−`, `+`, papelera) nunca es un `<button>` entero:** botón transparente superpuesto solo sobre la zona informativa (`CartItemResumen`, cards de la carta).
 - **Tests: afirmar señal semántica, no clases de color** (`aria-current`, `aria-pressed`). Excepción fijada a propósito: el precio de envío va en pastilla `rounded-full` (`tienda-fulfillment-selector.test.tsx`).

@@ -246,14 +246,20 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
   );
 }
 
-// Filete del marco de la foto: casi invisible en reposo y en el color del
-// tenant al pasar el raton (solo si la card es clicable). Va en un ::after por
-// ENCIMA de la foto — un borde o ring del propio contenedor quedaria tapado
-// por la imagen, que lo llena entero.
-function marcoFotoClass(clicable: boolean | undefined): string {
-  const base = "after:pointer-events-none after:absolute after:inset-0 after:z-[1] after:border after:border-foreground/10 after:content-['']";
-  if (clicable) return `${base} after:transition-colors after:duration-300 group-hover:after:border-primary`;
-  return base;
+// Card con borde y sombra al pasar el raton (decision del usuario, 2026-09-27:
+// preferia el marco + sombreado a los filetes sueltos del rediseño). Sin
+// `hover:scale`: escalar un bloque con texto lo emborrona en la transicion.
+// Sin `overflow-hidden` en la card: recortaria el focus ring del boton
+// superpuesto (`ring-offset-4`).
+// Card "especial" (item.highlight): borde en el color del tenant para que
+// destaque en la rejilla, y al pasar el raton se intensifica en vez de
+// apagarse al gris de las demas.
+function cardClass(clicable: boolean | undefined, destacada: boolean | undefined): string {
+  const borde = destacada ? "border-primary/60 ring-1 ring-primary/20" : "border-foreground/15";
+  const base = `group relative flex h-full flex-col rounded-[3px] border bg-card ${borde}`;
+  if (!clicable) return base;
+  const bordeHover = destacada ? "hover:border-primary" : "hover:border-foreground/25";
+  return `${base} cursor-pointer transition-[box-shadow,transform,border-color] duration-300 ease-out hover:-translate-y-0.5 ${bordeHover} hover:shadow-elegant-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0`;
 }
 
 const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
@@ -307,7 +313,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   };
 
   return (
-    <div className={`group relative flex h-full flex-col ${isClickable ? "cursor-pointer" : ""}`}>
+    <div className={cardClass(isClickable, item.highlight)}>
       {isClickable && (
         <button
           type="button"
@@ -323,7 +329,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         />
       )}
       {item.image && !imageError && !hideImages && (
-        <div className={`relative mb-4 aspect-[4/3] w-full overflow-hidden bg-muted ${marcoFotoClass(isClickable)}`}>
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-[2px] bg-muted">
           <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
           {!item.image.endsWith(".mp4") && (
             <button
@@ -338,13 +344,13 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           )}
         </div>
       )}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col p-4">
         {item.highlight && (
-          <Badge variant="secondary" className="mb-1.5 w-fit rounded-none bg-transparent p-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary shadow-none">
+          <Badge variant="secondary" className="mb-2.5 w-fit rounded-[3px] border border-primary bg-transparent px-2 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-[0.18em] text-primary shadow-none">
             {t("especial", safeLanguage)}
           </Badge>
         )}
-        <h3 className="mb-1.5 min-w-0 [font-variant-numeric:lining-nums] font-serif text-[clamp(20px,1.8vw,24px)] font-normal leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere] decoration-primary decoration-1 underline-offset-[5px] group-hover:underline">
+        <h3 className="mb-1.5 min-w-0 [font-variant-numeric:lining-nums] font-serif text-[clamp(20px,1.8vw,24px)] font-normal leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">
           {displayName}
         </h3>
         {displayDescription && (
