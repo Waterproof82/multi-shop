@@ -31,13 +31,13 @@ interface SeccionState {
   contenido: Record<string, unknown>;
 }
 
-const TIPO_LABELS: Record<LandingSeccionTipo, string> = {
-  hero: "Hero",
-  nosotros: "Nosotros",
-  cta_carta: "Carta",
-  testimonio: "Testimonio",
-  galeria: "Galería",
-  visitanos: "Visítanos",
+const TIPO_LABELS: Record<LandingSeccionTipo, Parameters<typeof t>[0]> = {
+  hero: "landingTipoHero",
+  nosotros: "landingTipoNosotros",
+  cta_carta: "landingTipoCarta",
+  testimonio: "landingTipoTestimonio",
+  galeria: "landingTipoGaleria",
+  visitanos: "landingTipoVisitanos",
 };
 
 function tabClass(activa: boolean): string {
@@ -221,7 +221,7 @@ export default function LandingAdminPage() {
               tipoActivo === tipo
             )}`}
           >
-            {TIPO_LABELS[tipo]}
+            {t(TIPO_LABELS[tipo], language)}
             {secciones[tipo].activo && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
           </button>
         ))}

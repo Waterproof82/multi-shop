@@ -70,10 +70,10 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
     setImageError(null);
     try {
       const ok = await saveEmpresa({ url_image: newUrl }, efectivoEmpresaId);
-      if (!ok) setImageError('Error al guardar la imagen');
+      if (!ok) setImageError(t("errSaveImage", language));
     } catch (error) {
       logClientError(error, 'handleImageChange');
-      setImageError('Error al guardar la imagen');
+      setImageError(t("errSaveImage", language));
     } finally {
       setSavingImage(false);
     }
@@ -87,10 +87,10 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
     setLogoError(null);
     try {
       const ok = await saveEmpresa({ logo_url: newUrl }, efectivoEmpresaId);
-      if (!ok) setLogoError('Error al guardar el logo');
+      if (!ok) setLogoError(t("errSaveLogo", language));
     } catch (error) {
       logClientError(error, 'handleLogoChange');
-      setLogoError('Error al guardar el logo');
+      setLogoError(t("errSaveLogo", language));
     } finally {
       setSavingLogo(false);
     }
@@ -101,10 +101,10 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
     setSaved(false);
     try {
       const ok = await saveEmpresa({ banner_fit: fit }, efectivoEmpresaId);
-      if (!ok) setImageError('Error al guardar el ajuste');
+      if (!ok) setImageError(t("errSaveFit", language));
     } catch (error) {
       logClientError(error, 'handleBannerFitChange');
-      setImageError('Error al guardar el ajuste');
+      setImageError(t("errSaveFit", language));
     }
   };
 
@@ -113,10 +113,10 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
     setSaved(false);
     try {
       const ok = await saveEmpresa({ tipo_banner: tipo }, efectivoEmpresaId);
-      if (!ok) setImageError('Error al guardar el tipo de banner');
+      if (!ok) setImageError(t("errSaveBannerMode", language));
     } catch (error) {
       logClientError(error, 'handleTipoBannerChange');
-      setImageError('Error al guardar el tipo de banner');
+      setImageError(t("errSaveBannerMode", language));
     }
   };
 
@@ -125,10 +125,10 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
     setSaved(false);
     try {
       const ok = await saveEmpresa({ banner_slides: slides }, efectivoEmpresaId);
-      if (!ok) setImageError('Error al guardar las imágenes del slider');
+      if (!ok) setImageError(t("errSaveSlider", language));
     } catch (error) {
       logClientError(error, 'handleSlidesChange');
-      setImageError('Error al guardar las imágenes del slider');
+      setImageError(t("errSaveSlider", language));
     }
   };
 
@@ -191,16 +191,16 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
               setSaved(false);
               try {
                 const ok = await saveEmpresa({ mostrar_logo: newValue }, efectivoEmpresaId);
-                if (!ok) setLogoError('Error al guardar');
+                if (!ok) setLogoError(t("saveError", language));
               } catch (error) {
                 logClientError(error, 'toggleLogo');
-                setLogoError('Error al guardar');
+                setLogoError(t("saveError", language));
               }
             }}
-            ariaLabel="Mostrar logo en el banner"
+            ariaLabel={t("showLogoInBanner", language)}
             size="sm"
           />
-          <span className="text-sm text-muted-foreground">Mostrar logo en el banner</span>
+          <span className="text-sm text-muted-foreground">{t("showLogoInBanner", language)}</span>
         </div>
       </div>
 

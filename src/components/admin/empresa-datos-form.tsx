@@ -82,7 +82,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             type="email"
             value={formData.email_notification}
             onChange={(e) => handleChange('email_notification', e.target.value)}
-            placeholder="pedidos@tuempresa.com"
+            placeholder={t("notificationEmailPlaceholder", language)}
             aria-describedby="email_notification_help"
             aria-required="true"
             required
@@ -120,7 +120,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             type="text"
             value={formData.direccion}
             onChange={(e) => handleChange('direccion', e.target.value)}
-            placeholder="Av. Example 123, Ciudad"
+            placeholder={t("addressExamplePlaceholder", language)}
             aria-describedby="direccion_help"
           />
           <span id="direccion_help" className="text-xs text-muted-foreground">{t('addressHelp', language)}</span>
@@ -142,7 +142,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             aria-describedby="nif_help"
           />
           <span id="nif_help" className="text-xs text-muted-foreground">
-            Requerido para tickets fiscales (Verifactu / RD 1619/2012)
+            {t("nifHelp", language)}
           </span>
         </div>
 
@@ -150,7 +150,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         <div className="flex flex-col gap-2">
           <label htmlFor="razon_social" className="text-sm font-medium text-foreground flex items-center gap-2">
             <FileText className="w-4 h-4" />
-            Razón social
+            {t("razonSocialLabel", language)}
           </label>
           <Input
             id="razon_social"
@@ -158,18 +158,18 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             type="text"
             value={formData.razonSocial}
             onChange={(e) => handleChange('razonSocial', e.target.value)}
-            placeholder="Ej: Mi Empresa S.L."
+            placeholder={t("razonSocialPlaceholder", language)}
             aria-describedby="razon_social_help"
           />
           <span id="razon_social_help" className="text-xs text-muted-foreground">
-            Nombre legal completo. Se imprime en el encabezado del ticket fiscal.
+            {t("razonSocialHelp", language)}
           </span>
         </div>
 
         {/* Tipo de impuesto */}
         <div className="space-y-2">
           <label htmlFor="tipo_impuesto" className="text-sm font-medium text-foreground flex items-center gap-2">
-            Tipo de impuesto
+            {t("taxTypeLabel", language)}
           </label>
           <select
             id="tipo_impuesto"
@@ -182,15 +182,15 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             }}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
-            <option value="iva">IVA (Península y Baleares)</option>
-            <option value="igic">IGIC (Canarias)</option>
+            <option value="iva">{t("taxIvaOption", language)}</option>
+            <option value="igic">{t("taxIgicOption", language)}</option>
           </select>
         </div>
 
         {/* Porcentaje impuesto */}
         <div className="space-y-2">
           <label htmlFor="porcentaje_impuesto" className="text-sm font-medium text-foreground">
-            Porcentaje %
+            {t("taxPercentLabel", language)}
           </label>
           <input
             type="number"
@@ -204,7 +204,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
           <span className="text-xs text-muted-foreground">
-            10% IVA estándar restauración · 7% IGIC general
+            {t("taxPercentHelp", language)}
           </span>
         </div>
 

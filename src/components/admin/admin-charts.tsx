@@ -461,7 +461,7 @@ if (!promos.length) {
             <tr className="bg-muted">
               <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{t("date", language)}</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">{t("statsMessageLabel", language)}</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">{t("emailsLabel", language)}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -618,7 +618,7 @@ function TgtgStatsChart({
               <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-8">#</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{t("statsTgtgCampaignHeader", language)}</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">{t("statsTgtgScheduleHeader", language)}</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">{t("emailsLabel", language)}</th>
               <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">{t("tgtgReservas", language)}</th>
               <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">{t("revenueLabel", language)}</th>
             </tr>

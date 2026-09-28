@@ -180,7 +180,7 @@ export default function PromocionesPage() {
           </label>
           <Textarea
             id="promo_texto"
-            placeholder="Ej: ¡20% de descuento en tu próximo pedido!"
+            placeholder={t("promoMessagePlaceholder", language)}
             value={promoTexto}
             onChange={(e) => setPromoTexto(e.target.value)}
             rows={3}
@@ -211,7 +211,7 @@ export default function PromocionesPage() {
           </label>
           {previewImage ? (
             <div className="relative group rounded-lg overflow-hidden border border-white/20 h-48 mb-2">
-              <Image src={previewImage} alt="Vista previa" fill className="object-contain bg-white/5" />
+              <Image src={previewImage} alt={t("previewLabel", language)} fill className="object-contain bg-white/5" />
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <button type="button" onClick={handleRemoveImage}
                   className="px-3 py-1.5 bg-red-500/80 text-white rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
@@ -286,7 +286,7 @@ export default function PromocionesPage() {
               <div key={promo.id} className="p-4 bg-white/5 border border-white/10 rounded-lg">
                 {promo.imagen_url && (
                   <div className="mb-3">
-                    <Image src={promo.imagen_url} alt="Imagen de promoción" width={128} height={128} className="max-h-32 rounded-lg object-contain bg-white/10" />
+                    <Image src={promo.imagen_url} alt={t("promoImageAlt", language)} width={128} height={128} className="max-h-32 rounded-lg object-contain bg-white/10" />
                   </div>
                 )}
                 <div className="flex items-center justify-between">

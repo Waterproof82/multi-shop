@@ -66,7 +66,7 @@ export default function IngredientesPage() {
   const fetchIngredientes = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/stock/ingredientes');
-      if (!res.ok) throw new Error('Error al cargar ingredientes');
+      if (!res.ok) throw new Error(t("errLoadIngredientes", language));
       const data = await res.json();
       setIngredientes(data);
     } catch (err) {
@@ -74,7 +74,7 @@ export default function IngredientesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     fetchIngredientes();
@@ -102,7 +102,7 @@ export default function IngredientesPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Error al guardar');
+        throw new Error(data.error || t("saveError", language));
       }
 
       await fetchIngredientes();
@@ -115,14 +115,14 @@ export default function IngredientesPage() {
   };
 
   const handleDelete = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+    if (!confirm(t('stockDeleteIngredientConfirm', language).replace('{nombre}', nombre))) return;
 
     try {
       const res = await fetchWithCsrf(`/api/admin/stock/ingredientes/${id}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) throw new Error('Error al eliminar');
+      if (!res.ok) throw new Error(t("deleteError", language));
       await fetchIngredientes();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -288,7 +288,7 @@ export default function IngredientesPage() {
                     <span className="text-xs text-slate-400">{ing.unidad}</span>
                     <StockBadge ingrediente={ing} />
                     <span className="text-xs text-slate-400">
-                      Umbral: {ing.umbralAlerta} {ing.unidad}
+                      {t("stockThreshold", language)} {ing.umbralAlerta} {ing.unidad}
                     </span>
                   </div>
                 </div>
@@ -330,8 +330,8 @@ export default function IngredientesPage() {
             </DialogTitle>
             <DialogDescription>
               {editingId
-                ? 'Modifica nombre, unidad o umbral. La cantidad se ajusta desde Movimientos.'
-                : 'Crea un nuevo ingrediente para el stock.'}
+                ? t("stockEditIngredientDesc", language)
+                : t("stockNewIngredientDesc", language)}
             </DialogDescription>
           </DialogHeader>
 

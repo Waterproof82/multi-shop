@@ -18,7 +18,7 @@ export default function EmpleadosTpvPage() {
           {t('sidebarEmpleadosTpv', language)}
         </h1>
         <p className="text-slate-400 text-sm mt-1">
-          Gestiona los cajeros y encargados que acceden al TPV con PIN.
+          {t("empleadosTpvSubtitle", language)}
         </p>
       </div>
 

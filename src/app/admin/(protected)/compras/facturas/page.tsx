@@ -110,7 +110,7 @@ export default function FacturasPage() {
     try {
       const params = filtroEstado ? `?estadoPago=${filtroEstado}` : '';
       const res = await fetch(`/api/admin/compras/facturas${params}`);
-      if (!res.ok) throw new Error('Error al cargar facturas');
+      if (!res.ok) throw new Error(t("errLoadFacturas", language));
       const data = await res.json();
       setFacturas(data);
     } catch (err) {
@@ -118,7 +118,7 @@ export default function FacturasPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, language]);
 
   const fetchSecondaryData = useCallback(async () => {
     try {
@@ -174,7 +174,7 @@ export default function FacturasPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al crear factura');
+        throw new Error(data.error ?? t("errCreateFactura", language));
       }
 
       await fetchFacturas();
@@ -220,7 +220,7 @@ export default function FacturasPage() {
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value as EstadoPago | '')}
-            aria-label="Filtrar por estado de pago"
+            aria-label={t("comprasFilterByPaymentStatus", language)}
             className="px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
           >
             {ESTADOS_PAGO.map((s) => (
@@ -309,7 +309,7 @@ export default function FacturasPage() {
                 required
                 value={form.proveedorId}
                 onChange={updateField('proveedorId')}
-                aria-label="Seleccionar proveedor"
+                aria-label={t("comprasSelectSupplier", language)}
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               >
                 <option value="">{t('comprasSeleccionarProveedor', language)}</option>

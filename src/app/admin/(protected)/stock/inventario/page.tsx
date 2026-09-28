@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { InventarioFisicoClient } from '@/components/admin/stock/InventarioFisicoClient';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Ingrediente {
   id: string;
@@ -14,6 +16,7 @@ interface Ingrediente {
 type ApiResponse = { id: string; nombre: string; unidad: string; cantidadActual: number }[];
 
 export default function InventarioFisicoPage() {
+  const { language } = useLanguage();
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export default function InventarioFisicoPage() {
     setError(null);
     try {
       const res = await fetch('/api/admin/stock/ingredientes');
-      if (!res.ok) throw new Error('Error al cargar ingredientes');
+      if (!res.ok) throw new Error(t("errLoadIngredientes", language));
       const json = await res.json() as ApiResponse;
       setIngredientes(
         json.map(i => ({
@@ -34,11 +37,11 @@ export default function InventarioFisicoPage() {
         }))
       );
     } catch {
-      setError('No se pudieron cargar los ingredientes. Intenta recargar la página.');
+      setError(t("stockLoadIngredientsError", language));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     void fetchIngredientes();
@@ -63,9 +66,9 @@ export default function InventarioFisicoPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Inventario Físico</h1>
+        <h1 className="text-2xl font-bold">{t("stockInventarioTitle", language)}</h1>
         <p className="text-sm text-[#6b7280] mt-1">
-          Conteo real de almacén. El sistema calculará la desviación respecto al teórico.
+          {t("stockInventarioSubtitle", language)}
         </p>
       </div>
       <InventarioFisicoClient

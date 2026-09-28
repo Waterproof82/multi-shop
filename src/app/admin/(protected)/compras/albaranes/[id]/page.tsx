@@ -67,7 +67,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
   const fetchAlbaran = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/compras/albaranes/${id}`);
-      if (!res.ok) throw new Error('Albarán no encontrado');
+      if (!res.ok) throw new Error(t("albaranNotFound", language));
       const data = await res.json();
       setAlbaran(data);
     } catch (err) {
@@ -75,7 +75,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, language]);
 
   useEffect(() => {
     fetchAlbaran();
@@ -120,7 +120,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al añadir ítem');
+        throw new Error(data.error ?? t("errAddItem", language));
       }
 
       await fetchAlbaran();
@@ -141,7 +141,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
       const res = await fetchWithCsrf(`/api/admin/compras/albaranes/${id}/recibir`, { method: 'POST' });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al marcar como recibido');
+        throw new Error(data.error ?? t("errMarkReceived", language));
       }
       await fetchAlbaran();
     } catch (err) {
@@ -237,7 +237,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
                   required
                   value={addForm.catalogoCompraId}
                   onChange={updateAddForm('catalogoCompraId')}
-                  aria-label="Seleccionar artículo del catálogo"
+                  aria-label={t("comprasSelectCatalogItem", language)}
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
                   <option value="">{t('comprasSeleccionarArticulo', language)}</option>
@@ -288,7 +288,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
                   required
                   value={addForm.porcentajeIva}
                   onChange={updateAddForm('porcentajeIva')}
-                  aria-label="Porcentaje de IVA"
+                  aria-label={t("comprasVatPercent", language)}
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
                   {rateOptions.map(({ value, labelKey }) => (

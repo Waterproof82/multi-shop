@@ -12,6 +12,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { BcgItem, BcgQuadrant } from '@/core/domain/entities/analytics-types';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface BcgScatterChartProps {
   items: BcgItem[];
@@ -33,11 +35,13 @@ const QUADRANT_BG: Record<BcgQuadrant, string> = {
   dog: '#6b728015',
 };
 
-const LEGEND_ITEMS: { quadrant: BcgQuadrant; label: string; desc: string }[] = [
-  { quadrant: 'star', label: 'Estrella', desc: 'Alta popularidad, alto margen' },
-  { quadrant: 'plow', label: 'Caballo de batalla', desc: 'Alta popularidad, bajo margen' },
-  { quadrant: 'question', label: 'Interrogante', desc: 'Baja popularidad, alto margen' },
-  { quadrant: 'dog', label: 'Perro', desc: 'Baja popularidad, bajo margen' },
+type TranslationKey = Parameters<typeof t>[0];
+
+const LEGEND_ITEMS: { quadrant: BcgQuadrant; labelKey: TranslationKey; descKey: TranslationKey }[] = [
+  { quadrant: 'star', labelKey: 'bcgStar', descKey: 'bcgStarDesc' },
+  { quadrant: 'plow', labelKey: 'bcgPlowhorse', descKey: 'bcgPlowhorseDesc' },
+  { quadrant: 'question', labelKey: 'bcgPuzzle', descKey: 'bcgPuzzleDesc' },
+  { quadrant: 'dog', labelKey: 'bcgDog', descKey: 'bcgDogDesc' },
 ];
 
 interface TooltipPayload {
@@ -51,12 +55,13 @@ interface TooltipProps {
 }
 
 function BcgTooltip({ active, payload }: Readonly<TooltipProps>) {
+  const { language } = useLanguage();
   if (!active || !payload || payload.length < 2) return null;
   return (
     <div className="bg-slate-900 border border-white/20 rounded-lg px-3 py-2 text-sm">
       <p className="font-semibold text-white">{payload[0]?.name}</p>
-      <p className="text-slate-300">Unidades: {payload[0]?.value}</p>
-      <p className="text-slate-300">Margen: {payload[1]?.value?.toFixed(1)} %</p>
+      <p className="text-slate-300">{t("bcgUnits", language)} {payload[0]?.value}</p>
+      <p className="text-slate-300">{t("bcgMargin", language)} {payload[1]?.value?.toFixed(1)} %</p>
     </div>
   );
 }
@@ -66,9 +71,10 @@ export function BcgScatterChart({
   medianUnidades,
   medianMargen,
 }: Readonly<BcgScatterChartProps>) {
+  const { language } = useLanguage();
   if (items.length === 0) {
     return (
-      <p className="text-slate-400 text-center py-8">No hay datos para el período seleccionado</p>
+      <p className="text-slate-400 text-center py-8">{t("analyticsNoDataPeriod", language)}</p>
     );
   }
 
@@ -147,7 +153,7 @@ export function BcgScatterChart({
               style={{ backgroundColor: QUADRANT_COLOR[item.quadrant] }}
             />
             <span className="text-slate-300">
-              <span className="font-semibold">{item.label}</span> — {item.desc}
+              <span className="font-semibold">{t(item.labelKey, language)}</span> — {t(item.descKey, language)}
             </span>
           </div>
         ))}

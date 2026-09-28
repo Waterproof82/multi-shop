@@ -324,7 +324,7 @@ function DivisionModal({
         className="absolute inset-0 w-full h-full"
         style={{ background: 'transparent', border: 'none', cursor: 'default' }}
         onClick={onClose}
-        aria-label="Cerrar"
+        aria-label={t("close", lang)}
       />
       <div
         className="w-full max-w-sm rounded-t-3xl p-6 pb-10 relative"
@@ -356,7 +356,7 @@ function DivisionModal({
               color: "#fffcf7",
             }}
             disabled={selected <= 2}
-            aria-label="Menos personas"
+            aria-label={t("mesaDivisionMenosPersonas", lang)}
           >
             −
           </button>
@@ -384,7 +384,7 @@ function DivisionModal({
               color: "#fffcf7",
             }}
             disabled={selected >= 20}
-            aria-label="Más personas"
+            aria-label={t("mesaDivisionMasPersonas", lang)}
           >
             +
           </button>
@@ -436,7 +436,7 @@ function DivisionTypeModal({
         className="absolute inset-0 w-full h-full"
         style={{ background: 'transparent', border: 'none', cursor: 'default' }}
         onClick={onClose}
-        aria-label="Cerrar"
+        aria-label={t("close", lang)}
       />
       <div className="w-full max-w-md rounded-t-2xl bg-white p-6 shadow-2xl relative z-10">
         <h2 className="mb-5 text-center text-lg font-semibold text-[#1a1612]">
@@ -756,7 +756,7 @@ function CustomSelectionView({
           return (
             <div>
               <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#b0a090", fontFamily: "monospace" }}>
-                Sin pagar
+                {t("mesaSinPagar", lang)}
               </p>
               <div className="rounded-2xl overflow-hidden border border-[#e8e0d8] bg-white px-4">
                 {sorted.map((group, i) => (
@@ -909,10 +909,10 @@ function RemainingItemsActions({
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-xs uppercase tracking-widest font-medium" style={{ color: "#8a7560", fontFamily: "monospace" }}>
-            Pago personalizado
+            {t("mesaPagoPersonalizado", lang)}
           </p>
           <p className="text-base font-bold" style={{ color: "#1a1612" }}>
-            Pendiente: {formatPrice(remainingCents / 100, "EUR", lang)}
+            {t("mesaPendiente", lang)}: {formatPrice(remainingCents / 100, "EUR", lang)}
           </p>
         </div>
       </div>
@@ -923,7 +923,7 @@ function RemainingItemsActions({
         {remainingItems.length > 0 && (
           <div>
             <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#b0a090", fontFamily: "monospace" }}>
-              Sin pagar
+              {t("mesaSinPagar", lang)}
             </p>
             <div className="rounded-2xl overflow-hidden border border-[#e8e0d8] bg-white divide-y divide-[#f0ede8]">
               {remainingItems.map(({ key, nombre, precio, remaining }) => (
@@ -1328,7 +1328,7 @@ function TotalDeLaCuenta({ sessionData, fullyPaid, lang }: Readonly<{
         </div>
         <div className="flex justify-between items-baseline">
           <span className="text-xs uppercase tracking-[0.2em]" style={{ color: "#6aaa7a" }}>
-            Pagado
+            {t("mesaPagado", lang)}
           </span>
           <span className="text-sm tabular-nums font-semibold" style={{ color: "#6aaa7a" }}>
             − {formatPrice(pagado, "EUR", lang)}
@@ -1336,7 +1336,7 @@ function TotalDeLaCuenta({ sessionData, fullyPaid, lang }: Readonly<{
         </div>
         <div className="flex justify-between items-baseline border-t pt-2" style={{ borderColor: "#e8e0d8" }}>
           <span className="text-xs uppercase tracking-[0.2em] font-bold" style={{ color: "#1a1612" }}>
-            Pendiente
+            {t("mesaPendiente", lang)}
           </span>
           <span className="text-lg font-bold tabular-nums" style={{ color: "#1a1612" }}>
             {formatPrice(Math.max(0, sessionData.total - pagado), "EUR", lang)}
@@ -2096,7 +2096,7 @@ function SeccionDePago({
               className="text-[10px] uppercase tracking-[0.18em]"
               style={{ color: "#8a7560", fontFamily: "monospace" }}
             >
-              Pago seguro
+              {t("mesaPagoSeguro", lang)}
             </span>
           </div>
         )}
@@ -2398,7 +2398,7 @@ function SeccionDePago({
           >
             <Image
               src="/tpv-redsys-woocommerce.jpg"
-              alt="Pago procesado por Redsys. Aceptamos Visa y Mastercard."
+              alt={t("mesaRedsysAlt", lang)}
               width={128}
               height={40}
               style={{ opacity: 0.6, objectFit: "contain" }}

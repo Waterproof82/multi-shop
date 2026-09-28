@@ -2,13 +2,20 @@
 
 import { Fragment } from 'react';
 import type { OcupacionHeatmapRow } from '@/core/domain/entities/analytics-types';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface HeatmapGridProps {
   rows: OcupacionHeatmapRow[];
   metric: 'count' | 'duration';
 }
 
-const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+// Nombres cortos de dia en el idioma del admin. 2024-01-07 fue domingo, asi
+// que el indice coincide con getDay() (0 = domingo).
+function dayLabels(language: string): string[] {
+  const fmt = new Intl.DateTimeFormat(language, { weekday: 'short' });
+  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 7 + i)));
+}
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
 
@@ -35,10 +42,12 @@ function resolveMax(rows: OcupacionHeatmapRow[], metric: 'count' | 'duration'): 
 }
 
 export function HeatmapGrid({ rows, metric }: Readonly<HeatmapGridProps>) {
+  const { language } = useLanguage();
+  const DAY_LABELS = dayLabels(language);
   if (rows.length === 0) {
     return (
       <p className="text-slate-400 text-center py-8">
-        No hay datos para el período seleccionado
+        {t("analyticsNoDataPeriod", language)}
       </p>
     );
   }
@@ -87,7 +96,7 @@ export function HeatmapGrid({ rows, metric }: Readonly<HeatmapGridProps>) {
                   }}
                   title={
                     metric === 'count'
-                      ? `${DAY_LABELS[dow]} ${String(hour).padStart(2, '0')}:00 — ${val} sesiones`
+                      ? `${DAY_LABELS[dow]} ${String(hour).padStart(2, '0')}:00 — ${val} ${t('heatmapSessionsUnit', language)}`
                       : `${DAY_LABELS[dow]} ${String(hour).padStart(2, '0')}:00 — ${val} min`
                   }
                 >

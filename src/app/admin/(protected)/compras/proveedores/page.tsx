@@ -78,7 +78,7 @@ export default function ProveedoresPage() {
   const fetchProveedores = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/compras/proveedores');
-      if (!res.ok) throw new Error('Error al cargar proveedores');
+      if (!res.ok) throw new Error(t("errLoadProveedores", language));
       const data = await res.json();
       setProveedores(data);
     } catch (err) {
@@ -86,7 +86,7 @@ export default function ProveedoresPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     fetchProveedores();
@@ -110,7 +110,7 @@ export default function ProveedoresPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al guardar');
+        throw new Error(data.error ?? t("saveError", language));
       }
 
       await fetchProveedores();
@@ -129,7 +129,7 @@ export default function ProveedoresPage() {
       const res = await fetchWithCsrf(`/api/admin/compras/proveedores/${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Error al eliminar');
+      if (!res.ok) throw new Error(t("deleteError", language));
       await fetchProveedores();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
