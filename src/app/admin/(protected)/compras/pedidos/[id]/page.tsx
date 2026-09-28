@@ -46,7 +46,7 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
   const fetchPedido = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/compras/pedidos/${id}`);
-      if (!res.ok) throw new Error('Pedido no encontrado');
+      if (!res.ok) throw new Error(t("pedidoCompraNotFound", language));
       const data = await res.json();
       setPedido(data);
     } catch (err) {
@@ -54,7 +54,7 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, language]);
 
   useEffect(() => {
     fetchPedido();
@@ -91,7 +91,7 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al añadir ítem');
+        throw new Error(data.error ?? t("errAddItem", language));
       }
       await fetchPedido();
       setAddForm({ catalogoCompraId: '', cantidad: '1' });
@@ -207,7 +207,7 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
                   required
                   value={addForm.catalogoCompraId}
                   onChange={updateAddForm('catalogoCompraId')}
-                  aria-label="Seleccionar artículo del catálogo"
+                  aria-label={t("comprasSelectCatalogItem", language)}
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
                   <option value="">{t('comprasSeleccionarArticulo', language)}</option>

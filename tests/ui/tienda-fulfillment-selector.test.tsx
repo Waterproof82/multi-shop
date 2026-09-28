@@ -169,7 +169,21 @@ describe('TiendaFulfillmentSelector', () => {
     expect(screen.queryByPlaceholderText(/dirección/i)).not.toBeInTheDocument();
   });
 
+  // Icono de linea (lucide), no emoji: el emoji cambia segun el sistema y no
+  // casa con el resto de iconos. `data-icono` es la clave guardada en DB.
   it('muestra el ícono de cada modalidad de domicilio', () => {
+    const { container } = renderSelector({
+      envioHabilitado: true,
+      modalidades: [domicilio],
+      value: null,
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    expect(container.querySelector('svg[data-icono="bike"]')).not.toBeNull();
+    expect(screen.queryByText('🚲')).toBeNull();
+  });
+
+  it('la lista de envio tiene titulo y queda nombrada por el', () => {
     renderSelector({
       envioHabilitado: true,
       modalidades: [domicilio],
@@ -177,7 +191,37 @@ describe('TiendaFulfillmentSelector', () => {
       onChange: vi.fn(),
       onAddressSelect: vi.fn(),
     });
-    expect(screen.getByText('🚲')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Método de entrega' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Método de entrega' })).toBeInTheDocument();
+  });
+
+  it('anuncia la opcion elegida con aria-pressed (y solo esa)', () => {
+    renderSelector({
+      envioHabilitado: true,
+      modalidades: [domicilio, domicilioExpres],
+      value: null,
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    const botones = within(screen.getByRole('list')).getAllByRole('button');
+    expect(botones.map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
+
+    fireEvent.click(botones[2]);
+
+    expect(botones.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
+  });
+
+  it('el campo de direccion tiene etiqueta visible asociada', () => {
+    renderSelector({
+      envioHabilitado: true,
+      modalidades: [domicilio],
+      value: null,
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    fireEvent.click(within(screen.getByRole('list')).getAllByRole('button')[1]);
+
+    expect(screen.getByLabelText('Dirección de entrega')).toBeInTheDocument();
   });
 
   it('muestra el precio y el rango de tiempo de cada modalidad de domicilio', () => {

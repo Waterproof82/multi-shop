@@ -6,6 +6,7 @@ import { getDeliverySettingsUseCase } from '@/core/application/use-cases/deliver
 import { DeliveryCredentialsForm } from '@/components/admin/delivery/DeliveryCredentialsForm';
 import { TiendaDeliverySettings } from '@/components/admin/TiendaDeliverySettings';
 import { Settings } from 'lucide-react';
+import { TextoTraducido } from '@/components/texto-traducido';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,9 +56,9 @@ export default async function DeliveryPage() {
           <div className="flex items-center gap-3 mb-6">
             <Settings className="w-6 h-6 text-cyan-400 shrink-0" aria-hidden="true" />
             <div>
-              <h2 className="text-2xl font-bold text-white">Integración de entrega</h2>
+              <h2 className="text-2xl font-bold text-white"><TextoTraducido k="deliveryIntegrationTitle" /></h2>
               <p className="text-sm text-slate-400 mt-0.5">
-                Credenciales de Glovo Business y Redsys TPV Virtual
+                <TextoTraducido k="deliveryIntegrationSubtitle" />
               </p>
             </div>
           </div>

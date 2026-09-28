@@ -2,6 +2,8 @@
 
 import { Component, ErrorInfo, ReactNode } from "react";
 import { logger } from "@/core/infrastructure/logging/logger";
+import { readCurrentLanguage } from "@/lib/language-context";
+import { t } from "@/lib/translations";
 
 interface Props {
   children: ReactNode;
@@ -43,20 +45,23 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      // Fuera del LanguageProvider (lo envuelve): se lee el idioma guardado.
+      const language = readCurrentLanguage();
+
       return (
         <div className="flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
-          <div className="mb-4 text-4xl" role="img" aria-label="Advertencia">⚠️</div>
+          <div className="mb-4 text-4xl" role="img" aria-label={t("errorIconLabel", language)}>⚠️</div>
           <h3 className="mb-2 text-lg font-semibold text-destructive">
-            Algo salió mal
+            {t("errorTitle", language)}
           </h3>
           <p className="mb-4 text-sm text-muted-foreground max-w-md">
-            Ha ocurrido un error inesperado. Por favor, recarga la página o contacta al soporte si el problema persiste.
+            {t("errorDescReload", language)}
           </p>
           <button type="button"
             onClick={() => globalThis.location.reload()}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Recargar página
+            {t("errorReloadPage", language)}
           </button>
         </div>
       );

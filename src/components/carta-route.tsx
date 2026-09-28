@@ -88,7 +88,8 @@ export async function CartaRoute({
   // Enlace de vuelta a la landing solo para el visitante normal de /carta:
   // con QR de mesa, modo camarero o subdominio de pedidos, `/` sirve la
   // carta directamente (bypass), asi que el enlace no llevaria a la landing.
-  const mostrarVolverLanding = desdeRutaCarta && !rawMesaParam && !isWaiterMode && !isPedidos;
+  // Si landing_habilitada = false, tampoco mostrar el enlace.
+  const mostrarVolverLanding = desdeRutaCarta && !rawMesaParam && !isWaiterMode && !isPedidos && (empresa?.landingHabilitada ?? false);
   const header = await SiteHeaderWrapper({ showCart, empresa, mostrarVolverLanding });
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
 

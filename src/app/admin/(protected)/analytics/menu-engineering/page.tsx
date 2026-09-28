@@ -100,7 +100,7 @@ export default function MenuEngineeringPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
           {t('sidebarAnalyticsMenuEngineering', language)}
         </h1>
-        <p className="text-slate-300 text-sm mt-1">Matriz BCG de ingeniería de menú</p>
+        <p className="text-slate-300 text-sm mt-1">{t("analyticsBcgTitle", language)}</p>
       </div>
 
       <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl">

@@ -110,6 +110,16 @@ function compararCategoriasPorActivoYOrden(a: Category, b: Category): number {
   return a.orden - b.orden;
 }
 
+function mensajeListaVacia(isSearching: boolean, filtradas: number, padres: number, language: Language): string | null {
+  if (isSearching) return filtradas === 0 ? t("noCategoriesFound", language) : null;
+  return padres === 0 ? t("noCategoriesYet", language) : null;
+}
+
+function textosDialogo(editingId: string | null, language: Language): { titulo: string; descripcion: string } {
+  if (editingId === null) return { titulo: t("newCategory", language), descripcion: t("newCategoryDesc", language) };
+  return { titulo: t("editCategory", language), descripcion: t("editCategoryDesc", language) };
+}
+
 const emptyForm: CategoryFormData = {
   nombre_es: '',
   nombre_en: '',
@@ -154,11 +164,11 @@ function CategoryTypeBadges({ cat, parentName, empresaTipo, language }: Readonly
       )}
       {empresaTipo === 'restaurante' && (cat.tipo_producto === 'bebida' ? (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium">
-          <GlassWater className="w-3 h-3" /> Bar
+          <GlassWater className="w-3 h-3" /> {t("routeBar", language)}
         </span>
       ) : (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-medium">
-          <UtensilsCrossed className="w-3 h-3" /> Cocina
+          <UtensilsCrossed className="w-3 h-3" /> {t("routeKitchen", language)}
         </span>
       ))}
     </div>
@@ -419,7 +429,7 @@ function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onE
             <p className="font-medium text-white">{cat.nombre_es}</p>
             {cat.categoria_padre_id && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
-                Sub
+                {t("categoriaSubBadge", language)}
               </span>
             )}
             {!cat.categoria_padre_id && hasSubcategories && (
@@ -720,6 +730,8 @@ export default function CategoriasPage() {
   }
 
   const subcategoriasCount = categorias.filter(cat => cat.categoria_padre_id !== null).length;
+  const mensajeVacio = mensajeListaVacia(isSearching, filteredCategorias.length, padresCombinados.length, language);
+  const dialogo = textosDialogo(editingId, language);
 
   return (
     <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -895,10 +907,10 @@ export default function CategoriasPage() {
                   </SortableContext>
                 </DndContext>
               )}
-              {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
+              {mensajeVacio && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
-                    {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
+                    {mensajeVacio}
                   </td>
                 </tr>
               )}
@@ -918,7 +930,7 @@ export default function CategoriasPage() {
                       <p className="font-medium text-white">{cat.nombre_es}</p>
                       {cat.categoria_padre_id && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
-                          Sub
+                          {t("categoriaSubBadge", language)}
                         </span>
                       )}
                       {!cat.categoria_padre_id && cat.hasSubcategories && (
@@ -1003,9 +1015,9 @@ export default function CategoriasPage() {
               </SortableContext>
             </DndContext>
           )}
-          {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
+          {mensajeVacio && (
             <div className="p-8 text-center text-slate-400">
-              {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
+              {mensajeVacio}
             </div>
           )}
         </div>
@@ -1015,10 +1027,10 @@ export default function CategoriasPage() {
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? t("editCategory", language) : t("newCategory", language)}
+              {dialogo.titulo}
             </DialogTitle>
             <DialogDescription>
-              {editingId ? t("editCategoryDesc", language) : t("newCategoryDesc", language)}
+              {dialogo.descripcion}
             </DialogDescription>
           </DialogHeader>
 
@@ -1215,7 +1227,7 @@ export default function CategoriasPage() {
             {empresaTipo === 'restaurante' && (
             <div>
               <p className="block text-sm font-medium text-foreground mb-2">
-                Tipo
+                {t("typeLabel", language)}
               </p>
               <div className="flex gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1228,7 +1240,7 @@ export default function CategoriasPage() {
                     className="accent-primary"
                   />
                   <span className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-400">
-                    <UtensilsCrossed className="w-3 h-3" /> Cocina
+                    <UtensilsCrossed className="w-3 h-3" /> {t("routeKitchen", language)}
                   </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1241,12 +1253,12 @@ export default function CategoriasPage() {
                     className="accent-primary"
                   />
                   <span className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400">
-                    <GlassWater className="w-3 h-3" /> Bar
+                    <GlassWater className="w-3 h-3" /> {t("routeBar", language)}
                   </span>
                 </label>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Todos los productos de esta categoría se enrutarán a Cocina o Bar.
+                {t("categoriaRuteoHelp", language)}
               </p>
             </div>
             )}

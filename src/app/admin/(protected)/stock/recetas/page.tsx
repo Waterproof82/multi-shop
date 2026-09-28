@@ -51,8 +51,8 @@ export default function RecetasPage() {
         fetch(productosUrl),
         fetch('/api/admin/stock/ingredientes'),
       ]);
-      if (!prodRes.ok) throw new Error('Error al cargar productos');
-      if (!ingRes.ok) throw new Error('Error al cargar ingredientes');
+      if (!prodRes.ok) throw new Error(t("errLoadProductos", language));
+      if (!ingRes.ok) throw new Error(t("errLoadIngredientes", language));
       const prodData = await prodRes.json();
       const ingData = await ingRes.json();
       setProductos(prodData);
@@ -62,7 +62,7 @@ export default function RecetasPage() {
     } finally {
       setLoadingInit(false);
     }
-  }, [empresaId, overrideEmpresaId]);
+  }, [empresaId, overrideEmpresaId, language]);
 
   useEffect(() => {
     fetchInit();
@@ -74,7 +74,7 @@ export default function RecetasPage() {
     setError('');
     try {
       const res = await fetch(`/api/admin/stock/recetas/${productoId}`);
-      if (!res.ok) throw new Error('Error al cargar receta');
+      if (!res.ok) throw new Error(t("errLoadReceta", language));
       const data: Array<{ ingredienteId: string; cantidadNecesaria: number }> = await res.json();
       setRows(data.map((item) => ({ ingredienteId: item.ingredienteId, cantidadNecesaria: item.cantidadNecesaria })));
     } catch (err) {
@@ -82,7 +82,7 @@ export default function RecetasPage() {
     } finally {
       setLoadingReceta(false);
     }
-  }, []);
+  }, [language]);
 
   const handleProductoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
@@ -131,9 +131,9 @@ export default function RecetasPage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Error al guardar receta');
+        throw new Error(data.error || t("errSaveReceta", language));
       }
-      setSuccess('Receta guardada correctamente');
+      setSuccess(t("stockRecipeSaved", language));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {

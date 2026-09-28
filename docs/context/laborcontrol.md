@@ -29,8 +29,7 @@ src/core/laborcontrol/
 │   ├── dtos/
 │   │   ├── fichaje.dto.ts
 │   │   ├── correccion.dto.ts
-│   │   ├── export.dto.ts
-│   │   └── perfil-laboral.dto.ts
+│   │   └── export.dto.ts
 │   └── use-cases/
 │       ├── RegistrarFichaje.usecase.ts
 │       ├── RegistrarCorreccion.usecase.ts
@@ -252,6 +251,7 @@ Para instalaciones Electron sin conexión permanente:
 - `verifyPinOffline(empleadoId, pin)` — compara el PIN con el hash almacenado
 - **Rate limit**: máximo 4 intentos por ventana de 30 segundos por empleado
 - Requiere que el main process Electron exponga `window.electronAPI.lcPinStore` vía IPC
+- **Estado: sin conectar.** El almacén IPC (`electron/main.ts`) y este cliente existen, pero ninguna pantalla llama todavía a `cachePin`/`verifyPinOffline`. No borrar ninguna de las dos mitades por "código muerto".
 
 ### Hash TS Reference
 

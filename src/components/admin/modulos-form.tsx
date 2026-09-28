@@ -81,7 +81,7 @@ export function ModulosForm({ mostrarPromociones: initialPromo, mostrarTgtg: ini
     setSaving(false);
 
     if (!res.ok) {
-      setError('Error al guardar los cambios');
+      setError(t("saveChangesError", language));
       return;
     }
 

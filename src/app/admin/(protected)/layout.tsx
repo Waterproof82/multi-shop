@@ -8,6 +8,7 @@ import { getAuthAdminUseCase, getEmpresaUseCase } from '@/core/infrastructure/da
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { SuperadminBanner } from '@/components/superadmin-banner';
+import { TextoTraducido } from '@/components/texto-traducido';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +88,9 @@ export default async function AdminProtectedLayout({
         overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
         isSuperAdmin={isSuperAdminView}
       >
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        {/* `dark`: la carcasa del admin es oscura; sin esto los tokens (text-foreground,
+            bg-muted...) salen del tema claro de la tienda → texto oscuro sobre slate-900. */}
+        <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
           {isSuperAdminView && (
             <SuperadminBanner empresaNombre={empresa?.nombre ?? ''} />
           )}
@@ -95,7 +98,7 @@ export default async function AdminProtectedLayout({
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-cyan-500 focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
           >
-            Saltar al contenido principal
+            <TextoTraducido k="skipToMainContent" />
           </a>
           <AdminSidebar empresaId={empresaId} />
           <main id="main-content" className={`lg:ml-64 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${isSuperAdminView ? 'pt-20' : 'pt-16'}`}>

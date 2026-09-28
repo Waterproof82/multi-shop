@@ -7,14 +7,13 @@ import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useLanguage } from "@/lib/language-context";
+import { useAdmin } from "@/lib/admin-context";
 import { t } from "@/lib/translations";
 import { TranslatableField, type TranslatableTextValue } from "@/components/admin/landing/translatable-field";
-import {
-  ADMIN_INPUT_CLASS,
-  ADMIN_LABEL_CLASS as LABEL_CLASS,
-  ADMIN_OUTLINE_BUTTON_CLASS as OUTLINE_BUTTON_CLASS,
-} from "@/components/admin/admin-styles";
+import { ADMIN_INPUT_CLASS, ADMIN_LABEL_CLASS as LABEL_CLASS } from "@/components/admin/admin-styles";
 import { SECCION_CAMPOS, type CampoConfig } from "@/components/admin/landing/seccion-campos";
+import { CintaCampo } from "@/components/admin/landing/cinta-campo";
+import { ListaImagenesCampo, UPLOADER_WRAPPER_CLASS } from "@/components/admin/landing/lista-imagenes-campo";
 import { LANDING_SECCION_TIPOS, type LandingSeccionTipo } from "@/core/domain/entities/types";
 
 interface LandingSeccionApi {
@@ -32,17 +31,14 @@ interface SeccionState {
   contenido: Record<string, unknown>;
 }
 
-const TIPO_LABELS: Record<LandingSeccionTipo, string> = {
-  hero: "Hero",
-  nosotros: "Nosotros",
-  cta_carta: "Carta",
-  testimonio: "Testimonio",
-  galeria: "Galería",
-  visitanos: "Visítanos",
+const TIPO_LABELS: Record<LandingSeccionTipo, Parameters<typeof t>[0]> = {
+  hero: "landingTipoHero",
+  nosotros: "landingTipoNosotros",
+  cta_carta: "landingTipoCarta",
+  testimonio: "landingTipoTestimonio",
+  galeria: "landingTipoGaleria",
+  visitanos: "landingTipoVisitanos",
 };
-
-// ImageUploader es compartido y usa tokens del tema; aca lo aclaramos solo dentro de este fondo oscuro.
-const UPLOADER_WRAPPER_CLASS = "[&_label]:text-white [&_span]:text-slate-300";
 
 function tabClass(activa: boolean): string {
   if (activa) return "bg-cyan-500/20 text-cyan-300";
@@ -61,6 +57,9 @@ function seccionesIniciales(): Record<LandingSeccionTipo, SeccionState> {
 
 export default function LandingAdminPage() {
   const { language } = useLanguage();
+  // Superadmin no tiene empresaId en el JWT: la API exige ?empresaId= (si no, 400).
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [secciones, setSecciones] = useState<Record<LandingSeccionTipo, SeccionState>>(seccionesIniciales);
   const [loading, setLoading] = useState(true);
   const [tipoActivo, setTipoActivo] = useState<LandingSeccionTipo>("hero");
@@ -68,7 +67,8 @@ export default function LandingAdminPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void fetch("/api/admin/landing-secciones")
+    if (!effectiveEmpresaId) return;
+    void fetch(`/api/admin/landing-secciones?empresaId=${effectiveEmpresaId}`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data: LandingSeccionApi[]) => {
         setSecciones((prev) => {
@@ -80,7 +80,7 @@ export default function LandingAdminPage() {
         });
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const seccionActual = secciones[tipoActivo];
   const campos = SECCION_CAMPOS[tipoActivo];
@@ -107,7 +107,7 @@ export default function LandingAdminPage() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetchWithCsrf(`/api/admin/landing-secciones/${tipoActivo}`, {
+      const res = await fetchWithCsrf(`/api/admin/landing-secciones/${tipoActivo}?empresaId=${effectiveEmpresaId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(seccionActual),
@@ -146,10 +146,13 @@ export default function LandingAdminPage() {
     if (campo.kind === "imagen") {
       return (
         <div key={campo.key} className={UPLOADER_WRAPPER_CLASS}>
+          {/* Resolucion de banner (1920px): la landing pinta estas fotos a sangre
+              o a media pantalla; a 480px (optimizeImage) saldrian borrosas. */}
           <ImageUploader
             value={(valor as string | null | undefined) ?? ""}
             onChange={(url) => actualizarCampo(campo.key, url)}
             label={campo.label}
+            isBannerImage
           />
         </div>
       );
@@ -173,44 +176,24 @@ export default function LandingAdminPage() {
       );
     }
 
-    const imagenes = (valor as string[] | undefined) ?? [];
+    if (campo.kind === "cinta") {
+      return (
+        <CintaCampo
+          key={campo.key}
+          label={campo.label}
+          contenido={seccionActual.contenido}
+          onChange={actualizarCampo}
+        />
+      );
+    }
+
     return (
-      <div key={campo.key} className="space-y-2">
-        <span className={LABEL_CLASS}>{campo.label}</span>
-        <div className="space-y-3">
-          {imagenes.map((url, idx) => (
-            <div key={idx} className={`flex items-start gap-2 ${UPLOADER_WRAPPER_CLASS}`}>
-              <ImageUploader
-                value={url}
-                onChange={(nuevaUrl) => {
-                  const next = [...imagenes];
-                  next[idx] = nuevaUrl;
-                  actualizarCampo("imagenes", next);
-                }}
-                label={`${campo.label} ${idx + 1}`}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className={OUTLINE_BUTTON_CLASS}
-                onClick={() => actualizarCampo("imagenes", imagenes.filter((_, i) => i !== idx))}
-              >
-                {t("remove", language)}
-              </Button>
-            </div>
-          ))}
-          {imagenes.length < 20 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className={OUTLINE_BUTTON_CLASS}
-              onClick={() => actualizarCampo("imagenes", [...imagenes, ""])}
-            >
-              + {t("landingSeccionAgregarImagen", language)}
-            </Button>
-          )}
-        </div>
-      </div>
+      <ListaImagenesCampo
+        key={campo.key}
+        label={campo.label}
+        imagenes={(valor as string[] | undefined) ?? []}
+        onChange={(next) => actualizarCampo("imagenes", next)}
+      />
     );
   }
 
@@ -238,7 +221,7 @@ export default function LandingAdminPage() {
               tipoActivo === tipo
             )}`}
           >
-            {TIPO_LABELS[tipo]}
+            {t(TIPO_LABELS[tipo], language)}
             {secciones[tipo].activo && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
           </button>
         ))}

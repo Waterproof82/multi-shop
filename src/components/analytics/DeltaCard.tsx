@@ -1,6 +1,8 @@
 'use client';
 
 import type { DeltaKpi } from '@/core/domain/entities/analytics-types';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface DeltaCardProps {
   kpi: DeltaKpi;
@@ -42,6 +44,7 @@ const DELTA_BG: Record<DeltaClass, string> = {
 };
 
 export function DeltaCard({ kpi }: Readonly<DeltaCardProps>) {
+  const { language } = useLanguage();
   const cls = resolveDeltaClass(kpi);
 
   return (
@@ -49,7 +52,7 @@ export function DeltaCard({ kpi }: Readonly<DeltaCardProps>) {
       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{kpi.label}</p>
       <p className="text-2xl font-bold text-white">{formatValue(kpi.label, kpi.currentCents)}</p>
       <p className="text-xs text-slate-500">
-        Anterior: {formatValue(kpi.label, kpi.previousCents)}
+        {t("deltaPrevious", language)} {formatValue(kpi.label, kpi.previousCents)}
       </p>
       <span
         className={`self-start px-2 py-0.5 rounded-md text-sm font-semibold border ${DELTA_BG[cls]} ${DELTA_COLOR[cls]}`}

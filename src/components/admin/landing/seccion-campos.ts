@@ -4,7 +4,9 @@ export type CampoConfig =
   | { key: string; kind: "texto"; label: string; multiline?: boolean }
   | { key: string; kind: "imagen"; label: string }
   | { key: string; kind: "url"; label: string }
-  | { key: "imagenes"; kind: "galeria"; label: string };
+  | { key: "imagenes"; kind: "galeria"; label: string }
+  // Ocupa varias claves del contenido: marquee, marqueeModo, marqueeImagenes.
+  | { key: "marquee"; kind: "cinta"; label: string };
 
 export const SECCION_CAMPOS: Record<LandingSeccionTipo, CampoConfig[]> = {
   hero: [
@@ -15,7 +17,7 @@ export const SECCION_CAMPOS: Record<LandingSeccionTipo, CampoConfig[]> = {
     { key: "ctaSecundariaTexto", kind: "texto", label: "Texto del botón secundario" },
     { key: "ctaSecundariaUrl", kind: "url", label: "URL del botón secundario" },
     { key: "horario", kind: "texto", label: "Horario" },
-    { key: "marquee", kind: "texto", label: "Cinta animada (palabras separadas por comas)" },
+    { key: "marquee", kind: "cinta", label: "Cinta animada" },
   ],
   nosotros: [
     { key: "kicker", kind: "texto", label: "Kicker" },

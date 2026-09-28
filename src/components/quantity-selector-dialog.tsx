@@ -202,6 +202,18 @@ function resolveOpcionName(opcion: ComplementVM, language: string): string {
   return opcion.name;
 }
 
+// Opcion de complemento: seleccionada = borde y fondo suave del tenant.
+function opcionClass(seleccionada: boolean): string {
+  if (seleccionada) return "border-primary bg-primary/10"
+  return "border-foreground/15 hover:border-foreground/40"
+}
+
+// "Obligatorio" sin completar se marca en el color del tenant; el resto, apagado.
+function etiquetaGrupoClass(obligatorio: boolean, completo: boolean): string {
+  if (obligatorio && !completo) return "text-primary"
+  return "text-muted-foreground"
+}
+
 export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogProps>) {
   const { item, open, onOpenChange } = props;
   const [quantity, setQuantity] = useState(1)
@@ -323,8 +335,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
             initialIndex={activeImageIndex}
           />
         )}
-        <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
-          <DialogTitle>{displayName}</DialogTitle>
+        <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b border-foreground/10">
+          <DialogTitle className="font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] pr-8 [overflow-wrap:anywhere]">{displayName}</DialogTitle>
           {/* Radix exige un Description accesible (aria-describedby) para el
               Dialog; sin descripcion propia del producto usamos el nombre
               como fallback silencioso en vez de dejar el warning en consola. */}
@@ -343,28 +355,19 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 const isComplete = grupo.obligatorio ? selectedCount > 0 : true;
                 const progressMax = grupo.tipo === 'radio' ? 1 : Math.max(1, grupo.opciones.length);
                 const progressPct = isComplete ? 100 : Math.min(100, (selectedCount / progressMax) * 100);
-                let barBackground = 'oklch(60% 0.18 25)';
-                if (isComplete) {
-                  barBackground = grupo.obligatorio ? 'oklch(60% 0.15 145)' : 'oklch(60% 0.15 250)';
-                }
                 return (
-                  <div key={grupo.id} className="mb-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium">{grupo.name}</span>
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        style={{
-                          background: grupo.obligatorio ? 'oklch(95% 0.05 0)' : 'oklch(95% 0.02 250)',
-                          color: grupo.obligatorio ? 'oklch(45% 0.15 25)' : 'oklch(45% 0.08 250)',
-                        }}
-                      >
+                  <div key={grupo.id} className="mb-6">
+                    <div className="flex items-baseline justify-between gap-3 mb-2">
+                      <span className="font-serif text-lg font-normal leading-tight">{grupo.name}</span>
+                      <span className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] ${etiquetaGrupoClass(grupo.obligatorio, isComplete)}`}>
                         {getBadgeText(grupo)}
                       </span>
                     </div>
-                    <div className="h-1 rounded-full mb-2 overflow-hidden bg-muted">
+                    {/* Progreso: filete fino en el color del tenant, sin semaforo de colores fijos. */}
+                    <div className="h-px mb-3 overflow-hidden bg-foreground/15">
                       <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${progressPct}%`, background: barBackground }}
+                        className="h-full bg-primary transition-[width] duration-300"
+                        style={{ width: `${progressPct}%` }}
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -377,11 +380,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                         return (
                           <label
                             key={opcion.id}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all w-full outline-none cursor-pointer [&:has(input:focus-visible)]:ring-2 [&:has(input:focus-visible)]:ring-ring [&:has(input:focus-visible)]:ring-offset-2"
-                            style={{
-                              background: isSelected ? 'color-mix(in oklch, var(--color-primary) 15%, transparent)' : 'transparent',
-                              borderColor: isSelected ? 'var(--color-primary)' : undefined,
-                            }}
+                            className={`flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-[3px] border px-3 py-2.5 text-left outline-none transition-colors [&:has(input:focus-visible)]:ring-2 [&:has(input:focus-visible)]:ring-ring [&:has(input:focus-visible)]:ring-offset-2 ${opcionClass(isSelected)}`}
                           >
                             <input
                               type={inputType}
@@ -393,7 +392,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
                             <span className="flex-1 text-sm">{resolveOpcionName(opcion, language)}</span>
                             {opcion.price > 0 && (
-                              <span className="text-xs font-medium shrink-0 text-primary">
+                              <span className="text-xs font-semibold shrink-0 tabular-nums text-foreground">
                                 +{formatPrice(opcion.price, 'EUR', language)}
                               </span>
                             )}
@@ -416,10 +415,10 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
             <button
               type="button"
               onClick={() => setShowNote(v => !v)}
-              className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+              className={`w-full min-h-[44px] flex items-center gap-2 border-b px-0 py-2 text-sm font-medium transition-colors ${
                 showNote
-                  ? 'border-primary/40 bg-primary/5 text-primary'
-                  : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                  ? 'border-foreground/40 text-foreground'
+                  : 'border-foreground/15 text-muted-foreground hover:text-foreground'
               }`}
             >
               <MessageSquarePlus className={`w-3.5 h-3.5 shrink-0 transition-colors ${showNote ? 'text-primary' : ''}`} />
@@ -432,7 +431,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={t("itemNotePlaceholder", language)}
-                className="resize-none text-sm"
+                className="resize-none rounded-[3px] text-sm"
                 rows={2}
                 maxLength={500}
                 autoFocus
@@ -447,7 +446,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               <RippleButton
                 variant="outline"
                 size="icon"
-                className="h-11 w-11 md:h-10 md:w-10"
+                className="h-11 w-11 rounded-[3px] md:h-10 md:w-10"
                 onClick={handleDecrement}
                 disabled={quantity <= 1}
                 aria-label={t("reduceQuantity", language)}
@@ -458,20 +457,20 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 id="quantity"
                 type="text"
                 value={quantity}
-                className="mx-1 h-10 w-12 flex items-center justify-center text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="mx-1 h-10 w-12 flex items-center justify-center rounded-[3px] border-0 text-center text-lg font-semibold tabular-nums shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 readOnly
                 tabIndex={0}
                 aria-live="polite"
                 aria-label={t("quantity", language)}
               />
-              <RippleButton variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" onClick={handleIncrement} aria-label={t("increaseQuantity", language)}>
+              <RippleButton variant="outline" size="icon" className="h-11 w-11 rounded-[3px] md:h-10 md:w-10" onClick={handleIncrement} aria-label={t("increaseQuantity", language)}>
                 <Plus className="h-4 w-4" />
               </RippleButton>
             </div>
           </div>
-          <div className="flex justify-between items-center text-lg font-bold">
-            <span>{t("total", language)}:</span>
-            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice, 'EUR', language)}</span>
+          <div className="flex items-baseline justify-between border-t border-foreground/15 pt-4">
+            <span className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t("total", language)}</span>
+            <span className="animate-price-update text-2xl font-semibold tabular-nums" key={totalPrice}>{formatPrice(totalPrice, 'EUR', language)}</span>
           </div>
 
           {isWaiterMode && item.tipoProducto !== 'bebida' && (
@@ -491,7 +490,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                     className="flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-all"
                     style={{
                       background: isSelected ? pc.bg : `color-mix(in oklch, ${pc.bg} 35%, transparent)`,
-                      color: isSelected ? pc.text : `color-mix(in oklch, ${pc.text} 70%, var(--color-muted-foreground))`,
+                      color: isSelected ? pc.text : `color-mix(in oklch, ${pc.text} 70%, var(--muted-foreground))`,
                       borderColor: isSelected ? pc.border : `color-mix(in oklch, ${pc.border} 50%, transparent)`,
                     }}
                   >
@@ -505,12 +504,12 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
         </div>
 
-        <DialogFooter className="px-5 py-4 shrink-0 border-t">
+        <DialogFooter className="px-5 py-4 shrink-0 border-t border-foreground/10">
           <RippleButton
             type="button"
             onClick={handleConfirmAddToCart}
             disabled={!isGroupsValid(effectiveGroups, selectedByGroup) || addedAnimation || (isWaiterMode && item.tipoProducto !== 'bebida' && !selectedPase)}
-            className={addedAnimation ? 'animate-complement-select' : ''}
+            className={`min-h-[48px] w-full text-[15px] font-semibold rounded-[3px] bg-foreground text-background hover:bg-foreground/85 ${addedAnimation ? 'animate-complement-select' : ''}`}
           >
             {addedAnimation ? (
               <span className="flex items-center gap-2">

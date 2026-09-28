@@ -18,6 +18,9 @@ const heroContenidoSchema = z.object({
   ctaSecundariaUrl: z.string().max(2000).nullable().optional(),
   horario: translatableTextSchema.optional(),
   marquee: translatableTextSchema.optional(),
+  // Sin modo = 'palabras': las filas guardadas antes de existir el modo siguen igual.
+  marqueeModo: z.enum(['palabras', 'imagenes']).optional(),
+  marqueeImagenes: z.array(z.string().max(2000)).max(20).optional(),
 });
 
 const nosotrosContenidoSchema = z.object({

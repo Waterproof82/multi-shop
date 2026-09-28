@@ -95,7 +95,7 @@ describe('Landing — contenido', () => {
   it('el telefono del hero es marcable', () => {
     renderLanding();
     const hero = screen.getByRole('region', { name: 'Cocina de verdad' });
-    expect(within(hero).getByRole('link', { name: '+34 600 11 22 33' })).toHaveAttribute('href', 'tel:+34600112233');
+    expect(within(hero).getByRole('link', { name: '600112233' })).toHaveAttribute('href', 'tel:+34600112233');
   });
 
   it('horario/telefono/direccion son listas de descripcion (dt/dd), no titulos', () => {

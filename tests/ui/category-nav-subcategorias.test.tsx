@@ -115,7 +115,10 @@ describe('CategoryNav — categorías con subcategorías', () => {
     fireEvent.click(screen.getByText('Cítricos'));
     await waitFor(() => expect(window.scrollTo).toHaveBeenCalled());
 
-    expect(screen.getByRole('button', { name: /Mermeladas/ }).className).toMatch(/bg-primary/);
+    // Señal semántica (no la clase de color, que es diseño): la padre y SOLO ella.
+    const padre = screen.getByRole('button', { name: /Mermeladas/ });
+    expect(padre).toHaveAttribute('aria-current', 'true');
+    expect(document.querySelectorAll('[aria-current="true"]')).toHaveLength(1);
   });
 });
 

@@ -55,7 +55,7 @@ export function NuevoPedidoPanel({
         {pendingItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-6">
             <span className="text-3xl">🍽</span>
-            <p className="text-sm text-[#94a3b8]">Seleccioná platos del menú para añadirlos aquí</p>
+            <p className="text-sm text-[#94a3b8]">Selecciona platos del menú para añadirlos aquí</p>
           </div>
         ) : (
           <div className="py-2">

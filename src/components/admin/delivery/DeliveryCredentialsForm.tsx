@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { DeliverySettings } from '@/core/application/use-cases/delivery/getDeliverySettingsUseCase';
@@ -34,8 +34,8 @@ const CLASE_CONTROL =
  * que el campo llega vacío aunque haya una guardada. Sin este aviso, quien edita
  * otra cosa del formulario cree que la borró.
  */
-function placeholderDeCredencial(isSet: boolean, placeholder?: string): string | undefined {
-  return isSet ? '(dejar vacío para mantener el existente)' : placeholder;
+function placeholderDeCredencial(isSet: boolean, language: Language, placeholder?: string): string | undefined {
+  return isSet ? t('credentialKeepExisting', language) : placeholder;
 }
 
 type ControlProps = Readonly<
@@ -43,19 +43,21 @@ type ControlProps = Readonly<
 >;
 
 function ControlLargo({ id, value, onChange, placeholder, isSet }: ControlProps) {
+  const { language } = useLanguage();
   return (
     <textarea
       id={id}
       rows={5}
       value={value}
       onChange={e => onChange(e.target.value)}
-      placeholder={placeholderDeCredencial(Boolean(isSet), placeholder)}
+      placeholder={placeholderDeCredencial(Boolean(isSet), language, placeholder)}
       className={`${CLASE_CONTROL} resize-y font-mono text-xs`}
     />
   );
 }
 
 function ControlSecreto({ id, value, onChange, placeholder, isSet }: ControlProps) {
+  const { language } = useLanguage();
   // El estado vive aquí, que es el único control que lo usa. Antes estaba en
   // `Field` y se creaba también para los campos que nunca se ocultan.
   const [show, setShow] = useState(false);
@@ -67,14 +69,14 @@ function ControlSecreto({ id, value, onChange, placeholder, isSet }: ControlProp
         type={show ? 'text' : 'password'}
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder={placeholderDeCredencial(Boolean(isSet), placeholder)}
+        placeholder={placeholderDeCredencial(Boolean(isSet), language, placeholder)}
         className={`${CLASE_CONTROL} pr-10`}
       />
       <button
         type="button"
         onClick={() => setShow(s => !s)}
         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-        aria-label={show ? 'Ocultar' : 'Mostrar'}
+        aria-label={show ? t("hideAction", language) : t("showAction", language)}
       >
         {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
       </button>
@@ -96,6 +98,7 @@ function ControlSimple({ id, value, onChange, placeholder }: ControlProps) {
 }
 
 function Field({ label, id, value, onChange, placeholder, hint, textarea, secret, isSet }: Readonly<FieldProps>) {
+  const { language } = useLanguage();
   const control = { id, value, onChange, placeholder, isSet };
 
   function renderControl() {
@@ -109,7 +112,7 @@ function Field({ label, id, value, onChange, placeholder, hint, textarea, secret
       <label htmlFor={id} className="block text-sm font-medium text-foreground">
         {label}
         {isSet && !value && (
-          <span className="ml-2 text-xs text-green-500 font-normal">✓ guardado</span>
+          <span className="ml-2 text-xs text-green-500 font-normal">{t("savedCheck", language)}</span>
         )}
       </label>
       {renderControl()}
@@ -189,24 +192,24 @@ export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Prop
       {/* Delivery config */}
       <section className="space-y-4">
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-          Configuración general
+          {t("deliveryGeneralConfig", language)}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field
-            label="Pedido mínimo (€)"
+            label={t("deliveryMinOrder", language)}
             id="min-order"
             value={minOrderEuros}
             onChange={setMinOrderEuros}
             placeholder="0"
-            hint="Dejar en 0 para sin mínimo"
+            hint={t("deliveryMinOrderHint", language)}
           />
           <Field
-            label="Recargo de envío adicional (€)"
+            label={t("deliveryExtraFee", language)}
             id="surcharge"
             value={surchargeEuros}
             onChange={setSurchargeEuros}
             placeholder="0"
-            hint="Se suma a la tarifa de Glovo"
+            hint={t("deliveryExtraFeeHint", language)}
           />
         </div>
       </section>
@@ -241,21 +244,21 @@ export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Prop
                 placeholder="outlet-slug"
               />
               <Field
-                label="País"
+                label={t("countryLabel", language)}
                 id="glovo-country"
                 value={glovoCountry}
                 onChange={setGlovoCountry}
                 placeholder="es"
-                hint="Código ISO de 2 letras: es, pt, fr..."
+                hint={t("deliveryCountryHint", language)}
               />
             </div>
             <Field
-              label="Clave privada RSA (PEM)"
+              label={t("deliveryRsaKey", language)}
               id="glovo-private-key"
               value={glovoPrivateKey}
               onChange={setGlovoPrivateKey}
               placeholder="-----BEGIN RSA PRIVATE KEY-----"
-              hint="Solo pegá si querés reemplazar la existente."
+              hint={t("deliveryReplaceSecretHint", language)}
               textarea
               isSet={initial.glovo_private_key_set}
             />
@@ -267,7 +270,7 @@ export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Prop
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
-                label="Código de comercio"
+                label={t("deliveryMerchantCode", language)}
                 id="redsys-merchant-code"
                 value={redsysMerchantCode}
                 onChange={setRedsysMerchantCode}
@@ -282,12 +285,12 @@ export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Prop
               />
             </div>
             <Field
-              label="Clave secreta (Base64)"
+              label={t("deliverySecretKey", language)}
               id="redsys-secret-key"
               value={redsysSecretKey}
               onChange={setRedsysSecretKey}
               placeholder="sq7HjrUOBfKmC576ILgskD5srU870gJ7"
-              hint="Solo pegá si querés reemplazar la existente."
+              hint={t("deliveryReplaceSecretHint", language)}
               secret
               isSet={initial.redsys_secret_key_set}
             />

@@ -11,9 +11,10 @@ import {
   AvisoNuevaPestana,
   Eyebrow,
   TituloResaltado,
-  landingBtnGhost,
+  displayPhoneNumber,
   landingBtnOscuro,
-  landingShadowSoft,
+  landingLinkArrow,
+  landingPadX,
   telHref,
 } from "@/components/landing/landing-ui";
 
@@ -23,9 +24,11 @@ interface HeroSectionProps {
   telefono: string | null;
 }
 
-function gridClass(conImagen: boolean): string {
-  if (conImagen) return "lg:grid-cols-[1fr_1.1fr]";
-  return "mx-auto max-w-4xl";
+// Sin foto, el titular abre la pagina y necesita aire arriba; con foto, la
+// foto ya hace de umbral y el texto se pega a su borde.
+function bandaTextoClass(conImagen: boolean): string {
+  if (conImagen) return "pt-[clamp(32px,5vw,72px)]";
+  return "pt-[clamp(56px,10vw,140px)]";
 }
 
 interface MetaProps {
@@ -37,8 +40,8 @@ interface MetaProps {
 function Meta({ etiqueta, children }: Readonly<MetaProps>) {
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">{etiqueta}</dt>
-      <dd className="whitespace-pre-line">{children}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{etiqueta}</dt>
+      <dd className="whitespace-pre-line text-foreground">{children}</dd>
     </div>
   );
 }
@@ -57,54 +60,62 @@ export function HeroSection({ contenido, empresaNombre, telefono }: Readonly<Her
   const nuevaPestana = t("opensInNewTab", language);
 
   return (
-    <section
-      aria-labelledby={tituloId}
-      className={`grid w-full items-stretch gap-[clamp(16px,2.4vw,30px)] p-[clamp(16px,2.4vw,30px)] ${gridClass(imagenUrl !== null)}`}
-    >
+    <section aria-labelledby={tituloId} className="w-full">
+      {/* La foto manda: a sangre, sin esquinas ni sombra. Su borde inferior es el separador. */}
       {imagenUrl && (
-        <div
-          className={`relative h-[50vh] overflow-hidden rounded-[42px] lg:h-auto lg:min-h-[62vh] ${landingShadowSoft}`}
-        >
+        <div className="relative h-[clamp(320px,72svh,820px)] w-full overflow-hidden bg-muted">
           <Image
             src={imagenUrl}
             alt={empresaNombre}
             fill
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-cover object-[center_55%] saturate-[1.05]"
+            sizes="100vw"
+            className="object-cover object-[center_55%]"
             priority
           />
         </div>
       )}
 
-      <div className="flex flex-col justify-center p-[clamp(24px,4vw,60px)]">
-        {kicker && <Eyebrow>{kicker}</Eyebrow>}
-        <h1 id={tituloId} className="mb-7 font-serif text-[clamp(40px,6.4vw,96px)] font-bold leading-[1.05] tracking-[-0.01em] text-foreground">
-          <TituloResaltado texto={titulo} />
-        </h1>
-        {descripcion && (
-          <p className="mb-9 max-w-[46ch] whitespace-pre-line text-[clamp(16px,1.4vw,19px)] leading-[1.55] text-muted-foreground">
-            {descripcion}
-          </p>
-        )}
-        <div className="mb-10 flex flex-wrap gap-3">
-          <Link href="/carta" className={`${landingBtnOscuro} px-[30px] py-3 text-[15px]`}>
-            <ShoppingBag className="size-5 shrink-0" aria-hidden="true" />
-            {t("viewMenu", language)}
-          </Link>
-          {ctaSecundariaTexto && ctaSecundariaUrl && (
-            <a href={ctaSecundariaUrl} target="_blank" rel="noopener noreferrer" className={landingBtnGhost}>
-              {ctaSecundariaTexto}
-              <AvisoNuevaPestana texto={nuevaPestana} />
-            </a>
-          )}
+      {/* Banda de texto asimetrica: titular a la izquierda, anotacion a la derecha. */}
+      <div
+        className={`mx-auto grid max-w-7xl grid-cols-1 gap-x-[clamp(32px,6vw,96px)] gap-y-8 pb-[clamp(48px,7vw,96px)] lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end ${landingPadX} ${bandaTextoClass(imagenUrl !== null)}`}
+      >
+        <div className="min-w-0">
+          {kicker && <Eyebrow>{kicker}</Eyebrow>}
+          <h1
+            id={tituloId}
+            className="font-serif text-[clamp(40px,6.2vw,104px)] font-normal leading-[1] tracking-[-0.025em] text-foreground [overflow-wrap:anywhere]"
+          >
+            <TituloResaltado texto={titulo} />
+          </h1>
         </div>
+
+        <div className="min-w-0 lg:pb-2">
+          {descripcion && (
+            <p className="mb-8 max-w-[44ch] whitespace-pre-line text-[clamp(16px,1.3vw,18px)] leading-[1.6] text-muted-foreground">
+              {descripcion}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link href="/carta" className={`${landingBtnOscuro} px-6 py-3 text-[15px]`}>
+              <ShoppingBag className="size-[18px] shrink-0" aria-hidden="true" />
+              {t("viewMenu", language)}
+            </Link>
+            {ctaSecundariaTexto && ctaSecundariaUrl && (
+              <a href={ctaSecundariaUrl} target="_blank" rel="noopener noreferrer" className={landingLinkArrow}>
+                {ctaSecundariaTexto}
+                <AvisoNuevaPestana texto={nuevaPestana} />
+              </a>
+            )}
+          </div>
+        </div>
+
         {(horario || telefono) && (
-          <dl className="grid grid-cols-1 gap-6 border-t border-border pt-8 text-sm text-muted-foreground sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-6 border-t border-foreground/15 pt-6 text-sm sm:grid-cols-2 lg:col-span-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             {horario && <Meta etiqueta={t("landingHours", language)}>{horario}</Meta>}
             {telefono && (
               <Meta etiqueta={t("phone", language)}>
-                <a href={telHref(telefono)} className="transition-colors hover:text-primary">
-                  {telefono}
+                <a href={telHref(telefono)} className="underline-offset-4 transition-colors hover:text-primary hover:underline">
+                  {displayPhoneNumber(telefono)}
                 </a>
               </Meta>
             )}

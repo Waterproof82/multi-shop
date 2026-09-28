@@ -111,10 +111,10 @@ export function DeliveryMethodSelector({
     !loadingFee;
 
   return (
-    <div className="space-y-3 mb-3">
-      <p className="text-xs font-medium text-muted-foreground">
+    <div className="mb-4 mt-4 space-y-3 border-t border-foreground/10 pt-4">
+      <h3 className="font-serif text-lg font-normal leading-tight text-foreground">
         {t('deliveryMethodTitle', language)}
-      </p>
+      </h3>
 
       <div className={`grid gap-2 ${deliveryHabilitado ? 'grid-cols-2' : 'grid-cols-1'}`}>
         <button
@@ -122,12 +122,12 @@ export function DeliveryMethodSelector({
           onClick={() => onChange('recogida')}
           disabled={disabled}
           className={`
-            flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 min-h-[64px] text-sm font-medium transition-all duration-150
+            flex flex-col items-center justify-center gap-1.5 rounded-[3px] border px-3 py-3 min-h-[64px] text-sm font-semibold transition-colors duration-150
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
             disabled:opacity-50 disabled:cursor-not-allowed
             ${value === 'recogida'
               ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/40'}
+              : 'border-foreground/15 bg-background text-foreground hover:border-foreground/40'}
           `}
           aria-pressed={value === 'recogida'}
         >
@@ -141,12 +141,12 @@ export function DeliveryMethodSelector({
             onClick={() => onChange('delivery')}
             disabled={disabled}
             className={`
-              flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 min-h-[64px] text-sm font-medium transition-all duration-150
+              flex flex-col items-center justify-center gap-1.5 rounded-[3px] border px-3 py-3 min-h-[64px] text-sm font-semibold transition-colors duration-150
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
               disabled:opacity-50 disabled:cursor-not-allowed
               ${value === 'delivery'
                 ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/40'}
+                : 'border-foreground/15 bg-background text-foreground hover:border-foreground/40'}
             `}
             aria-pressed={value === 'delivery'}
           >
@@ -158,11 +158,12 @@ export function DeliveryMethodSelector({
 
       {value === 'delivery' && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground block mb-1">
+          <label htmlFor="restaurante-direccion" className="text-xs font-medium text-muted-foreground block mb-1">
             {t('deliveryAddress', language)}
           </label>
 
           <MapboxAddressInput
+            id="restaurante-direccion"
             onInputChange={() => {
               setSelectedAddress('');
               setEstimatedFeeCents(null);
@@ -185,7 +186,7 @@ export function DeliveryMethodSelector({
           )}
 
           {estimatedFeeCents !== null ? (
-            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary font-medium">
+            <div className="flex items-center gap-2 rounded-[3px] border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary font-medium">
               <MapPin className="size-4 shrink-0" aria-hidden="true" />
               <span>
                 {t('deliveryFeeLabel', language)}: {(estimatedFeeCents / 100).toFixed(2)}€
@@ -196,7 +197,7 @@ export function DeliveryMethodSelector({
               type="button"
               onClick={handleFetchFee}
               disabled={!canFetchFee || disabled}
-              className="w-full min-h-[44px] rounded-lg border border-primary bg-primary/10 text-primary text-sm font-medium transition-all duration-150 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2"
+              className="w-full min-h-[44px] rounded-[3px] border border-primary bg-primary/10 text-primary text-sm font-medium transition-colors duration-150 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2"
             >
               {loadingFee
                 ? t('deliveryQuoteLoading', language)

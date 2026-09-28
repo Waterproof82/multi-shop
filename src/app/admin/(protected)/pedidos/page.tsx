@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar, Trash, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Check, Clock, Ban, ShoppingCart, Calendar, Trash, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADO_COLORS, ESTADOS_POR_ORIGEN, getOrigenPedido, type PedidoEstado } from '@/core/domain/constants/pedido';
@@ -173,20 +173,20 @@ export function renderOrigenBadge(pedido: Pedido, language: Language) {
   if (pedido.origen === 'delivery') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-400/30">
-        Domicilio
+        {t("orderTypeDomicilioShort", language)}
       </span>
     );
   }
   if (pedido.tracking_token) {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-400/30">
-        Recogida
+        {t("orderTypeRecogida", language)}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-500/20 text-slate-400 border border-slate-500/30">
-      Web
+      {t("orderTypeWeb", language)}
     </span>
   );
 }
@@ -397,7 +397,7 @@ export default function PedidosPage() {
   const [sortField, setSortField] = useState<keyof Pedido | 'origen'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
+  const [cancelConfirm, setCancelConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
   const [deleteAllConfirm, setDeleteAllConfirm] = useState<{ show: boolean; confirmText: string }>({ show: false, confirmText: '' });
   const [deletingAll, setDeletingAll] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
@@ -455,28 +455,17 @@ export default function PedidosPage() {
     }
   }, [effectiveEmpresaId]);
 
-  const deletePedido = useCallback((id: string, orderNum: number | null) => {
-    setDeleteConfirm({ show: true, id, numero: orderNum });
+  const askCancelPedido = useCallback((id: string, orderNum: number | null) => {
+    setCancelConfirm({ show: true, id, numero: orderNum });
   }, []);
 
-  const confirmDelete = async () => {
-    if (!deleteConfirm.id) return;
+  // Art.66 LGT: los pedidos no se borran (trigger pedidos_no_delete). Se cancelan.
+  const confirmCancel = async () => {
+    if (!cancelConfirm.id) return;
     try {
-      const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
-        method: 'DELETE',
-        body: JSON.stringify({ id: deleteConfirm.id }),
-      }, {
-        maxRetries: 2,
-        baseDelay: 1000,
-        retryOn: (response) => response.status >= 500 || response.status === 429
-      });
-      if (res.ok) {
-        setPedidos(pedidos.filter(p => p.id !== deleteConfirm.id));
-      }
-    } catch (error) {
-      logClientError(error, 'confirmDelete');
+      await updateEstado(cancelConfirm.id, 'cancelado');
     } finally {
-      setDeleteConfirm({ show: false, id: null, numero: null });
+      setCancelConfirm({ show: false, id: null, numero: null });
     }
   };
 
@@ -546,7 +535,7 @@ export default function PedidosPage() {
           <button type="button"
             onClick={() => cambiarMes(-1)}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
-            aria-label="Mes anterior"
+            aria-label={t("previousMonth", language)}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -559,7 +548,7 @@ export default function PedidosPage() {
                 onClick={() => setSelectedMonth({ mes: new Date().getMonth(), año: new Date().getFullYear() })}
                 className="block text-xs text-cyan-400 hover:text-cyan-300 underline mx-auto mt-1 transition-colors"
               >
-                Ver actual
+                {t("goToCurrentMonthShort", language)}
               </button>
             )}
           </div>
@@ -620,7 +609,7 @@ export default function PedidosPage() {
                     onClick={() => handleSort('origen')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    Tipo
+                    {t("typeLabel", language)}
                     {sortField === 'origen' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
@@ -702,13 +691,16 @@ export default function PedidosPage() {
                         }, language)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
-                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          aria-label={t("deleteOrder", language)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {pedido.estado !== 'cancelado' && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); askCancelPedido(pedido.id, pedido.numero_pedido); }}
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            aria-label={t("cancelOrder", language)}
+                            title={t("cancelOrder", language)}
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                     {expandedPedido === pedido.id && (
@@ -760,12 +752,12 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      <DeleteOrderDialog
-        show={deleteConfirm.show}
-        orderNumber={deleteConfirm.numero}
+      <CancelOrderDialog
+        show={cancelConfirm.show}
+        orderNumber={cancelConfirm.numero}
         language={language}
-        onClose={() => setDeleteConfirm({ show: false, id: null, numero: null })}
-        onConfirm={confirmDelete}
+        onClose={() => setCancelConfirm({ show: false, id: null, numero: null })}
+        onConfirm={confirmCancel}
       />
 
       <DeleteAllOrdersDialog
@@ -782,7 +774,7 @@ export default function PedidosPage() {
   );
 }
 
-function DeleteOrderDialog({
+function CancelOrderDialog({
   show,
   orderNumber,
   language,
@@ -801,12 +793,12 @@ function DeleteOrderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div className="p-2 bg-destructive/10 rounded-full">
-              <Trash2 className="w-5 h-5 text-destructive" />
+              <Ban className="w-5 h-5 text-destructive" />
             </div>
-            {t("deleteOrder", language)}
+            {t("cancelOrder", language)}
           </DialogTitle>
           <DialogDescription>
-            {t("deleteOrderConfirm", language)} <strong>#{orderNumber}</strong>? {t("cannotUndo", language)}
+            {t("cancelOrderConfirm", language)} <strong>#{orderNumber}</strong>? {t("cancelOrderHint", language)}
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-3 justify-end">
@@ -814,13 +806,13 @@ function DeleteOrderDialog({
             onClick={onClose}
             className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
-            {t("cancel", language)}
+            {t("keepOrder", language)}
           </button>
           <button type="button"
             onClick={onConfirm}
             className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
-            {t("delete", language)}
+            {t("cancelOrder", language)}
           </button>
         </div>
       </DialogContent>

@@ -1,7 +1,12 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@theme {
+/* `inline`: la utilidad usa `var(--foreground)` directamente y se resuelve en
+   cada elemento. Sin `inline`, Tailwind declara `--color-foreground:
+   var(--foreground)` en :root, que se resuelve UNA vez ahi (tema claro) y se
+   hereda congelada: un `.dark` en un subarbol (el panel admin) no cambiaria
+   ningun color. Las fuentes van aparte, en un @theme normal, a proposito. */
+@theme inline {
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -38,9 +43,6 @@
   --color-whatsapp-hover: var(--whatsapp-hover);
 
   --color-placeholder: var(--placeholder);
-
-  --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
-  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -105,6 +107,11 @@
 
   /* Primary subtle tint for badges and highlights */
   --color-primary-subtle: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+@theme {
+  --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
 }
 
 :root {
@@ -548,7 +555,7 @@
 
 @layer base {
   * {
-    border-color: var(--color-border);
+    border-color: var(--border);
   }
 
   /* Scroll offset for sticky headers - synced with header heights */

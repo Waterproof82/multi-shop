@@ -6,7 +6,7 @@
 
 100% aditivo: no toca `categorias`/`productos.categoria_id` ni su jerarquía. Sin gating por `empresa.tipo` — cualquier empresa puede usarlo.
 
-Spec y plan completos (con todas las decisiones de diseño y el detalle fase a fase): `docs/superpowers/specs/2026-09-16-menus-virtuales-design.md` y `docs/superpowers/plans/2026-09-16-menus-virtuales.md`.
+Spec completo (con todas las decisiones de diseño): `docs/superpowers/specs/2026-09-16-menus-virtuales-design.md`. El plan fase a fase ya ejecutado se retiró del repo; está en el historial de git (`git log --all -- docs/superpowers/plans/2026-09-16-menus-virtuales.md`).
 
 ## Tablas DB
 

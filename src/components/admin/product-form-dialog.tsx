@@ -23,7 +23,7 @@ import {
   SelectGroup,
   SelectLabel,
 } from '@/components/ui/select';
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { AllergenIcon, ALLERGEN_KEYS, ALLERGEN_TRANSLATION_KEY } from '@/components/allergen-icons';
 import type { AllergenKey } from '@/components/allergen-icons';
@@ -66,6 +66,7 @@ interface ProductComplementosSectionProps {
 }
 
 function ProductComplementosSection({ productoId }: Readonly<ProductComplementosSectionProps>) {
+  const { language } = useLanguage();
   const [allGrupos, setAllGrupos] = useState<ComplementoGrupo[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -112,11 +113,11 @@ function ProductComplementosSection({ productoId }: Readonly<ProductComplementos
 
   const assignedCount = selectedIds.size;
 
-  if (loading) return <p className="text-sm text-muted-foreground py-2">Cargando grupos...</p>;
+  if (loading) return <p className="text-sm text-muted-foreground py-2">{t("complementosLoadingGroups", language)}</p>;
   if (allGrupos.length === 0) return (
     <p className="text-sm text-muted-foreground">
-      No hay grupos de complementos.{' '}
-      <a href="/admin/complementos" className="text-primary hover:underline">Crear grupos →</a>
+      {t("complementosNoGroupsShort", language)}{' '}
+      <a href="/admin/complementos" className="text-primary hover:underline">{t("complementosCreateGroups", language)}</a>
     </p>
   );
 
@@ -130,7 +131,7 @@ function ProductComplementosSection({ productoId }: Readonly<ProductComplementos
       >
         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
           {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-          Grupos de complementos
+          {t("complementosGroups", language)}
           <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
             {assignedCount} asignado{assignedCount !== 1 ? 's' : ''}
           </span>
@@ -138,7 +139,7 @@ function ProductComplementosSection({ productoId }: Readonly<ProductComplementos
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {saving && <Loader2 className="w-3 h-3 animate-spin" />}
           {saved && !saving && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-          {saved && !saving && <span className="text-emerald-600 dark:text-emerald-400">Guardado</span>}
+          {saved && !saving && <span className="text-emerald-600 dark:text-emerald-400">{t("savedLabel", language)}</span>}
         </span>
       </button>
 
@@ -155,7 +156,7 @@ function ProductComplementosSection({ productoId }: Readonly<ProductComplementos
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground">{grupo.nombre_es}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {grupo.tipo === 'radio' ? 'Elige 1' : 'Múltiple'} · {grupo.obligatorio ? 'Obligatorio' : 'Opcional'} · {grupo.opciones.length} opciones
+                  {grupo.tipo === 'radio' ? t("complementosPickOne", language) : t("complementosMultiple", language)} · {grupo.obligatorio ? t("complementosRequired", language) : t("complementosOptional", language)} · {grupo.opciones.length} opciones
                 </p>
               </div>
               {selectedIds.has(grupo.id) && (
@@ -172,7 +173,7 @@ function ProductComplementosSection({ productoId }: Readonly<ProductComplementos
 interface AllergenSelectorProps {
   selected: string[];
   onChange: (alergenos: string[]) => void;
-  language: string;
+  language: Language;
 }
 
 function AllergenSelector({ selected, onChange, language }: Readonly<AllergenSelectorProps>) {
@@ -195,7 +196,7 @@ function AllergenSelector({ selected, onChange, language }: Readonly<AllergenSel
       >
         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
           {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-          Alérgenos
+          {t("allergensSectionTitle", language)}
           {selected.length > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
               {selected.length} seleccionado{selected.length !== 1 ? 's' : ''}
@@ -482,7 +483,7 @@ export function ProductFormDialog({
 
           <div className="col-span-2">
             <label htmlFor="porcentaje_impuesto_override" className="block text-sm font-medium text-foreground mb-1">
-              % Impuesto específico (override)
+              {t("taxOverrideLabel", language)}
             </label>
             <input
               id="porcentaje_impuesto_override"
@@ -498,12 +499,12 @@ export function ProductFormDialog({
                   porcentajeImpuestoOverride: raw === '' ? null : Number.parseFloat(raw),
                 });
               }}
-              placeholder="Ej: 4"
+              placeholder={t("taxOverridePlaceholder", language)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               aria-describedby="porcentaje_override_help"
             />
             <span id="porcentaje_override_help" className="text-xs text-muted-foreground mt-1 block">
-              Si vacío, usa el tipo general de la empresa
+              {t("taxOverrideHelp", language)}
             </span>
           </div>
 

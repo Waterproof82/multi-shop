@@ -20,6 +20,12 @@ interface ProductImageGalleryProps {
  * de un producto. Con una sola imagen no renderiza miniaturas — el output
  * es idéntico a un <ImagenSubida> suelto.
  */
+// Miniatura activa: marco en el color del tenant; el resto, filete casi invisible.
+function miniaturaClass(activa: boolean): string {
+  if (activa) return 'border-primary';
+  return 'border-foreground/10 hover:border-foreground/40';
+}
+
 export function ProductImageGallery({
   images,
   alt,
@@ -57,7 +63,7 @@ export function ProductImageGallery({
         <div className={mainImageClassName}>{mainImage}</div>
       )}
       {images.length > 1 && (
-        <div className="flex justify-center gap-2 border-t border-border bg-muted/40 px-3 py-2.5">
+        <div className="flex justify-center gap-2 border-t border-foreground/10 bg-background px-3 py-3">
           {images.map((src, index) => (
             <button
               key={src}
@@ -65,9 +71,7 @@ export function ProductImageGallery({
               onClick={() => selectIndex(index)}
               aria-label={`${alt} ${index + 1}`}
               aria-current={index === selectedIndex}
-              className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
-                index === selectedIndex ? 'border-primary' : 'border-border'
-              }`}
+              className={`relative h-12 w-12 shrink-0 overflow-hidden border-2 bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${miniaturaClass(index === selectedIndex)}`}
             >
               <ImagenSubida src={src} alt="" fill className="object-cover" sizes="48px" />
             </button>

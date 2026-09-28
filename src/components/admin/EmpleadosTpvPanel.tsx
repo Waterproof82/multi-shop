@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Users, Plus, Key, Power, Trash2, X } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Empleado {
   id: string;
@@ -17,6 +19,7 @@ interface Props {
 }
 
 function RolBadge({ rol }: Readonly<{ rol: 'cajero' | 'encargado' }>) {
+  const { language } = useLanguage();
   const isEncargado = rol === 'encargado';
   return (
     <span
@@ -25,12 +28,13 @@ function RolBadge({ rol }: Readonly<{ rol: 'cajero' | 'encargado' }>) {
         ? { background: 'oklch(28% 0.10 250 / 0.6)', color: 'oklch(82% 0.18 250)' }
         : { background: 'oklch(28% 0.10 148 / 0.6)', color: 'oklch(82% 0.18 148)' }}
     >
-      {isEncargado ? 'Encargado' : 'Cajero'}
+      {isEncargado ? t("tpvRoleManager", language) : t("tpvRoleCashier", language)}
     </span>
   );
 }
 
 export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
+  const { language } = useLanguage();
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -75,7 +79,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
     setSaving(false);
     if (!res.ok) {
       const data = await res.json() as { error?: string };
-      setError(data.error ?? 'Error al crear empleado');
+      setError(data.error ?? t("errCreateEmpleado", language));
       return;
     }
     setNombre('');
@@ -105,7 +109,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
     setChangingPin(false);
     if (!res.ok) {
       const data = await res.json() as { error?: string };
-      setError(data.error ?? 'Error al cambiar PIN');
+      setError(data.error ?? t("errChangePin", language));
       return;
     }
     setNewPin('');
@@ -118,7 +122,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
   }
 
   if (loading) {
-    return <p className="text-sm text-[#6b7280] py-8 text-center">Cargando empleados...</p>;
+    return <p className="text-sm text-[#6b7280] py-8 text-center">{t("empleadosLoading", language)}</p>;
   }
 
   return (
@@ -126,7 +130,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-[#4f72ff]" />
-          <h3 className="font-semibold text-[#e8eaf0]">Empleados TPV</h3>
+          <h3 className="font-semibold text-[#e8eaf0]">{t("sidebarEmpleadosTpv", language)}</h3>
           <span className="text-xs text-[#6b7280]">({empleados.length})</span>
         </div>
         <button
@@ -135,7 +139,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
           className="flex items-center gap-1.5 text-sm bg-[#4f72ff] text-white px-3 py-1.5 rounded-lg hover:brightness-110 transition-all"
         >
           <Plus className="h-4 w-4" />
-          Nuevo empleado
+          {t("empleadosNew", language)}
         </button>
       </div>
 
@@ -145,7 +149,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
           className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-4"
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-semibold text-[#e8eaf0]">Nuevo empleado</span>
+            <span className="text-sm font-semibold text-[#e8eaf0]">{t("empleadosNew", language)}</span>
             <button type="button" onClick={() => setShowCreate(false)}>
               <X className="h-4 w-4 text-[#6b7280] hover:text-[#e8eaf0]" />
             </button>
@@ -154,7 +158,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
             type="text"
             value={nombre}
             onChange={e => setNombre(e.target.value)}
-            placeholder="Nombre completo"
+            placeholder={t("fullNamePlaceholder", language)}
             maxLength={80}
             required
             className="bg-[#22263a] border border-[#2e3347] rounded-lg px-3 py-2 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors"
@@ -164,15 +168,15 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
             onChange={e => setRol(e.target.value as 'cajero' | 'encargado')}
             className="bg-[#22263a] border border-[#2e3347] rounded-lg px-3 py-2 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors"
           >
-            <option value="cajero">Cajero</option>
-            <option value="encargado">Encargado</option>
+            <option value="cajero">{t("tpvRoleCashier", language)}</option>
+            <option value="encargado">{t("tpvRoleManager", language)}</option>
           </select>
           <input
             type="password"
             inputMode="numeric"
             value={pin}
             onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="PIN (4-8 dígitos)"
+            placeholder={t("pinPlaceholder", language)}
             required
             className="bg-[#22263a] border border-[#2e3347] rounded-lg px-3 py-2 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors tracking-widest"
           />
@@ -184,13 +188,13 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
             disabled={nombre.length < 2 || pin.length < 4 || saving}
             className="bg-[#4f72ff] text-white rounded-lg py-2 text-sm font-bold disabled:opacity-40 hover:brightness-110 transition-all"
           >
-            {saving ? 'Guardando...' : 'Crear empleado'}
+            {saving ? t("savingProgress", language) : t("empleadosCreate", language)}
           </button>
         </form>
       )}
 
       {empleados.length === 0 && !showCreate && (
-        <p className="text-sm text-[#6b7280] py-4 text-center">No hay empleados creados aún.</p>
+        <p className="text-sm text-[#6b7280] py-4 text-center">{t("empleadosEmpty", language)}</p>
       )}
 
       <div className="flex flex-col gap-2">
@@ -215,7 +219,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
                     inputMode="numeric"
                     value={newPin}
                     onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder="Nuevo PIN"
+                    placeholder={t("newPinPlaceholder", language)}
                     autoFocus
                     className="bg-[#22263a] border border-[#2e3347] rounded-lg px-2 py-1 text-xs text-[#e8eaf0] outline-none focus:border-[#4f72ff] w-24 tracking-widest"
                   />
@@ -236,7 +240,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
                   <button
                     type="button"
                     onClick={() => { setPinModalId(emp.id); setError(null); }}
-                    title="Cambiar PIN"
+                    title={t("changePin", language)}
                     className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#4f72ff] transition-colors"
                   >
                     <Key className="h-4 w-4" />
@@ -244,7 +248,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
                   <button
                     type="button"
                     onClick={() => handleToggleActivo(emp.id, emp.activo)}
-                    title={emp.activo ? 'Desactivar' : 'Activar'}
+                    title={emp.activo ? t("deactivateAction", language) : t("activateAction", language)}
                     className={`p-1.5 rounded-lg transition-colors ${emp.activo ? 'text-[#22c55e] hover:text-[#6b7280]' : 'text-[#6b7280] hover:text-[#22c55e]'}`}
                   >
                     <Power className="h-4 w-4" />
@@ -256,21 +260,21 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
                         onClick={() => { void handleDelete(emp.id); setConfirmDeleteId(null); }}
                         className="text-[10px] bg-[#ef4444] text-white px-2 py-0.5 rounded-md"
                       >
-                        Sí, borrar
+                        {t("confirmDeleteYes", language)}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(null)}
                         className="text-[10px] text-[#6b7280] px-1"
                       >
-                        No
+                        {t("noLabel", language)}
                       </button>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(emp.id)}
-                      title="Eliminar"
+                      title={t("delete", language)}
                       className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#ef4444] transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />

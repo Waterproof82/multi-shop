@@ -417,7 +417,8 @@ WAITER_PIN_PEPPER=
 |-----------|-----------|
 | [`docs/context/security.md`](docs/context/security.md) | Medidas de seguridad detalladas |
 | [`docs/context/testing-ci.md`](docs/context/testing-ci.md) | Suites de test, Husky hooks, workflows de CI |
-| [`docs/context/bbdd.md`](docs/context/bbdd.md) | Esquema completo de base de datos |
+| [`supabase/migrations/`](supabase/migrations/) | Esquema de base de datos (fuente de verdad: las migraciones) |
+| [`docs/context/superadmin.md`](docs/context/superadmin.md) | Panel superadmin y cambio de tenant |
 | [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) | Checklist legal TPV (Ley Antifraude, VeriFactu, RGPD, PCI-DSS) |
 | [`docs/context/legal-compliance.md`](docs/context/legal-compliance.md) | Registro de leyes y normativas |
 | [`docs/context/laborcontrol.md`](docs/context/laborcontrol.md) | LaborControl: arquitectura, API, cadena SHA-256, offline |

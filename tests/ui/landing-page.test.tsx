@@ -40,6 +40,8 @@ const baseEmpresa: EmpresaPublic = {
   pagosPickupHabilitados: false,
   deliveryHabilitado: false,
   envioDomicilioHabilitado: false,
+  landingHabilitada: true,
+  googleReviewsUrl: null,
 };
 
 function seccion(overrides: Partial<LandingSeccion> & Pick<LandingSeccion, 'id' | 'tipo'>): LandingSeccion {
@@ -152,12 +154,13 @@ describe('LandingPage', () => {
     expect(within(heading).getByText('de verdad').tagName).toBe('EM');
   });
 
-  it('con teléfono muestra los accesos a WhatsApp (hero, franja, visítanos y botón flotante)', () => {
+  // 'Síguenos' ya no incluye WhatsApp (10f92040): quedan 3 accesos.
+  it('con teléfono muestra los accesos a WhatsApp', () => {
     renderLanding([seccion({ id: 's-visit', tipo: 'visitanos' })], { telefono: '+34 600 11 22 33' });
     const enlaces = screen
       .getAllByRole('link')
       .filter((a) => a.getAttribute('href') === 'https://wa.me/34600112233');
-    expect(enlaces.length).toBeGreaterThanOrEqual(4);
+    expect(enlaces.length).toBeGreaterThanOrEqual(3);
   });
 
   it('sin teléfono no pinta ningún enlace de WhatsApp', () => {
@@ -176,6 +179,34 @@ describe('LandingPage', () => {
     expect(within(cinta as HTMLElement).getAllByText('Biryani')).toHaveLength(2);
     // 3 palabras (la vacía entre comas se descarta) + 3 separadores, por 2 copias
     expect(cinta?.children).toHaveLength(12);
+  });
+
+  it('la cinta en modo imágenes pinta las imágenes (dos copias) y no las palabras', () => {
+    const { container } = renderLanding([
+      seccion({
+        id: 's-hero',
+        tipo: 'hero',
+        contenido: {
+          marquee: { es: 'Tandoori, Biryani' },
+          marqueeModo: 'imagenes',
+          marqueeImagenes: ['https://cdn.example.com/a.webp', '', 'https://cdn.example.com/b.webp'],
+        },
+      }),
+    ]);
+    const cinta = container.querySelector('.animate-landing-marquee') as HTMLElement;
+    expect(cinta).not.toBeNull();
+    // 2 imágenes (la vacía se descarta) por 2 copias; decorativas → alt vacío
+    const imgs = cinta.querySelectorAll('img');
+    expect(imgs).toHaveLength(4);
+    expect(imgs[0]).toHaveAttribute('alt', '');
+    expect(within(cinta).queryByText('Biryani')).toBeNull();
+  });
+
+  it('la cinta en modo imágenes sin imágenes no se pinta', () => {
+    const { container } = renderLanding([
+      seccion({ id: 's-hero', tipo: 'hero', contenido: { marquee: { es: 'Naan' }, marqueeModo: 'imagenes' } }),
+    ]);
+    expect(container.querySelector('.animate-landing-marquee')).toBeNull();
   });
 
   it('usa el mismo pie de página que la carta (SiteFooter)', () => {

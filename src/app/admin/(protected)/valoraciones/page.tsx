@@ -60,9 +60,9 @@ export default function ValoracionesPage() {
         if (!r.ok) throw new Error(json?.error ?? `Error ${r.status}`);
         setData(json as ValoracionData);
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error al cargar valoraciones'))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : t("errLoadValoraciones", language)))
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, language]);
 
   return (
     <div className="p-6 max-w-4xl">
@@ -71,7 +71,7 @@ export default function ValoracionesPage() {
       </h1>
 
       {loading && !data && (
-        <p className="text-slate-400">Cargando...</p>
+        <p className="text-slate-400">{t("loading", language)}</p>
       )}
 
       {error && (
@@ -120,9 +120,9 @@ export default function ValoracionesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left text-slate-400 px-4 py-3 font-medium">Fecha</th>
-                    <th className="text-left text-slate-400 px-4 py-3 font-medium">Mesa</th>
-                    <th className="text-left text-slate-400 px-4 py-3 font-medium">Estrellas</th>
+                    <th className="text-left text-slate-400 px-4 py-3 font-medium">{t("date", language)}</th>
+                    <th className="text-left text-slate-400 px-4 py-3 font-medium">{t("mesaLabel", language)}</th>
+                    <th className="text-left text-slate-400 px-4 py-3 font-medium">{t("ratingsStars", language)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -149,14 +149,14 @@ export default function ValoracionesPage() {
               onClick={() => setPage(p => p - 1)}
               className="px-4 py-2 rounded-lg bg-slate-700 text-white text-sm disabled:opacity-40 hover:bg-slate-600 transition-colors"
             >
-              Anterior
+              {t("previousLabel", language)}
             </button>
             <button type="button"
               disabled={data.list.length < 20}
               onClick={() => setPage(p => p + 1)}
               className="px-4 py-2 rounded-lg bg-slate-700 text-white text-sm disabled:opacity-40 hover:bg-slate-600 transition-colors"
             >
-              Siguiente
+              {t("nextLabel", language)}
             </button>
           </div>
         </>

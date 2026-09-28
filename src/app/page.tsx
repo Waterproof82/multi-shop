@@ -61,7 +61,8 @@ export default async function Home({ searchParams }: Readonly<HomeProps>) {
     isPedidosSubdomain: isPedidos,
   });
 
-  if (bypass) {
+  // Si landing no está habilitada, bypass directo a carta
+  if (bypass || !empresa.landingHabilitada) {
     return <CartaRoute searchParams={searchParams} />;
   }
 

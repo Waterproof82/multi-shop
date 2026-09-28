@@ -8,6 +8,8 @@ import { useAdmin } from '@/lib/admin-context';
 import { logClientError } from '@/lib/client-error';
 import { Input } from '@/components/ui/input';
 import { formatPrice } from '@/lib/format-price';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,7 @@ function buildQrUrl(mesaId: string): string {
 }
 
 export default function MesasPage() {
+  const { language } = useLanguage();
   const { empresaId, overrideEmpresaId, mesasHabilitadas } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const router = useRouter();
@@ -89,7 +92,7 @@ export default function MesasPage() {
     setAddError('');
     const num = parseInt(numero, 10);
     if (isNaN(num) || num < 1 || num > 999) {
-      setAddError('El número de mesa debe estar entre 1 y 999');
+      setAddError(t("errMesaNumeroRange", language));
       return;
     }
     setAdding(true);
@@ -104,11 +107,11 @@ export default function MesasPage() {
         setNumero('');
         setNombre('');
       } else {
-        setAddError('Error al crear la mesa');
+        setAddError(t("errCreateMesa", language));
       }
     } catch (e) {
       logClientError(e, 'addMesa');
-      setAddError('Error al crear la mesa');
+      setAddError(t("errCreateMesa", language));
     } finally {
       setAdding(false);
     }
@@ -161,11 +164,11 @@ export default function MesasPage() {
     setPinError('');
     setPinSuccess(false);
     if (!/^\d{4,8}$/.test(pin)) {
-      setPinError('El PIN debe tener entre 4 y 8 dígitos numéricos');
+      setPinError(t("errPinLength", language));
       return;
     }
     if (pin !== pinConfirm) {
-      setPinError('Los PINs no coinciden');
+      setPinError(t("errPinMismatch", language));
       return;
     }
     setSavingPin(true);
@@ -180,11 +183,11 @@ export default function MesasPage() {
         setPinConfirm('');
         setTimeout(() => setPinSuccess(false), 3000);
       } else {
-        setPinError('Error al guardar el PIN');
+        setPinError(t("errSavePin", language));
       }
     } catch (e) {
       logClientError(e, 'savePin');
-      setPinError('Error al guardar el PIN');
+      setPinError(t("errSavePin", language));
     } finally {
       setSavingPin(false);
     }
@@ -207,8 +210,8 @@ export default function MesasPage() {
             <UtensilsCrossed className="w-6 h-6 text-amber-300" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Mesas</h1>
-            <p className="text-slate-300 text-sm mt-1">Gestiona las mesas, su estado y el PIN del camarero</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">{t("sidebarMesas", language)}</h1>
+            <p className="text-slate-300 text-sm mt-1">{t("adminMesasSubtitle", language)}</p>
           </div>
         </div>
       </div>
@@ -218,42 +221,42 @@ export default function MesasPage() {
         <div className="p-6 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <QrCode className="w-5 h-5 text-cyan-300" />
-            Mesas disponibles
+            {t("adminMesasAvailable", language)}
           </h2>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-slate-400">Cargando...</div>
+          <div className="p-8 text-center text-slate-400">{t("loading", language)}</div>
         ) : mesas.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">No hay mesas configuradas</div>
+          <div className="p-8 text-center text-slate-400">{t("adminMesasEmpty", language)}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Nombre</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Pedidos activos</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Total sesión</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">URL QR</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("nameLabel", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("status", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("adminMesasActiveOrders", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("adminMesasSessionTotal", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("adminMesasQrUrl", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("actions", language)}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {mesas.map(mesa => (
                   <tr key={mesa.id} className="hover:bg-muted/50">
                     <td className="px-4 py-3 font-medium text-foreground">{mesa.numero}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{mesa.nombre ?? <span className="italic text-slate-500">Sin nombre</span>}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{mesa.nombre ?? <span className="italic text-slate-500">{t("adminMesasNoName", language)}</span>}</td>
                     <td className="px-4 py-3">
                       {mesa.sesionId ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Ocupada
+                          {t("adminMesasOccupied", language)}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-500/20 text-slate-400 border border-slate-500/30">
-                          Libre
+                          {t("adminMesasFree", language)}
                         </span>
                       )}
                     </td>
@@ -278,7 +281,7 @@ export default function MesasPage() {
                         <button type="button"
                           onClick={() => handleCopy(mesa.id)}
                           className="p-1.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                          aria-label="Copiar URL"
+                          aria-label={t("adminMesasCopyUrl", language)}
                         >
                           {copiedId === mesa.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                         </button>
@@ -290,8 +293,8 @@ export default function MesasPage() {
                           <button type="button"
                             onClick={() => setCloseConfirm({ show: true, mesa })}
                             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-amber-400 hover:bg-amber-500/10 rounded-sm"
-                            aria-label={`Cerrar sesión de mesa ${mesa.numero}`}
-                            title="Cerrar mesa (nueva cuenta)"
+                            aria-label={t("adminMesasCloseSessionAria", language).replace("{numero}", String(mesa.numero))}
+                            title={t("adminMesasCloseTitle", language)}
                           >
                             <XCircle className="w-4 h-4" />
                           </button>
@@ -316,11 +319,11 @@ export default function MesasPage() {
         <div className="p-6 border-t border-white/10">
           <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
             <Plus className="w-4 h-4" />
-            Añadir mesa
+            {t("adminMesasAdd", language)}
           </h3>
           <form onSubmit={handleAdd} className="flex flex-wrap gap-3 items-end">
             <div>
-              <label htmlFor="numero" className="block text-xs text-slate-400 mb-1">Número *</label>
+              <label htmlFor="numero" className="block text-xs text-slate-400 mb-1">{t("adminMesasNumber", language)}</label>
               <Input
                 id="numero"
                 type="number"
@@ -334,14 +337,14 @@ export default function MesasPage() {
               />
             </div>
             <div>
-              <label htmlFor="nombre" className="block text-xs text-slate-400 mb-1">Nombre (opcional)</label>
+              <label htmlFor="nombre" className="block text-xs text-slate-400 mb-1">{t("adminMesasNameOptional", language)}</label>
               <Input
                 id="nombre"
                 type="text"
                 maxLength={100}
                 value={nombre}
                 onChange={e => setNombre(e.target.value)}
-                placeholder="Terraza 1"
+                placeholder={t("adminMesasNamePlaceholder", language)}
                 className="w-48 bg-white/5 border-white/20 text-white placeholder:text-slate-500"
               />
             </div>
@@ -351,7 +354,7 @@ export default function MesasPage() {
               className="flex items-center gap-2 px-4 py-2 min-h-[40px] bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              {adding ? 'Añadiendo...' : 'Añadir mesa'}
+              {adding ? t("adminMesasAdding", language) : t("adminMesasAdd", language)}
             </button>
           </form>
           {addError && <p className="text-destructive text-sm mt-2">{addError}</p>}
@@ -363,16 +366,16 @@ export default function MesasPage() {
         <div className="p-6 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-amber-300" />
-            PIN del camarero
+            {t("adminMesasWaiterPin", language)}
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            El camarero usa este PIN para acceder al panel de sala en <code className="text-cyan-300">/waiter</code>
+            {t("adminMesasWaiterPinHelp", language)} <code className="text-cyan-300">/waiter</code>
           </p>
         </div>
         <div className="p-6">
           <form onSubmit={handleSavePin} className="flex flex-wrap gap-3 items-end max-w-sm">
             <div className="w-full">
-              <label htmlFor="pin" className="block text-xs text-slate-400 mb-1">Nuevo PIN (4–8 dígitos)</label>
+              <label htmlFor="pin" className="block text-xs text-slate-400 mb-1">{t("adminMesasNewPin", language)}</label>
               <Input
                 id="pin"
                 type="password"
@@ -386,7 +389,7 @@ export default function MesasPage() {
               />
             </div>
             <div className="w-full">
-              <label htmlFor="pinConfirm" className="block text-xs text-slate-400 mb-1">Confirmar PIN</label>
+              <label htmlFor="pinConfirm" className="block text-xs text-slate-400 mb-1">{t("adminMesasConfirmPin", language)}</label>
               <Input
                 id="pinConfirm"
                 type="password"
@@ -405,11 +408,11 @@ export default function MesasPage() {
               className="flex items-center gap-2 px-4 py-2 min-h-[40px] bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <KeyRound className="w-4 h-4" />
-              {savingPin ? 'Guardando...' : 'Guardar PIN'}
+              {savingPin ? t("savingProgress", language) : t("adminMesasSavePin", language)}
             </button>
             {pinSuccess && (
               <p className="w-full flex items-center gap-1.5 text-emerald-400 text-sm">
-                <Check className="w-4 h-4" /> PIN guardado correctamente
+                <Check className="w-4 h-4" /> {t("adminMesasPinSaved", language)}
               </p>
             )}
             {pinError && <p className="w-full text-destructive text-sm">{pinError}</p>}
@@ -425,11 +428,11 @@ export default function MesasPage() {
               <div className="p-2 bg-amber-500/10 rounded-full">
                 <XCircle className="w-5 h-5 text-amber-400" />
               </div>
-              Cerrar mesa {closeConfirm.mesa?.numero}
+              {t("adminMesasClose", language)} {closeConfirm.mesa?.numero}
             </DialogTitle>
             <DialogDescription>
-              Esto cerrará la sesión activa. El próximo cliente comenzará una cuenta nueva.
-              {closeConfirm.mesa?.sessionTotal ? ` Total de la sesión: ${formatPrice(closeConfirm.mesa.sessionTotal)}.` : ''}
+              {t("adminMesasCloseDesc", language)}
+              {closeConfirm.mesa?.sessionTotal ? ` ${t("adminMesasSessionTotalLine", language).replace("{total}", formatPrice(closeConfirm.mesa.sessionTotal))}` : ''}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3 justify-end">
@@ -438,14 +441,14 @@ export default function MesasPage() {
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
               disabled={closing}
             >
-              Cancelar
+              {t("cancel", language)}
             </button>
             <button type="button"
               onClick={confirmCloseSession}
               disabled={closing}
               className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-500 rounded-lg disabled:opacity-50"
             >
-              {closing ? 'Cerrando...' : 'Cerrar mesa'}
+              {closing ? t("closingProgress", language) : t("adminMesasClose", language)}
             </button>
           </div>
         </DialogContent>
@@ -459,10 +462,10 @@ export default function MesasPage() {
               <div className="p-2 bg-destructive/10 rounded-full">
                 <AlertTriangle className="w-5 h-5 text-destructive" />
               </div>
-              Eliminar mesa {deleteConfirm.numero}
+              {t("adminMesasDelete", language)} {deleteConfirm.numero}
             </DialogTitle>
             <DialogDescription>
-              Esta acción eliminará la mesa permanentemente. Los pedidos asociados no se eliminarán.
+              {t("adminMesasDeleteDesc", language)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3 justify-end">
@@ -471,14 +474,14 @@ export default function MesasPage() {
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
               disabled={deleting}
             >
-              Cancelar
+              {t("cancel", language)}
             </button>
             <button type="button"
               onClick={confirmDelete}
               disabled={deleting}
               className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg disabled:opacity-50"
             >
-              {deleting ? 'Eliminando...' : 'Eliminar'}
+              {deleting ? t("deletingProgress", language) : t("delete", language)}
             </button>
           </div>
         </DialogContent>

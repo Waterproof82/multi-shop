@@ -18,6 +18,12 @@ interface CategoryNavProps {
   isWaiterMode?: boolean
 }
 
+// Pestana activa: subrayado en el color del tenant, no pastilla rellena.
+function claseCategoria(activa: boolean): string {
+  if (activa) return "border-primary text-foreground"
+  return "border-transparent text-muted-foreground hover:text-foreground"
+}
+
 export function CategoryNav(props: Readonly<CategoryNavProps>) {
   const { categories, showTabs, tab, onTabChange, isWaiterMode } = props;
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "")
@@ -176,33 +182,33 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
     <>
       <nav
         ref={navRef}
-        className="sticky top-16 z-40 w-full overflow-x-auto border-b border-border bg-background/95 backdrop-blur-sm md:top-20 lg:top-20 [-webkit-overflow-scrolling:touch]"
+        className="sticky top-16 z-40 w-full overflow-x-auto border-b border-foreground/10 bg-background md:top-20 lg:top-20 [-webkit-overflow-scrolling:touch]"
         style={{ scrollMarginTop: 'var(--scroll-offset, 4rem)' }}
         aria-label={t("menuCategories", language)}
       >
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="flex flex-nowrap gap-1 py-2 items-center min-w-max">
+        <div className="mx-auto max-w-7xl px-[clamp(16px,4vw,64px)]">
+          <div className="flex min-w-max flex-nowrap items-stretch gap-1">
             {showTabs && onTabChange && (
               <>
                 {tab === 'bebidas' && (
                   <button
                     type="button"
                     onClick={() => onTabChange('comida')}
-                    className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                    className="whitespace-nowrap px-3 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]"
                   >
-                    🍳 {t("filterFood", language)}
+                    {t("filterFood", language)}
                   </button>
                 )}
                 {tab === 'comida' && (
                   <button
                     type="button"
                     onClick={() => onTabChange('bebidas')}
-                    className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                    className="whitespace-nowrap px-3 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]"
                   >
-                    🥤 {t("filterDrinks", language)}
+                    {t("filterDrinks", language)}
                   </button>
                 )}
-                <span className="h-5 w-px bg-border mx-1 shrink-0" aria-hidden />
+                <span className="mx-1 h-5 w-px shrink-0 self-center bg-foreground/15" aria-hidden />
               </>
             )}
             {categories.map((cat) => {
@@ -214,11 +220,10 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                   type="button"
                   aria-haspopup={conSubcategorias ? "dialog" : undefined}
                   onClick={(e) => conSubcategorias ? openSubcategoryDialog(cat.id, e) : scrollTo(cat.id)}
+                  aria-current={activeId === cat.id ? "true" : undefined}
                   className={cn(
-                    "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]",
-                    activeId === cat.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                    "min-h-[48px] min-w-[44px] whitespace-nowrap border-b-2 px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                    claseCategoria(activeId === cat.id)
                   )}
                 >
                   {catLabel(cat)}
@@ -234,32 +239,31 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
         open={subcatDialogFor !== null}
         onOpenChange={(open) => { if (!open) setSubcatDialogFor(null) }}
       >
-        <DialogContent style={{ transformOrigin: dialogOrigin }} className="sm:max-w-sm">
+        <DialogContent style={{ transformOrigin: dialogOrigin }} className="gap-0 rounded-[3px] p-0 shadow-none sm:max-w-sm">
           {activeDialogCategory && (
             <>
-              <DialogHeader>
-                <DialogTitle>{catLabel(activeDialogCategory)}</DialogTitle>
+              <DialogHeader className="border-b border-foreground/10 px-6 pb-4 pt-6 text-left">
+                <DialogTitle className="font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] pr-8">{catLabel(activeDialogCategory)}</DialogTitle>
                 <DialogDescription className="sr-only">{t("chooseSubcategory", language)}</DialogDescription>
               </DialogHeader>
-              <ul className="max-h-72 overflow-y-auto -mx-1">
-                <li className="border-b border-border">
+              <ul className="max-h-80 overflow-y-auto px-2 py-2">
+                <li className="border-b border-foreground/10">
                   <button
                     type="button"
                     onClick={() => pickAndClose(activeDialogCategory.id, activeDialogCategory.id)}
-                    className="w-full flex items-center gap-2 text-left px-3 py-3 rounded-md text-sm font-semibold text-primary hover:bg-primary/10"
+                    className="flex min-h-[48px] w-full items-center gap-2 px-4 text-left text-sm font-semibold text-foreground underline decoration-primary decoration-1 underline-offset-[6px] outline-none hover:decoration-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {t("viewAllCollection", language)}
                   </button>
                 </li>
                 {subcategoriasConProductos(activeDialogCategory).map((subcat) => (
-                  <li key={subcat.id}>
+                  <li key={subcat.id} className="border-b border-foreground/10 last:border-0">
                     <button
                       type="button"
                       onClick={() => pickAndClose(subcat.id, activeDialogCategory.id)}
-                      className="w-full flex items-center gap-2 text-left px-3 py-3 rounded-md text-sm hover:bg-secondary"
+                      className="flex min-h-[48px] w-full items-center px-4 text-left font-serif text-lg font-normal text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
-                      <span aria-hidden="true">▸</span>
                       {(language !== "es" && subcat.translations?.[language]?.name) || subcat.nombre}
                     </button>
                   </li>
