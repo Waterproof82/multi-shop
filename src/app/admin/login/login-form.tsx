@@ -11,6 +11,7 @@ import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
 function TpvPinCard() {
+  const { language } = useLanguage();
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +30,7 @@ function TpvPinCard() {
 
     if (!res.ok) {
       setLoading(false);
-      setError('PIN incorrecto');
+      setError(t("waiterLoginError", language));
       setPin('');
       return;
     }
@@ -49,8 +50,8 @@ function TpvPinCard() {
     <div className="max-w-md w-full bg-[#1a1d27] border border-[#2e3347] rounded-lg p-8">
       <div className="text-center mb-6">
         <span className="inline-block text-xs font-bold text-[#4f72ff] uppercase tracking-widest mb-2">TPV</span>
-        <h2 className="text-lg font-semibold text-[#e8eaf0]">Acceso de empleado</h2>
-        <p className="text-sm text-[#6b7280] mt-1">Introduce tu PIN para acceder al TPV</p>
+        <h2 className="text-lg font-semibold text-[#e8eaf0]">{t("tpvEmployeeAccess", language)}</h2>
+        <p className="text-sm text-[#6b7280] mt-1">{t("tpvEmployeeAccessHint", language)}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -65,7 +66,7 @@ function TpvPinCard() {
           autoComplete="one-time-code"
           value={pin}
           onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-          placeholder="PIN (4-8 dígitos)"
+          placeholder={t("pinPlaceholder", language)}
           style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
           className="w-full bg-[#22263a] border border-[#2e3347] rounded-md px-4 py-3 text-xl font-bold text-center tracking-widest text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-[#6b7280]"
         />
@@ -77,10 +78,10 @@ function TpvPinCard() {
           {loading ? (
             <>
               <Loader2 className="animate-spin h-4 w-4" />
-              Verificando...
+              {t("verifyingProgress", language)}
             </>
           ) : (
-            'Entrar al TPV'
+            t("tpvEnterButton", language)
           )}
         </button>
       </form>
@@ -196,7 +197,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               autoComplete="email"
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
-              placeholder="admin@tuempresa.com"
+              placeholder={t("adminEmailPlaceholder", language)}
               className="mt-1"
             />
           </div>
@@ -238,7 +239,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
         {searchParams.get('from') === 'tpv' ? (
           <div className="mt-6 text-center">
             <a href="/tpv/mostrador" className="text-sm text-primary hover:underline">
-              ← Volver al TPV
+              {t("backToTpv", language)}
             </a>
           </div>
         ) : !searchParams.get('next')?.startsWith('/admin') && !searchParams.get('next')?.startsWith('/tpv') && (

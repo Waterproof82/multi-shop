@@ -4,10 +4,12 @@ import { TranslatableField, type TranslatableTextValue } from "@/components/admi
 import { ListaImagenesCampo } from "@/components/admin/landing/lista-imagenes-campo";
 import { ADMIN_LABEL_CLASS as LABEL_CLASS } from "@/components/admin/admin-styles";
 import type { MarqueeModo } from "@/components/landing/marquee";
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
-const MODOS: { modo: MarqueeModo; label: string }[] = [
-  { modo: "palabras", label: "Palabras" },
-  { modo: "imagenes", label: "Iconos / imágenes" },
+const MODOS: { modo: MarqueeModo; labelKey: Parameters<typeof t>[0] }[] = [
+  { modo: "palabras", labelKey: "cintaWords" },
+  { modo: "imagenes", labelKey: "cintaIcons" },
 ];
 
 function modoClass(activo: boolean): string {
@@ -24,6 +26,7 @@ interface CintaCampoProps {
 // Cinta animada del hero: el admin elige si corre texto o iconos/imágenes.
 // Se guardan ambos valores, así cambiar de modo no pierde lo ya cargado.
 export function CintaCampo({ label, contenido, onChange }: Readonly<CintaCampoProps>) {
+  const { language } = useLanguage();
   const modo: MarqueeModo = contenido.marqueeModo === "imagenes" ? "imagenes" : "palabras";
   const imagenes = (contenido.marqueeImagenes as string[] | undefined) ?? [];
 
@@ -39,20 +42,20 @@ export function CintaCampo({ label, contenido, onChange }: Readonly<CintaCampoPr
             onClick={() => onChange("marqueeModo", opcion.modo)}
             className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-medium ${modoClass(modo === opcion.modo)}`}
           >
-            {opcion.label}
+            {t(opcion.labelKey, language)}
           </button>
         ))}
       </div>
 
       {modo === "palabras" ? (
         <TranslatableField
-          label="Palabras separadas por comas"
+          label={t("cintaWordsLabel", language)}
           value={contenido.marquee as TranslatableTextValue | undefined}
           onChange={(next) => onChange("marquee", next)}
         />
       ) : (
         <ListaImagenesCampo
-          label="Icono / imagen"
+          label={t("cintaIconLabel", language)}
           imagenes={imagenes}
           onChange={(next) => onChange("marqueeImagenes", next)}
         />

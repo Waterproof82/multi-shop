@@ -61,7 +61,7 @@ export default function OcupacionPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
           {t('sidebarAnalyticsOcupacion', language)}
         </h1>
-        <p className="text-slate-300 text-sm mt-1">Ocupación de mesas por día y hora</p>
+        <p className="text-slate-300 text-sm mt-1">{t("analyticsOcupacionTitle", language)}</p>
       </div>
 
       <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl flex flex-wrap gap-4 items-center">
@@ -76,14 +76,14 @@ export default function OcupacionPage() {
             onClick={() => setMetric('count')}
             className={metricBtnClass(metric === 'count')}
           >
-            Sesiones
+            {t("analyticsSesiones", language)}
           </button>
           <button
             type="button"
             onClick={() => setMetric('duration')}
             className={metricBtnClass(metric === 'duration')}
           >
-            Duración (min)
+            {t("analyticsDuracionMin", language)}
           </button>
         </div>
       </div>

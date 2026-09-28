@@ -81,7 +81,7 @@ export default function MovimientosPage() {
     try {
       const qs = buildQueryString(currentPage, LIMIT, currentFilters);
       const res = await fetch(`/api/admin/stock/movimientos?${qs}`);
-      if (!res.ok) throw new Error('Error al cargar movimientos');
+      if (!res.ok) throw new Error(t("errLoadMovimientos", language));
       const result = await res.json();
       setData(result);
     } catch (err) {
@@ -89,7 +89,7 @@ export default function MovimientosPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   const fetchIngredientes = useCallback(async () => {
     try {
@@ -156,7 +156,7 @@ export default function MovimientosPage() {
               className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors cursor-pointer"
               aria-label={t('stockFiltrarIngrediente', language)}
             >
-              <option value="">Todos</option>
+              <option value="">{t("allLabel", language)}</option>
               {ingredientes.map((ing) => (
                 <option key={ing.id} value={ing.id}>{ing.nombre}</option>
               ))}
@@ -174,7 +174,7 @@ export default function MovimientosPage() {
               className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors cursor-pointer"
               aria-label={t('stockFiltrarTipo', language)}
             >
-              <option value="">Todos</option>
+              <option value="">{t("allLabel", language)}</option>
               {TIPOS.map((tipo) => (
                 <option key={tipo} value={tipo}>{tipo}</option>
               ))}
@@ -305,7 +305,7 @@ export default function MovimientosPage() {
             {/* Pagination */}
             <div className="p-4 border-t border-white/10 flex items-center justify-between">
               <span className="text-sm text-slate-400">
-                {data ? `${(page - 1) * LIMIT + 1}–${Math.min(page * LIMIT, data.total)} de ${data.total}` : ''}
+                {data ? `${(page - 1) * LIMIT + 1}–${Math.min(page * LIMIT, data.total)} ${t('auditLogOf', language)} ${data.total}` : ''}
               </span>
               <div className="flex items-center gap-2">
                 <Button

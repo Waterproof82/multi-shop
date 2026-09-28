@@ -7,8 +7,11 @@ import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 export default function ComplementosPage() {
+  const { language } = useLanguage();
   const { empresaId } = useAdmin();
   const [grupos, setGrupos] = useState<ComplementoGrupo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +79,7 @@ export default function ComplementosPage() {
 
   async function handleDeleteGrupo() {
     if (!selectedGrupoId) return;
-    if (!confirm('¿Eliminar este grupo y todas sus opciones?')) return;
+    if (!confirm(t("complementosDeleteGroupConfirm", language))) return;
     const res = await fetchWithCsrf(`/api/admin/complementos/grupos/${selectedGrupoId}`, { method: 'DELETE' });
     if (res.ok) {
       setGrupos(prev => prev.filter(g => g.id !== selectedGrupoId));
@@ -128,14 +131,14 @@ export default function ComplementosPage() {
         {/* Left panel — group list */}
         <div className="w-72 flex-shrink-0 border-r border-white/10 flex flex-col bg-slate-900/50">
           <div className="p-4 border-b border-white/10">
-            <h1 className="text-white font-semibold text-lg mb-3">Complementos</h1>
+            <h1 className="text-white font-semibold text-lg mb-3">{t("complements", language)}</h1>
             <Button
               onClick={() => void handleNuevoGrupo()}
               className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
               size="sm"
             >
               <Plus className="w-4 h-4" />
-              Nuevo grupo
+              {t("complementosNewGroup", language)}
             </Button>
           </div>
 
@@ -143,8 +146,8 @@ export default function ComplementosPage() {
             {grupos.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
                 <ListChecks className="w-8 h-8 text-slate-500" />
-                <p className="text-sm text-slate-400">Sin grupos creados</p>
-                <p className="text-xs text-slate-500">Crea un grupo para empezar</p>
+                <p className="text-sm text-slate-400">{t("complementosNoGroups", language)}</p>
+                <p className="text-xs text-slate-500">{t("complementosNoGroupsHint", language)}</p>
               </div>
             )}
             {grupos.map(grupo => {
@@ -164,14 +167,14 @@ export default function ComplementosPage() {
                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-300">
                       {grupo.tipo === 'radio' ? <ToggleLeft className="w-3 h-3" /> : <ToggleRight className="w-3 h-3" />}
-                      {grupo.tipo === 'radio' ? 'Elige 1' : 'Múltiple'}
+                      {grupo.tipo === 'radio' ? t("complementosPickOne", language) : t("complementosMultiple", language)}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       grupo.obligatorio
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-400/20'
                         : 'bg-white/10 text-slate-400'
                     }`}>
-                      {grupo.obligatorio ? 'Obligatorio' : 'Opcional'}
+                      {grupo.obligatorio ? t("complementosRequired", language) : t("complementosOptional", language)}
                     </span>
                     <span className="text-xs text-slate-500">{grupo.opciones.length} opc.</span>
                   </div>
@@ -187,21 +190,21 @@ export default function ComplementosPage() {
             <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
               <ListChecks className="w-7 h-7 text-slate-500" />
             </div>
-            <p className="text-slate-300 font-medium">Selecciona un grupo</p>
-            <p className="text-sm text-slate-500">Elige uno de la lista para editarlo</p>
+            <p className="text-slate-300 font-medium">{t("complementosSelectGroup", language)}</p>
+            <p className="text-sm text-slate-500">{t("complementosSelectGroupHint", language)}</p>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
             {/* Header */}
             <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5">
-              <h2 className="text-white font-semibold text-base mb-4">Detalles del grupo</h2>
+              <h2 className="text-white font-semibold text-base mb-4">{t("complementosGroupDetails", language)}</h2>
 
               <div className="space-y-4 max-w-lg">
                 {/* Name */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-400 uppercase tracking-wider" htmlFor="edit-nombre">
-                    Nombre
+                    {t("nameLabel", language)}
                   </label>
                   <Input
                     id="edit-nombre"
@@ -215,7 +218,7 @@ export default function ComplementosPage() {
 
                 {/* Type toggle */}
                 <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Tipo de selección</span>
+                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("complementosSelectionType", language)}</span>
                   <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
                     {(['radio', 'checkbox'] as const).map(tipo => (
                       <button
@@ -229,7 +232,7 @@ export default function ComplementosPage() {
                         }`}
                       >
                         {tipo === 'radio' ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
-                        {tipo === 'radio' ? 'Elige 1' : 'Múltiple'}
+                        {tipo === 'radio' ? t("complementosPickOne", language) : t("complementosMultiple", language)}
                       </button>
                     ))}
                   </div>
@@ -248,7 +251,7 @@ export default function ComplementosPage() {
                   <div className={`w-8 h-4 rounded-full transition-colors relative ${editObligatorio ? 'bg-amber-400' : 'bg-slate-600'}`}>
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${editObligatorio ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
-                  Selección obligatoria
+                  {t("complementosRequiredSelection", language)}
                 </button>
 
                 {/* Actions */}
@@ -260,7 +263,7 @@ export default function ComplementosPage() {
                     className="gap-2"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    {saving ? 'Guardando...' : 'Guardar cambios'}
+                    {saving ? t("savingProgress", language) : t("saveChanges", language)}
                   </Button>
                   <Button
                     type="button"
@@ -270,7 +273,7 @@ export default function ComplementosPage() {
                     className="gap-2 border-red-400/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 bg-transparent"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Eliminar grupo
+                    {t("complementosDeleteGroup", language)}
                   </Button>
                 </div>
               </div>
@@ -280,7 +283,7 @@ export default function ComplementosPage() {
             <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Tag className="w-4 h-4 text-slate-400" />
-                <h2 className="text-white font-semibold text-base">Opciones</h2>
+                <h2 className="text-white font-semibold text-base">{t("complementosOptions", language)}</h2>
                 {selectedGrupo.opciones.length > 0 && (
                   <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-400">
                     {selectedGrupo.opciones.length}
@@ -290,7 +293,7 @@ export default function ComplementosPage() {
 
               <div className="max-w-lg space-y-2">
                 {selectedGrupo.opciones.length === 0 && (
-                  <p className="text-sm text-slate-500 py-3 text-center">Sin opciones. Añade una abajo.</p>
+                  <p className="text-sm text-slate-500 py-3 text-center">{t("complementosNoOptions", language)}</p>
                 )}
                 {selectedGrupo.opciones.map(opcion => (
                   <div
@@ -309,7 +312,7 @@ export default function ComplementosPage() {
                       type="button"
                       onClick={() => void handleDeleteOpcion(opcion.id)}
                       className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                      aria-label="Eliminar opción"
+                      aria-label={t("complementosDeleteOption", language)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -323,7 +326,7 @@ export default function ComplementosPage() {
                     value={newOpcionNombre}
                     onChange={e => setNewOpcionNombre(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') void handleAddOpcion(); }}
-                    placeholder="Nombre de la opción"
+                    placeholder={t("complementosOptionName", language)}
                     maxLength={200}
                     className="flex-1 bg-white/5 border-white/15 text-white placeholder:text-slate-500 focus:border-primary h-9 text-sm"
                   />
@@ -343,7 +346,7 @@ export default function ComplementosPage() {
                     className="gap-1.5 h-9 shrink-0"
                   >
                     {addingOpcion ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    Añadir
+                    {t("addAction", language)}
                   </Button>
                 </div>
               </div>

@@ -268,7 +268,7 @@ export default function FoodCostPage() {
                 <tfoot className="border-t border-white/20 bg-white/5">
                   <tr>
                     <td className="px-4 py-3 text-sm font-semibold text-white" colSpan={2}>
-                      Total
+                      {t("total", language)}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-white text-right">
                       {formatCents(totalTeoricoCents)} €

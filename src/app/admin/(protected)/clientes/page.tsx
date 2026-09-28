@@ -216,7 +216,7 @@ export default function ClientesPage() {
   };
 
   const handleAnonimizarCliente = async (cliente: Cliente) => {
-    if (!confirm(`¿Anonimizar a "${cliente.nombre ?? cliente.email}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(t('clientAnonymizeConfirm', language).replace('{nombre}', cliente.nombre ?? cliente.email ?? ''))) return;
     setSaving(true);
     try {
       await fetchWithCsrf(`/api/admin/rgpd/anonimizar-cliente?clienteId=${cliente.id}`, { method: 'POST' });
@@ -440,7 +440,7 @@ export default function ClientesPage() {
                         href={`/api/admin/rgpd/exportar-cliente?clienteId=${cliente.id}`}
                         download
                         className="p-2 hover:bg-blue-500/10 rounded-lg transition-colors inline-flex items-center justify-center min-h-[44px] min-w-[44px]"
-                        title="Exportar datos RGPD (Art.20)"
+                        title={t("clientExportGdpr", language)}
                       >
                         <Download className="size-4 text-blue-500" />
                       </a>
@@ -450,7 +450,7 @@ export default function ClientesPage() {
                         onClick={() => void handleAnonimizarCliente(cliente)}
                         disabled={!!cliente.anonimizado_en}
                         className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Anonimizar datos personales (RGPD Art.17)"
+                        title={t("clientAnonymizeGdpr", language)}
                       >
                         <UserX className="size-4 text-orange-500" />
                       </button>
@@ -503,7 +503,7 @@ export default function ClientesPage() {
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="email@ejemplo.com"
+                placeholder={t("placeholderEmailExample", language)}
               />
             </div>
             <div>
@@ -590,7 +590,7 @@ export default function ClientesPage() {
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="email@ejemplo.com"
+                placeholder={t("placeholderEmailExample", language)}
               />
             </div>
             <div>

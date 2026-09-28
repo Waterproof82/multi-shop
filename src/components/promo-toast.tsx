@@ -6,11 +6,13 @@ import { X, CheckCircle, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
+type TranslationKey = Parameters<typeof t>[0];
+
 export function PromoToast() {
   const { language } = useLanguage();
   const shouldReduceMotion = useReducedMotion() ?? false;
   const [visible, setVisible] = useState(false);
-  const [message, setMessage] = useState('');
+  const [messageKey, setMessageKey] = useState<TranslationKey | null>(null);
   const [type, setType] = useState<'success' | 'error'>('success');
 
   useEffect(() => {
@@ -21,23 +23,23 @@ export function PromoToast() {
     if (!promoStatus && !error) return;
 
     if (promoStatus === 'on') {
-      setMessage('¡Te has dado de alta en las promociones!');
+      setMessageKey('promoSubscribed');
       setType('success');
       setVisible(true);
     } else if (promoStatus === 'off') {
-      setMessage('¡Te has dado de baja en las promociones!');
+      setMessageKey('promoUnsubscribed');
       setType('success');
       setVisible(true);
     } else if (error === 'notfound') {
-      setMessage('No se encontró tu cuenta. Contacta con la empresa.');
+      setMessageKey('promoErrorNotFound');
       setType('error');
       setVisible(true);
     } else if (error === 'invalid') {
-      setMessage('Enlace inválido.');
+      setMessageKey('promoErrorInvalid');
       setType('error');
       setVisible(true);
     } else if (error === 'internal') {
-      setMessage('Error interno. Intenta de nuevo.');
+      setMessageKey('promoErrorInternal');
       setType('error');
       setVisible(true);
     }
@@ -79,11 +81,11 @@ export function PromoToast() {
           )}
 
           <h3 className="text-lg font-semibold text-foreground mb-2">
-            {type === 'success' ? '¡Listo!' : 'Error'}
+            {t(type === 'success' ? 'promoToastDone' : 'errorIconLabel', language)}
           </h3>
 
           <p className="text-muted-foreground">
-            {message}
+            {messageKey === null ? null : t(messageKey, language)}
           </p>
 
           <button

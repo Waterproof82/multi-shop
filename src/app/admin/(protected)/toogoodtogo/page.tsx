@@ -81,6 +81,11 @@ function createEmptyItem(): TgtgItemForm {
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
+function reservasActivasTitle(total: number, language: Language): string {
+  if (total === 1) return t('tgtgCannotDeleteReservasOne', language);
+  return t('tgtgCannotDeleteReservasMany', language).replace('{count}', String(total));
+}
+
 export default function TooGoodToGoPage() {
   const { language } = useLanguage();
   const { empresaId, overrideEmpresaId } = useAdmin();
@@ -272,7 +277,7 @@ export default function TooGoodToGoPage() {
           setSelectedPromoIds(new Set());
         }
         if (data.emailError) {
-          alert(`Error al enviar emails: ${data.emailError}`);
+          alert(t('tgtgSendEmailsErrorDetail', language).replace('{error}', String(data.emailError)));
         }
       } else {
         const err = await res.json() as { error?: string };
@@ -637,7 +642,7 @@ export default function TooGoodToGoPage() {
                               id={`select-promo-${campaign.id}`}
                               checked={isSelected}
                               onChange={() => handleToggleSelectPromo(campaign.id)}
-                              aria-label={`Seleccionar campaña #${campaignNumber}`}
+                              aria-label={t("tgtgSelectCampaignAria", language).replace("{n}", String(campaignNumber))}
                               className="w-5 h-5 rounded border-border accent-green-600 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-shrink-0"
                             />
                             <div className="flex items-center gap-2">
@@ -685,8 +690,8 @@ export default function TooGoodToGoPage() {
                               const totalReservas = campaign.items.reduce((acc, i) => acc + i.reservasCount, 0);
                               const cannotDelete = totalReservas > 0;
                               const deleteTitle = totalReservas > 0
-                                ? `No se puede eliminar: hay ${totalReservas} reserva${totalReservas > 1 ? 's' : ''} activa${totalReservas > 1 ? 's' : ''}`
-                                : 'Eliminar campaña';
+                                ? reservasActivasTitle(totalReservas, language)
+                                : t("tgtgDeleteCampaign", language);
                               return (
                                 <button type="button"
                                   onClick={() => !cannotDelete && handleDeleteCampaign(campaign.id)}
@@ -721,7 +726,7 @@ export default function TooGoodToGoPage() {
                             <div className="mt-3 rounded-lg border border-border overflow-hidden">
                               {(allReservas[campaign.id] ?? []).length > 0 ? (
                                 <table className="w-full text-sm">
-                                  <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Oferta</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Cliente</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">Precio</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">Fecha</th></tr></thead>
+                                  <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">{t("tgtgOfferLabel", language)}</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">{t("customer", language)}</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">{t("price", language)}</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">{t("date", language)}</th></tr></thead>
                                   <tbody className="divide-y divide-border">
                                     {(allReservas[campaign.id] ?? []).map(r => {
                                       const item = campaign.items.find(i => i.id === r.itemId);
@@ -796,13 +801,13 @@ export default function TooGoodToGoPage() {
                             <span className="text-xs flex items-center gap-1 text-muted-foreground">
                               <Clock className="w-3.5 h-3.5" />{displayInicio} – {displayFin}
                             </span>
-                            <span className="text-xs flex items-center gap-1 text-muted-foreground" title="Emails enviados">
+                            <span className="text-xs flex items-center gap-1 text-muted-foreground" title={t("tgtgEmailsSent", language)}>
                               <Send className="w-3.5 h-3.5" />{campaign.numeroEnvios}
                             </span>
                             <button type="button"
                               disabled
-                              aria-label="No se puede eliminar una campaña ya enviada"
-                              title="No se puede eliminar una campaña ya enviada"
+                              aria-label={t("tgtgCannotDeleteSent", language)}
+                              title={t("tgtgCannotDeleteSent", language)}
                               className="p-1 rounded-md text-destructive opacity-30 cursor-not-allowed min-h-[44px] min-w-[44px] flex items-center justify-center"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -829,7 +834,7 @@ export default function TooGoodToGoPage() {
                             <div className="mt-3 rounded-lg border border-border overflow-hidden">
                               {(allReservas[campaign.id] ?? []).length > 0 ? (
                                 <table className="w-full text-sm">
-                                  <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Oferta</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Cliente</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">Precio</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">Fecha</th></tr></thead>
+                                  <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">{t("tgtgOfferLabel", language)}</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">{t("customer", language)}</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">{t("price", language)}</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">{t("date", language)}</th></tr></thead>
                                   <tbody className="divide-y divide-border">
                                     {(allReservas[campaign.id] ?? []).map(r => {
                                       const item = campaign.items.find(i => i.id === r.itemId);
@@ -947,10 +952,10 @@ export default function TooGoodToGoPage() {
               </div>
               <div>
                 <h2 id="confirm-modal-title" className="text-base font-semibold text-foreground">
-                  Confirmar envío de emails
+                  {t("tgtgConfirmSendTitle", language)}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Una vez enviados, la <strong className="text-foreground">fecha y horario de los emails no podrán modificarse</strong>. Asegúrate de que los datos son correctos antes de continuar.
+                  {t("tgtgConfirmSendIntro", language)} <strong className="text-foreground">{t("tgtgConfirmSendLocked", language)}</strong>{t("tgtgConfirmSendOutro", language)}
                 </p>
               </div>
             </div>
@@ -960,13 +965,13 @@ export default function TooGoodToGoPage() {
               {selectedActiveCampaigns.map(({ campaign }) => (
                 <div key={campaign.id} className="space-y-1.5 pb-3 last:pb-0 border-b last:border-b-0 border-border">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Fecha</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{t("date", language)}</span>
                     <span className="font-medium text-foreground">
                       {new Date(campaign.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Recogida</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{t("tgtgPickupWindow", language)}</span>
                     <span className="font-medium text-foreground">
                       {campaign.horaRecogidaInicio.slice(0, 5)} – {campaign.horaRecogidaFin.slice(0, 5)}
                     </span>
@@ -974,11 +979,11 @@ export default function TooGoodToGoPage() {
                 </div>
               ))}
               <div className="flex items-center justify-between pt-1">
-                <span className="text-muted-foreground flex items-center gap-1.5"><ShoppingBag className="w-3.5 h-3.5" />Total ofertas</span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><ShoppingBag className="w-3.5 h-3.5" />{t("tgtgTotalOffers", language)}</span>
                 <span className="font-medium text-foreground">{totalSelectedItems}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Destinatarios</span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{t("tgtgRecipients", language)}</span>
                 <span className="font-medium text-foreground">{clientesConPromociones.length} clientes</span>
               </div>
             </div>
@@ -991,14 +996,14 @@ export default function TooGoodToGoPage() {
                 className="min-h-[44px]"
               >
                 <X className="w-4 h-4" />
-                Cancelar
+                {t("cancel", language)}
               </Button>
               <Button
                 onClick={handleConfirmSendEmails}
                 className="bg-green-600 hover:bg-green-700 text-white min-h-[44px]"
               >
                 <Send className="w-4 h-4" />
-                Confirmar y enviar
+                {t("tgtgConfirmAndSend", language)}
               </Button>
             </div>
           </div>
@@ -1032,7 +1037,7 @@ function TgtgItemFormCard({
   return (
     <div className="border border-border rounded-lg p-4 space-y-3 relative">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-semibold text-foreground">Oferta {index + 1}</span>
+        <span className="text-sm font-semibold text-foreground">{t("tgtgOfferLabel", language)} {index + 1}</span>
         {canRemove && (
           <button
             type="button"
@@ -1052,7 +1057,7 @@ function TgtgItemFormCard({
           maxLength={200}
           value={item.titulo}
           onChange={e => onFieldChange(index, 'titulo', e.target.value)}
-          placeholder="Ej: Bolsa sorpresa panadería"
+          placeholder={t("tgtgOfferTitlePlaceholder", language)}
           className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
@@ -1064,7 +1069,7 @@ function TgtgItemFormCard({
           maxLength={500}
           value={item.descripcion}
           onChange={e => onFieldChange(index, 'descripcion', e.target.value)}
-          placeholder="Ej: Pan, bollería y repostería del día"
+          placeholder={t("tgtgOfferDescPlaceholder", language)}
           className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
@@ -1112,7 +1117,7 @@ function TgtgItemFormCard({
         <label className="block text-xs font-medium text-muted-foreground mb-1">{t("tgtgItemImage", language)}</label>
         {item.previewUrl ? (
           <div className="relative group rounded-lg overflow-hidden border h-32">
-            <Image src={item.previewUrl} alt="Vista previa" fill className="object-cover" />
+            <Image src={item.previewUrl} alt={t("previewLabel", language)} fill className="object-cover" />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <button type="button" onClick={() => onRemoveImage(index)}
                 className="px-2 py-1 bg-destructive text-destructive-foreground rounded text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
@@ -1189,7 +1194,7 @@ function TgtgItemAdminCard({
               <button type="button"
                 onClick={() => onAdjust(item.id, -1)}
                 disabled={adjusting || item.cuponesDisponibles <= 0}
-                aria-label="Reducir cupones"
+                aria-label={t("tgtgDecreaseCoupons", language)}
                 className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 disabled:pointer-events-none min-h-[44px] min-w-[44px]"
               >
                 {adjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Minus className="w-4 h-4" />}
@@ -1197,7 +1202,7 @@ function TgtgItemAdminCard({
               <button type="button"
                 onClick={() => onAdjust(item.id, 1)}
                 disabled={adjusting || item.cuponesDisponibles >= item.cuponesTotal}
-                aria-label="Aumentar cupones"
+                aria-label={t("tgtgIncreaseCoupons", language)}
                 className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 disabled:pointer-events-none min-h-[44px] min-w-[44px]"
               >
                 {adjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

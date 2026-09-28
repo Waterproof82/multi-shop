@@ -3,6 +3,7 @@
 import { ImagenSubida as Image } from './ui/imagen-subida';
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { pickTranslatable } from "@/lib/landing/read-translatable"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface HeroBannerProps {
@@ -24,7 +25,7 @@ export function HeroBanner({ empresa, bannerFit }: HeroBannerProps) {
   const titulo = empresa?.titulo ?? null
   const subtitulo = empresa?.subtitulo ?? null
   const subtitulo2 = empresa?.subtitulo2?.[language] ?? empresa?.subtitulo2?.es ?? null
-  const descripcion = empresa?.descripcion?.[language] ?? empresa?.descripcion?.es ?? null
+  const descripcion = pickTranslatable(empresa?.descripcion, language)
 
   const showTitulo = titulo !== null && titulo !== ""
   const showSubtitulo = subtitulo !== null && subtitulo !== ""

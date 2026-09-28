@@ -173,20 +173,20 @@ export function renderOrigenBadge(pedido: Pedido, language: Language) {
   if (pedido.origen === 'delivery') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-400/30">
-        Domicilio
+        {t("orderTypeDomicilioShort", language)}
       </span>
     );
   }
   if (pedido.tracking_token) {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-400/30">
-        Recogida
+        {t("orderTypeRecogida", language)}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-500/20 text-slate-400 border border-slate-500/30">
-      Web
+      {t("orderTypeWeb", language)}
     </span>
   );
 }
@@ -535,7 +535,7 @@ export default function PedidosPage() {
           <button type="button"
             onClick={() => cambiarMes(-1)}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
-            aria-label="Mes anterior"
+            aria-label={t("previousMonth", language)}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -548,7 +548,7 @@ export default function PedidosPage() {
                 onClick={() => setSelectedMonth({ mes: new Date().getMonth(), año: new Date().getFullYear() })}
                 className="block text-xs text-cyan-400 hover:text-cyan-300 underline mx-auto mt-1 transition-colors"
               >
-                Ver actual
+                {t("goToCurrentMonthShort", language)}
               </button>
             )}
           </div>
@@ -609,7 +609,7 @@ export default function PedidosPage() {
                     onClick={() => handleSort('origen')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    Tipo
+                    {t("typeLabel", language)}
                     {sortField === 'origen' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>

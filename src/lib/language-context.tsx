@@ -46,6 +46,12 @@ function getStoredLanguage(): Language {
   return "es"
 }
 
+// Para lo que se pinta FUERA del LanguageProvider (p. ej. el fallback de
+// ErrorBoundary, que lo envuelve): misma prioridad que el provider.
+export function readCurrentLanguage(): Language {
+  return getUrlLanguage() ?? getStoredLanguage()
+}
+
 function persistLanguage(lang: Language) {
   try {
     localStorage.setItem(STORAGE_KEY, lang)

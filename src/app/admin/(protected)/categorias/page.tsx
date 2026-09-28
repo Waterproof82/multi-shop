@@ -164,11 +164,11 @@ function CategoryTypeBadges({ cat, parentName, empresaTipo, language }: Readonly
       )}
       {empresaTipo === 'restaurante' && (cat.tipo_producto === 'bebida' ? (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium">
-          <GlassWater className="w-3 h-3" /> Bar
+          <GlassWater className="w-3 h-3" /> {t("routeBar", language)}
         </span>
       ) : (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-medium">
-          <UtensilsCrossed className="w-3 h-3" /> Cocina
+          <UtensilsCrossed className="w-3 h-3" /> {t("routeKitchen", language)}
         </span>
       ))}
     </div>
@@ -429,7 +429,7 @@ function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onE
             <p className="font-medium text-white">{cat.nombre_es}</p>
             {cat.categoria_padre_id && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
-                Sub
+                {t("categoriaSubBadge", language)}
               </span>
             )}
             {!cat.categoria_padre_id && hasSubcategories && (
@@ -930,7 +930,7 @@ export default function CategoriasPage() {
                       <p className="font-medium text-white">{cat.nombre_es}</p>
                       {cat.categoria_padre_id && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
-                          Sub
+                          {t("categoriaSubBadge", language)}
                         </span>
                       )}
                       {!cat.categoria_padre_id && cat.hasSubcategories && (
@@ -1227,7 +1227,7 @@ export default function CategoriasPage() {
             {empresaTipo === 'restaurante' && (
             <div>
               <p className="block text-sm font-medium text-foreground mb-2">
-                Tipo
+                {t("typeLabel", language)}
               </p>
               <div className="flex gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1240,7 +1240,7 @@ export default function CategoriasPage() {
                     className="accent-primary"
                   />
                   <span className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-400">
-                    <UtensilsCrossed className="w-3 h-3" /> Cocina
+                    <UtensilsCrossed className="w-3 h-3" /> {t("routeKitchen", language)}
                   </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1253,12 +1253,12 @@ export default function CategoriasPage() {
                     className="accent-primary"
                   />
                   <span className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400">
-                    <GlassWater className="w-3 h-3" /> Bar
+                    <GlassWater className="w-3 h-3" /> {t("routeBar", language)}
                   </span>
                 </label>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Todos los productos de esta categoría se enrutarán a Cocina o Bar.
+                {t("categoriaRuteoHelp", language)}
               </p>
             </div>
             )}

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, ChevronLeft, ChevronRight, ShieldCheck, MonitorCheck, UtensilsCrossed, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useLanguage } from '@/lib/language-context';
-import { t } from '@/lib/translations';
+import { useLanguage, type Language } from '@/lib/language-context';
+import { t, translations } from '@/lib/translations';
 import type { AuditLogEntry, AuditAction, ActorTipo } from '@/core/domain/entities/audit-types';
 
 const LIMIT = 50;
@@ -24,28 +24,19 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'admin.stock.ajuste',
 ];
 
-const ACTION_LABELS: Record<AuditAction, string> = {
-  'tpv.turno.abrir':          'Abrir turno',
-  'tpv.turno.cerrar':         'Cerrar turno',
-  'tpv.cobro.completar':      'Cobro completado',
-  'tpv.cobro.rectificar':     'Cobro rectificado',
-  'tpv.caja.movimiento':      'Movimiento de caja',
-  'tpv.stock.merma':          'Merma registrada',
-  'tpv.empleado.login':       'Empleado: inicio de sesión',
-  'tpv.empleado.logout':      'Empleado: cierre de sesión',
-  'waiter.mesa.cerrar_sesion':'Cerrar sesión de mesa',
-  'waiter.pedido.validar':    'Pedido validado',
-  'waiter.pago.manual':       'Pago manual registrado',
-  'admin.stock.ajuste':       'Ajuste de stock',
-};
+// Etiqueta traducida de cada accion: claves `auditAction.<accion>` en translations.ts.
+function actionLabel(action: string, language: Language): string {
+  const key = `auditAction.${action}`;
+  return key in translations.es ? t(key as Parameters<typeof t>[0], language) : action;
+}
 
 const ACTOR_TIPOS: ActorTipo[] = ['admin', 'empleado_tpv', 'waiter', 'system'];
 
-const ACTOR_CONFIG: Record<ActorTipo, { label: string; icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  admin:        { label: 'Administrador',  icon: ShieldCheck,      className: 'bg-violet-500/15 border-violet-400/30 text-violet-300' },
-  empleado_tpv: { label: 'Empleado TPV',   icon: MonitorCheck,     className: 'bg-amber-500/15 border-amber-400/30 text-amber-300'   },
-  waiter:       { label: 'Camarero',       icon: UtensilsCrossed,  className: 'bg-blue-500/15 border-blue-400/30 text-blue-300'      },
-  system:       { label: 'Sistema',        icon: Bot,              className: 'bg-slate-500/15 border-slate-400/30 text-slate-300'   },
+const ACTOR_CONFIG: Record<ActorTipo, { labelKey: Parameters<typeof t>[0]; icon: React.ComponentType<{ className?: string }>; className: string }> = {
+  admin:        { labelKey: 'auditLogActorAdmin',     icon: ShieldCheck,      className: 'bg-violet-500/15 border-violet-400/30 text-violet-300' },
+  empleado_tpv: { labelKey: 'auditLogActorEmployee',  icon: MonitorCheck,     className: 'bg-amber-500/15 border-amber-400/30 text-amber-300'   },
+  waiter:       { labelKey: 'auditLogActorWaiter',    icon: UtensilsCrossed,  className: 'bg-blue-500/15 border-blue-400/30 text-blue-300'      },
+  system:       { labelKey: 'auditLogActorSystem',    icon: Bot,              className: 'bg-slate-500/15 border-slate-400/30 text-slate-300'   },
 };
 
 function resolveActionColor(action: string): string {
@@ -60,8 +51,9 @@ interface ActionBadgeProps {
 }
 
 function ActionBadge({ action }: Readonly<ActionBadgeProps>) {
+  const { language } = useLanguage();
   const colorClass = resolveActionColor(action);
-  const label = ACTION_LABELS[action as AuditAction] ?? action;
+  const label = actionLabel(action, language);
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${colorClass}`}>
       {label}
@@ -74,12 +66,13 @@ interface ActorBadgeProps {
 }
 
 function ActorBadge({ actorTipo }: Readonly<ActorBadgeProps>) {
+  const { language } = useLanguage();
   const config = ACTOR_CONFIG[actorTipo] ?? ACTOR_CONFIG.system;
   const Icon = config.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${config.className}`}>
       <Icon className="w-3 h-3 shrink-0" />
-      {config.label}
+      {t(config.labelKey, language)}
     </span>
   );
 }
@@ -174,7 +167,7 @@ export default function AuditLogPage() {
             >
               <option value="">{t('auditLogAll', language)}</option>
               {AUDIT_ACTIONS.map((a) => (
-                <option key={a} value={a}>{ACTION_LABELS[a]}</option>
+                <option key={a} value={a}>{actionLabel(a, language)}</option>
               ))}
             </select>
           </div>
@@ -188,7 +181,7 @@ export default function AuditLogPage() {
             >
               <option value="">{t('auditLogAll', language)}</option>
               {ACTOR_TIPOS.map((tipo) => (
-                <option key={tipo} value={tipo}>{ACTOR_CONFIG[tipo].label}</option>
+                <option key={tipo} value={tipo}>{t(ACTOR_CONFIG[tipo].labelKey, language)}</option>
               ))}
             </select>
           </div>

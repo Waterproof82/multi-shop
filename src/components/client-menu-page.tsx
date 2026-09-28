@@ -304,7 +304,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                 type="search"
                 value={waiterSearch}
                 onChange={e => setWaiterSearch(e.target.value)}
-                placeholder="Buscar producto..."
+                placeholder={t("searchProductsPlaceholder", language)}
+                aria-label={t("searchProductsPlaceholder", language)}
                 autoFocus
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />

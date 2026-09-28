@@ -97,7 +97,7 @@ export default function ComparativaPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
           {t('sidebarAnalyticsComparativa', language)}
         </h1>
-        <p className="text-slate-300 text-sm mt-1">Comparativa de períodos</p>
+        <p className="text-slate-300 text-sm mt-1">{t("analyticsComparativaTitle", language)}</p>
       </div>
 
       <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl">
@@ -107,14 +107,14 @@ export default function ComparativaPage() {
             onClick={() => handleModeChange('semana')}
             className={modeBtnClass(mode === 'semana')}
           >
-            Semana actual vs. anterior
+            {t("analyticsWeekVsPrev", language)}
           </button>
           <button
             type="button"
             onClick={() => handleModeChange('mes')}
             className={modeBtnClass(mode === 'mes')}
           >
-            Mes actual vs. anterior
+            {t("analyticsMonthVsPrev", language)}
           </button>
         </div>
       </div>

@@ -49,7 +49,7 @@ export default function AlbaranesPage() {
     try {
       const params = filtroEstado ? `?estado=${filtroEstado}` : '';
       const res = await fetch(`/api/admin/compras/albaranes${params}`);
-      if (!res.ok) throw new Error('Error al cargar albaranes');
+      if (!res.ok) throw new Error(t("errLoadAlbaranes", language));
       const data = await res.json();
       setAlbaranes(data);
     } catch (err) {
@@ -57,7 +57,7 @@ export default function AlbaranesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, language]);
 
   const fetchProveedores = useCallback(async () => {
     try {
@@ -97,7 +97,7 @@ export default function AlbaranesPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al crear albarán');
+        throw new Error(data.error ?? t("errCreateAlbaran", language));
       }
 
       await fetchAlbaranes();
@@ -129,7 +129,7 @@ export default function AlbaranesPage() {
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value as AlbaranEstado | '')}
-            aria-label="Filtrar por estado"
+            aria-label={t("comprasFilterByStatus", language)}
             className="px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
           >
             {ESTADOS.map((s) => (
@@ -218,7 +218,7 @@ export default function AlbaranesPage() {
                 required
                 value={form.proveedorId}
                 onChange={updateForm('proveedorId')}
-                aria-label="Seleccionar proveedor"
+                aria-label={t("comprasSelectSupplier", language)}
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               >
                 <option value="">{t('comprasSeleccionarProveedor', language)}</option>

@@ -49,7 +49,7 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
   const fetchFactura = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/compras/facturas/${id}`);
-      if (!res.ok) throw new Error('Factura no encontrada');
+      if (!res.ok) throw new Error(t("facturaNotFound", language));
       const data = await res.json();
       setFactura(data);
     } catch (err) {
@@ -57,7 +57,7 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, language]);
 
   useEffect(() => {
     fetchFactura();
@@ -79,7 +79,7 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al registrar pago');
+        throw new Error(data.error ?? t("errRegisterPayment", language));
       }
 
       await fetchFactura();
@@ -170,7 +170,7 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
                 required
                 value={pagoForm.metodoPago}
                 onChange={updatePagoForm('metodoPago')}
-                aria-label="Método de pago"
+                aria-label={t("paymentMethodLabel", language)}
                 className="w-full sm:w-64 px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               >
                 <option value="pagado_caja">{t('comprasPagoMetodoCaja', language)}</option>

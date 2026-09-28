@@ -56,7 +56,7 @@ export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idi
     setIsLoading(true);
 
     if (!marketingConsent) {
-      setError('Debes aceptar recibir comunicaciones para continuar.');
+      setError(t('welcomeDiscountConsentRequired', idioma));
       setIsLoading(false);
       return;
     }
@@ -176,16 +176,16 @@ export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idi
                     id="welcome-consent-desc"
                     className="text-xs text-muted-foreground leading-snug cursor-pointer"
                   >
-                    Acepto recibir promociones y descuentos de{' '}
-                    <strong className="text-foreground">{empresaNombre}</strong> por email.
-                    Puedo darme de baja en cualquier momento. Consulta nuestra{' '}
+                    {t('welcomeDiscountConsentPrefix', idioma)}{' '}
+                    <strong className="text-foreground">{empresaNombre}</strong>{' '}
+                    {t('welcomeDiscountConsentSuffix', idioma)}{' '}
                     <a
                       href="/privacidad"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="underline hover:text-foreground"
                     >
-                      política de privacidad
+                      {t('privacyPolicyLink', idioma)}
                     </a>
                     .
                   </label>

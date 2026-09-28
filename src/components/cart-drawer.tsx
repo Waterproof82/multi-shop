@@ -1886,16 +1886,16 @@ export function CartDrawer({
 
               {/* Aviso privacidad RGPD Art.13 — base jurídica: ejecución del contrato */}
               <p className="text-[10px] text-muted-foreground text-center leading-relaxed mb-1">
-                Al confirmar aceptas nuestra{' '}
+                {t('cartPrivacyPrefix', language)}{' '}
                 <a
                   href="/privacidad"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline hover:text-foreground"
                 >
-                  política de privacidad
+                  {t('privacyPolicyLink', language)}
                 </a>
-                {'. Tus datos se usarán únicamente para gestionar tu pedido.'}
+                {t('cartPrivacySuffix', language)}
               </p>
 
               {/* Verificación edad mínima LOPDGDD Art.7 — solo pedidos con datos personales */}
@@ -1908,7 +1908,7 @@ export function CartDrawer({
                     className="mt-0.5 shrink-0 accent-primary"
                   />
                   <span className="text-[10px] text-muted-foreground leading-relaxed">
-                    Confirmo que tengo 14 años o más (LOPDGDD Art.7)
+                    {t('cartAgeConfirm', language)}
                   </span>
                 </label>
               )}

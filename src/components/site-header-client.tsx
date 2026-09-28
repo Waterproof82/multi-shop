@@ -82,7 +82,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
         >
           <BellRing className="w-4 h-4 shrink-0" style={{ color: 'oklch(80% 0.18 55)' }} />
           <span className="text-sm font-medium" style={{ color: 'oklch(92% 0.03 252)' }}>
-            Camarero avisado
+            {t("waiterCalledNotice", language)}
           </span>
         </div>
       )}
@@ -129,7 +129,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
               className="relative min-h-[44px] min-w-[44px] transition-colors duration-200"
               onClick={() => { void handleCallWaiter(); }}
               disabled={calling || called}
-              aria-label="Llamar al camarero"
+              aria-label={t("callWaiterLabel", language)}
               style={called ? { color: 'var(--primary)', opacity: 0.7 } : undefined}
             >
               <BellRing className={`size-5 ${called ? 'animate-pulse' : ''}`} />

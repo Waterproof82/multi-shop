@@ -51,7 +51,7 @@ export default function PedidosPage() {
     try {
       const params = filtroEstado ? `?estado=${filtroEstado}` : '';
       const res = await fetch(`/api/admin/compras/pedidos${params}`);
-      if (!res.ok) throw new Error('Error al cargar pedidos');
+      if (!res.ok) throw new Error(t("errLoadPedidosCompra", language));
       const data = await res.json();
       setPedidos(data);
     } catch (err) {
@@ -59,7 +59,7 @@ export default function PedidosPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, language]);
 
   const fetchProveedores = useCallback(async () => {
     try {
@@ -97,7 +97,7 @@ export default function PedidosPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Error al crear pedido');
+        throw new Error(data.error ?? t("errCreatePedidoCompra", language));
       }
 
       await fetchPedidos();
@@ -129,7 +129,7 @@ export default function PedidosPage() {
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value as PedidoCompraEstado | '')}
-            aria-label="Filtrar por estado"
+            aria-label={t("comprasFilterByStatus", language)}
             className="px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
           >
             {ESTADOS.map((s) => (
@@ -216,7 +216,7 @@ export default function PedidosPage() {
                 required
                 value={form.proveedorId}
                 onChange={updateForm('proveedorId')}
-                aria-label="Seleccionar proveedor"
+                aria-label={t("comprasSelectSupplier", language)}
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               >
                 <option value="">{t('comprasSeleccionarProveedor', language)}</option>
