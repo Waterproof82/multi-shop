@@ -4,7 +4,9 @@ import {
   buildAlternates,
   buildTenantPageMetadata,
   debeDesindexar,
+  getAvailableLangs,
   getDescriptionForLang,
+  getPrimaryLang,
   parseLangParam,
   recortarDescripcion,
   resolverIdiomaPagina,
@@ -33,6 +35,29 @@ describe('resolverIdiomaPagina', () => {
   it('ignora un ?lang= que el tenant no tiene traducido (no crea canonicals nuevos)', () => {
     expect(resolverIdiomaPagina('de', ['es', 'en'], 'es')).toBe('es');
     expect(resolverIdiomaPagina('en', ['es', 'en'], 'es')).toBe('en');
+  });
+});
+
+// Una URL sin ?lang= la pinta LanguageProvider en espanol, tenga el tenant la
+// descripcion que tenga. Deducir el idioma principal de "la primera
+// descripcion cargada" ponia "Our Catalog" en la pestana de un tenant con solo
+// descripcion en ingles (Alma de Arena, 2026-09-29) con la UI en espanol.
+describe('idioma principal', () => {
+  const soloIngles = { ...empresa, descripcion: { en: 'Only English' } } as unknown as EmpresaPublic;
+
+  it('es siempre espanol, aunque el tenant solo tenga descripcion en otro idioma', () => {
+    expect(getPrimaryLang(soloIngles)).toBe('es');
+    expect(getAvailableLangs(soloIngles)).toEqual(['es', 'en']);
+  });
+
+  it('sin ?lang= el titulo sale en espanol; con ?lang=en, en ingles', () => {
+    const titulo = (lang: string) => (lang === 'en' ? 'Our Catalog' : 'Nuestro Catálogo');
+    const es = buildTenantPageMetadata({ empresa: soloIngles, path: '/carta', langParam: undefined, titulo });
+    const en = buildTenantPageMetadata({ empresa: soloIngles, path: '/carta', langParam: 'en', titulo });
+    expect(es.title).toEqual({ absolute: 'Nuestro Catálogo | La Mermelada' });
+    expect(es.alternates?.canonical).toBe('/carta');
+    expect(en.title).toEqual({ absolute: 'Our Catalog | La Mermelada' });
+    expect(en.alternates?.canonical).toBe('/carta?lang=en');
   });
 });
 

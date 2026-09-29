@@ -1,4 +1,5 @@
 import { CartaRoute } from "@/components/carta-route";
+import { TituloPestana } from "@/components/titulo-pestana";
 import { resolverEmpresaPublica } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { buildTenantPageMetadata, debeDesindexar } from "@/lib/seo/tenant-seo";
@@ -26,5 +27,11 @@ export async function generateMetadata({ searchParams }: Readonly<CartaPageProps
 }
 
 export default async function CartaPage({ searchParams }: Readonly<CartaPageProps>) {
-  return <CartaRoute searchParams={searchParams} desdeRutaCarta />;
+  const { empresa } = await resolverEmpresaPublica(await getDomainFromHeaders());
+  return (
+    <>
+      {empresa && <TituloPestana k="nuestraCarta" nombre={empresa.nombre} />}
+      <CartaRoute searchParams={searchParams} desdeRutaCarta />
+    </>
+  );
 }
