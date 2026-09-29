@@ -10,6 +10,13 @@ import type { ICodigoDescuentoRepository } from '@/core/domain/repositories/ICod
 import type { IMesaSesionRepository } from '@/core/domain/repositories/IMesaSesionRepository';
 import type { Product } from '@/core/domain/entities/types';
 
+// El aviso de Telegram se intercepta: aquí interesa QUÉ pedido se le pasa.
+const telegramSpy = vi.hoisted(() => vi.fn(async () => ({ success: true as const, data: { messageId: 1 } })));
+vi.mock('@/core/infrastructure/services/telegram.service', () => ({
+  sendTelegramWithQuickReplies: telegramSpy,
+  sendTelegramWithInlineButtons: telegramSpy,
+}));
+
 // ─── Parte 1: contrato de ModalidadEntregaUseCase.validarPrecioVigente ───────
 // Ya existe desde la Task 5 — este bloque documenta el contrato que
 // PedidoUseCase.create consume en la Parte 2, no ejercita código nuevo.
@@ -67,6 +74,8 @@ function buildPedidoRepoMock(): { repo: IPedidoRepository; create: ReturnType<ty
     findById: vi.fn(),
     updateNumeroSeguimiento: vi.fn(),
     markSeguimientoEmailEnviado: vi.fn(),
+    reclamarEmailConfirmacion: vi.fn(),
+    liberarEmailConfirmacion: vi.fn(),
     findByTrackingToken: vi.fn(),
     createMesaOrder: vi.fn(),
     updateItemPase: vi.fn(),
@@ -429,5 +438,51 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     ];
     expect(finalTotal).toBeCloseTo(10); // solo el producto, sin los 999cts
     expect(payload?.modalidad_entrega_id).toBeUndefined();
+  });
+});
+
+describe('PedidoUseCase.create — el aviso de Telegram lleva la entrega VALIDADA', () => {
+  it('tienda a domicilio: tipo, nombre y precio del servidor, dirección y sin pago online', async () => {
+    telegramSpy.mockClear();
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 490, tipo: 'domicilio', nombre: 'SEUR 24h' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase } = buildUseCase(modalidadEntregaUseCase);
+
+    await useCase.create('empresa-1', baseDto({
+      modalidad_entrega_id: 'm1',
+      modalidad_entrega_tipo: 'recogida', // el cliente miente; manda el servidor
+      direccion_entrega: 'Calle Mayor 1, Puerta 501',
+      latitude_entrega: 40.4,
+      longitude_entrega: -3.7,
+    }), 'tienda', 'chat-1', false, false);
+
+    expect(telegramSpy).toHaveBeenCalledTimes(1);
+    expect((telegramSpy.mock.calls[0] as unknown[])[0]).toMatchObject({
+      modalidad_entrega_tipo: 'domicilio',
+      modalidad_entrega_nombre: 'SEUR 24h',
+      modalidad_entrega_precio_cents: 490,
+      direccion_entrega: 'Calle Mayor 1, Puerta 501',
+      paymentStatus: 'not_required',
+    });
+  });
+
+  it('tienda con recogida: no pasa la dirección aunque el cliente la mande', async () => {
+    telegramSpy.mockClear();
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({ success: true, data: { precioCents: 0, tipo: 'recogida' } }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase } = buildUseCase(modalidadEntregaUseCase);
+
+    await useCase.create('empresa-1', baseDto({
+      modalidad_entrega_id: 'm2', direccion_entrega: 'Calle Falsa 123',
+    }), 'tienda', 'chat-1', false, false);
+
+    const enviado = (telegramSpy.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(enviado.modalidad_entrega_tipo).toBe('recogida');
+    expect(enviado.direccion_entrega ?? null).toBeNull();
   });
 });

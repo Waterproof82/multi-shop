@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { TrackingPageClient } from "@/components/tracking-page-client";
 import { getPedidoRepository } from "@/core/infrastructure/database";
+import { vistaPublicaSeguimiento } from "@/lib/tracking/vista-publica";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -20,7 +21,8 @@ export default async function TrackingPage({ params }: Props) {
   if (isUUID) {
     const result = await getPedidoRepository().findByTrackingToken(token);
     if (result.success && result.data) {
-      initialStatus = result.data;
+      // Misma vista que la API: sin datos internos (Telegram) en el HTML público.
+      initialStatus = vistaPublicaSeguimiento(result.data);
     }
   }
 

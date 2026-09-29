@@ -4,6 +4,7 @@ import { getLandingSeccionUseCase } from "@/core/infrastructure/database";
 import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { LandingPage } from "@/components/landing-page";
 import { CartaRoute } from "@/components/carta-route";
+import { TituloPestana } from "@/components/titulo-pestana";
 import { JsonLd } from "@/components/json-ld";
 import { shouldBypassLanding } from "@/lib/landing/should-bypass-landing";
 import { logger } from "@/core/infrastructure/logging/logger";
@@ -63,7 +64,14 @@ export default async function Home({ searchParams }: Readonly<HomeProps>) {
 
   // Si landing no está habilitada, bypass directo a carta
   if (bypass || !empresa.landingHabilitada) {
-    return <CartaRoute searchParams={searchParams} />;
+    // Mismo criterio que generateMetadata: solo el subdominio de pedidos se
+    // titula como carta; si no, el titulo es el nombre (no depende del idioma).
+    return (
+      <>
+        {isPedidos && <TituloPestana k="nuestraCarta" nombre={empresa.nombre} />}
+        <CartaRoute searchParams={searchParams} />
+      </>
+    );
   }
 
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";

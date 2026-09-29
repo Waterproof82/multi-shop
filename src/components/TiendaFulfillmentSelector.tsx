@@ -60,6 +60,8 @@ interface TiendaFulfillmentSelectorProps {
   value: 'recogida' | 'domicilio' | null;
   onChange: (tipo: 'recogida' | 'domicilio', modalidadId: string | null, precioCents: number) => void;
   onAddressSelect: (address: SelectedAddress) => void;
+  /** El texto del buscador cambió tras elegir: la dirección elegida ya no vale. */
+  onAddressInvalidated?: () => void;
   disabled?: boolean;
 }
 
@@ -126,6 +128,7 @@ export function TiendaFulfillmentSelector({
   modalidades,
   onChange,
   onAddressSelect,
+  onAddressInvalidated,
   disabled,
 }: Readonly<TiendaFulfillmentSelectorProps>) {
   const { language } = useLanguage();
@@ -193,7 +196,7 @@ export function TiendaFulfillmentSelector({
           <label htmlFor={direccionId} className="block text-xs font-medium text-muted-foreground">
             {t('deliveryAddress', language)}
           </label>
-          <MapboxAddressInput id={direccionId} disabled={disabled} onSelect={handleAddressSelect} />
+          <MapboxAddressInput id={direccionId} disabled={disabled} onSelect={handleAddressSelect} onInputChange={onAddressInvalidated} />
         </div>
       )}
     </section>

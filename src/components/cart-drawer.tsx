@@ -40,6 +40,8 @@ import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-lazy';
 import { IDEMPOTENCY_HEADER, buildIdempotencyKey } from "@/lib/idempotency";
 import { TiendaFulfillmentSelector, type ModalidadEntregaPublica } from "@/components/TiendaFulfillmentSelector";
+import { emailObligatorio, pasaPorPasarela } from "@/lib/pedido/email-del-cliente";
+import { direccionCompleta, DIRECCION_DETALLE_MAX } from "@/lib/pedido/direccion";
 import { useMesaId } from "@/lib/mesa/use-mesa-id";
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
@@ -176,6 +178,25 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   if (digitsOnly.length < 9) return translate("validationPhoneMin", language);
   if (digitsOnly.length > 15) return translate("validationPhoneMax", language);
   return undefined;
+}
+
+function validateEmailInput(email: string, obligatorio: boolean, translate: TranslateFn, language: Language): string | undefined {
+  const trimmed = email.trim();
+  if (!trimmed) return obligatorio ? translate("validationEmailRequired", language) : undefined;
+  if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(trimmed)) return translate("validationEmailFormat", language);
+  return undefined;
+}
+
+function emailLabelKey(obligatorio: boolean): 'placeholderEmailRequired' | 'placeholderEmail' {
+  return obligatorio ? 'placeholderEmailRequired' : 'placeholderEmail';
+}
+
+function emailHintKey(obligatorio: boolean): 'emailHintRequired' | 'emailHintOptional' {
+  return obligatorio ? 'emailHintRequired' : 'emailHintOptional';
+}
+
+function emailDescribedBy(error: string | undefined): string {
+  return error ? 'email-error email-hint' : 'email-hint';
 }
 
 /**
@@ -745,8 +766,7 @@ function requiresRedsysRedirect(
   deliveryMethod: DeliveryMethod,
   isRestaurant: boolean
 ): boolean {
-  if (deliveryMethod === 'delivery') return true;
-  return pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant);
+  return pasaPorPasarela({ esRestaurante: isRestaurant, pagosPickupHabilitados, origen: deliveryMethod });
 }
 
 // Helper: submit to Redsys and handle payment form
@@ -1049,9 +1069,37 @@ function grandTotalColorClass(discountValid: { valid: boolean } | null): string 
   return discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 }
 
-function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean, ageConfirmed: boolean): boolean {
-  if (mesaToken === null && !ageConfirmed) return true;
+function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean, ageConfirmed: boolean, datosIncompletos: boolean): boolean {
+  if (mesaToken === null && (!ageConfirmed || datosIncompletos)) return true;
   return sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete;
+}
+
+/**
+ * Tienda con envío: hay que elegir recogida o una modalidad a domicilio. Solo
+ * cuando el selector se pinta (mismo filtro que `TiendaFulfillmentSelector`):
+ * sin modalidades activas no hay nada que elegir.
+ */
+function modalidadPendiente(
+  usaWizard: boolean,
+  modalidades: ModalidadEntregaPublica[],
+  tipo: ModalidadEntregaTipo,
+): boolean {
+  if (!usaWizard || tipo !== null) return false;
+  return modalidades.some((m) => m.tipo === 'domicilio' && m.activo);
+}
+
+/**
+ * Aviso bajo el botón deshabilitado. Si lo que falta es la dirección, ya lo
+ * explica su propio aviso (`deliverySelectValidAddress`): no se duplica.
+ */
+function showAvisoDatosIncompletos(
+  mesaToken: string | null,
+  datosIncompletos: boolean,
+  ageConfirmed: boolean,
+  isDeliveryIncomplete: boolean,
+): boolean {
+  if (mesaToken !== null || isDeliveryIncomplete) return false;
+  return datosIncompletos || !ageConfirmed;
 }
 
 function shouldShowQrGate(
@@ -1170,13 +1218,15 @@ interface CartDrawerProps {
 /**
  * Errores de los datos del cliente, o `null` si están todos bien.
  *
- * Devuelve los TRES a la vez en vez de parar en el primero: rellenar un
+ * Devuelve todos a la vez en vez de parar en el primero: rellenar un
  * formulario, verlo fallar, corregir y verlo fallar otra vez por el campo de al
  * lado es la forma más rápida de que alguien abandone un pedido.
  */
 function validarDatosDelCliente(datos: {
   nombre: string;
   telefono: string;
+  email: string;
+  emailObligatorio: boolean;
   isRestaurant: boolean;
   deliveryMethod: DeliveryMethod;
   deliveryLatitude: number | null;
@@ -1184,16 +1234,30 @@ function validarDatosDelCliente(datos: {
   t: typeof t;
   language: Parameters<typeof t>[1];
   modalidadEntregaTipo?: ModalidadEntregaTipo;
-}): { nombre?: string; telefono?: string; delivery?: string } | null {
+}): { nombre?: string; telefono?: string; email?: string; delivery?: string } | null {
   const nombre = validateNameInput(datos.nombre, datos.t, datos.language);
   const telefono = validatePhoneInput(datos.telefono, datos.t, datos.language);
+  const email = validateEmailInput(datos.email, datos.emailObligatorio, datos.t, datos.language);
   const delivery = resolveDeliveryError(
     datos.isRestaurant, datos.deliveryMethod, datos.deliveryLatitude, datos.deliveryLongitude, datos.t, datos.language,
     datos.modalidadEntregaTipo ?? null,
   );
 
-  if (!nombre && !telefono && !delivery) return null;
-  return { nombre, telefono, delivery };
+  if (!nombre && !telefono && !email && !delivery) return null;
+  return { nombre, telefono, email, delivery };
+}
+
+/**
+ * Misma validación que al pulsar "Enviar", evaluada en cada render: el botón no
+ * se habilita hasta que el pedido la supera. En mesa no hay datos que pedir.
+ */
+function computeDatosIncompletos(
+  mesaToken: string | null,
+  datos: Parameters<typeof validarDatosDelCliente>[0],
+  faltaModalidad: boolean,
+): boolean {
+  if (mesaToken !== null) return false;
+  return faltaModalidad || validarDatosDelCliente(datos) !== null;
 }
 
 /**
@@ -1222,6 +1286,42 @@ function construirPayloadEstandar(datos: {
     idioma: datos.language,
     codigoDescuento: datos.discountCode || undefined,
   };
+}
+
+/** Solo a domicilio y con la dirección ya elegida: antes no hay portal que completar. */
+function showDireccionDetalle(deliveryAddress: string, deliveryMethod: DeliveryMethod, modalidadEntregaTipo: ModalidadEntregaTipo): boolean {
+  if (!deliveryAddress) return false;
+  return deliveryMethod === 'delivery' || modalidadEntregaTipo === 'domicilio';
+}
+
+/**
+ * Piso, puerta, escalera. Mapbox geocodifica portales, no viviendas: esto lo
+ * escribe el cliente y se incrusta en la dirección (`direccionCompleta`).
+ */
+function DireccionDetalle({ value, onChange, disabled, language }: Readonly<{
+  value: string;
+  onChange: (valor: string) => void;
+  disabled: boolean;
+  language: Parameters<typeof t>[1];
+}>) {
+  return (
+    <div className="mb-4 space-y-1.5">
+      <label htmlFor="cart-direccion-detalle" className="block text-xs font-medium text-muted-foreground">
+        {t('addressDetailLabel', language)}
+      </label>
+      <Input
+        id="cart-direccion-detalle"
+        type="text"
+        placeholder={t('addressDetailPlaceholder', language)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-11 rounded-[3px]"
+        maxLength={DIRECCION_DETALLE_MAX}
+        autoComplete="address-line2"
+        disabled={disabled}
+      />
+    </div>
+  );
 }
 
 /** En modo mesa no se piden datos personales: la mesa ya identifica al pedido. */
@@ -1258,7 +1358,7 @@ function DistintivoDeMesa({ mesaInfo, mesaError, language }: Readonly<{
  */
 export function DatosDelComensal({
   mesaToken, mesaInfo, mesaError, language,
-  nombre, telefono, email, countryCode, errors,
+  nombre, telefono, email, countryCode, errors, emailObligatorio,
   onNombre, onTelefono, onEmail, onCountryCode,
 }: Readonly<{
   mesaToken: string | null;
@@ -1269,7 +1369,9 @@ export function DatosDelComensal({
   telefono: string;
   email: string;
   countryCode: string;
-  errors: { nombre?: string; telefono?: string };
+  errors: { nombre?: string; telefono?: string; email?: string };
+  /** Ver `emailObligatorio` en `@/lib/pedido/email-del-cliente`. */
+  emailObligatorio: boolean;
   onNombre: (valor: string) => void;
   onTelefono: (valor: string) => void;
   onEmail: (valor: string) => void;
@@ -1338,20 +1440,27 @@ export function DatosDelComensal({
         <FieldError id="telefono-error" message={errors.telefono} className="text-xs text-destructive mt-1 ml-4" />
       </div>
       <div>
-        <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderEmail", language)}</label>
+        <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t(emailLabelKey(emailObligatorio), language)}</label>
         <div className="flex items-center gap-2">
           <Mail className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
           <Input
             id="cart-email"
             type="email"
-            placeholder={t("placeholderEmail", language)}
+            placeholder={t(emailLabelKey(emailObligatorio), language)}
             value={email}
             onChange={(e) => onEmail(e.target.value)}
-            className="h-11 rounded-[3px]"
+            className={`h-11 rounded-[3px] ${errors.email ? 'border-destructive' : ''}`}
             maxLength={100}
             autoComplete="email"
+            aria-required={emailObligatorio || undefined}
+            aria-describedby={emailDescribedBy(errors.email)}
+            aria-invalid={!!errors.email}
           />
         </div>
+        <FieldError id="email-error" message={errors.email} className="text-xs text-destructive mt-1 ml-4" />
+        <p id="email-hint" className="text-xs mt-1 ml-4 text-muted-foreground">
+          {t(emailHintKey(emailObligatorio), language)}
+        </p>
         <p className="text-xs mt-1 ml-4 text-primary font-medium flex items-center gap-1">
           {t("promoMessage", language)} <Gift className="size-3.5" />
         </p>
@@ -1439,11 +1548,12 @@ export function CartDrawer({
   const [email, setEmail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [direccionDetalle, setDireccionDetalle] = useState('');
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
   const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null);
   const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null);
   const [estimatedFeeCents, setEstimatedFeeCents] = useState<number | null>(null);
-  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string; delivery?: string; general?: string }>({});
+  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string; email?: string; delivery?: string; general?: string }>({});
 
   const [step, setStep] = useState<'items' | 'checkout'>('items');
   const [modalidadEntregaId, setModalidadEntregaId] = useState<string | null>(null);
@@ -1451,6 +1561,8 @@ export function CartDrawer({
   const [modalidadEntregaPrecioCents, setModalidadEntregaPrecioCents] = useState(0);
 
   const usaWizard = usaWizardTienda(isRestaurant, mesaToken, envioDomicilioHabilitado);
+  // Misma regla que aplica la API: tienda siempre; restaurante solo si paga online.
+  const emailEsObligatorio = emailObligatorio({ esRestaurante: isRestaurant, pagosPickupHabilitados, origen: deliveryMethod });
 
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
@@ -1465,7 +1577,7 @@ export function CartDrawer({
 
     // Flujo estándar (sin mesa): aquí sí hay datos personales que validar.
     const errores = validarDatosDelCliente({
-      nombre, telefono, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language, modalidadEntregaTipo,
+      nombre, telefono, email, emailObligatorio: emailEsObligatorio, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language, modalidadEntregaTipo,
     });
     if (errores) {
       setErrors(errores);
@@ -1483,7 +1595,7 @@ export function CartDrawer({
       isRestaurant,
       pagosPickupHabilitados,
       deliveryMethod,
-      deliveryAddress,
+      deliveryAddress: direccionCompleta(deliveryAddress, direccionDetalle),
       deliveryPostalCode,
       deliveryLatitude,
       deliveryLongitude,
@@ -1505,7 +1617,7 @@ export function CartDrawer({
       setSending,
       attemptKey,
     });
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, modalidadEntregaId, modalidadEntregaTipo, modalidadEntregaPrecioCents, clearCart, closeCart, openCart, router, attemptKey]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, emailEsObligatorio, deliveryMethod, deliveryAddress, direccionDetalle, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, modalidadEntregaId, modalidadEntregaTipo, modalidadEntregaPrecioCents, clearCart, closeCart, openCart, router, attemptKey]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
@@ -1514,6 +1626,12 @@ export function CartDrawer({
     void fetch(`/api/mesas/${encodeURIComponent(mesaActivar)}/activate`, { method: 'POST' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
+
+  const datosIncompletos = computeDatosIncompletos(
+    mesaToken,
+    { nombre, telefono, email, emailObligatorio: emailEsObligatorio, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language, modalidadEntregaTipo },
+    modalidadPendiente(usaWizard, modalidadesEntrega, modalidadEntregaTipo),
+  );
 
   const isDeliveryIncomplete = computeIsDeliveryIncomplete(isRestaurant, mesaToken, deliveryMethod, deliveryLatitude, estimatedFeeCents, modalidadEntregaTipo, deliveryLongitude);
 
@@ -1527,6 +1645,7 @@ export function CartDrawer({
       setEmail('');
       setDeliveryMethod(null);
       setDeliveryAddress('');
+      setDireccionDetalle('');
       setDeliveryPostalCode('');
       setDeliveryLatitude(null);
       setDeliveryLongitude(null);
@@ -1575,6 +1694,17 @@ export function CartDrawer({
     setDeliveryLongitude(campos.longitude);
     setEstimatedFeeCents(campos.feeCents);
   }, [deliveryMethod]);
+
+  // Seguir escribiendo en el buscador tras elegir una sugerencia invalida la
+  // dirección: sin esto el pedido salía con la ANTERIOR mientras el cliente veía
+  // otra. Al quedar sin coordenadas, `isDeliveryIncomplete` bloquea el botón.
+  const invalidarDireccion = useCallback(() => {
+    setDeliveryAddress('');
+    setDeliveryPostalCode('');
+    setDeliveryLatitude(null);
+    setDeliveryLongitude(null);
+    setEstimatedFeeCents(null);
+  }, []);
 
   const isDelivery = deliveryMethod === 'delivery';
   const { deliveryFee, modalidadFee, grandTotal } = computeCartTotals(
@@ -1815,9 +1945,10 @@ export function CartDrawer({
                 email={email}
                 countryCode={countryCode}
                 errors={errors}
+                emailObligatorio={emailEsObligatorio}
                 onNombre={(valor) => { setNombre(valor); setErrors(prev => ({ ...prev, nombre: undefined })); }}
                 onTelefono={(valor) => { setTelefono(valor); setErrors(prev => ({ ...prev, telefono: undefined })); }}
-                onEmail={setEmail}
+                onEmail={(valor) => { setEmail(valor); setErrors(prev => ({ ...prev, email: undefined })); }}
                 onCountryCode={setCountryCode}
               />
 
@@ -1827,6 +1958,7 @@ export function CartDrawer({
                   value={deliveryMethod}
                   deliveryHabilitado={deliveryHabilitado}
                   onChange={handleDeliveryChange}
+                  onAddressInvalidated={invalidarDireccion}
                   orderTotalCents={Math.round(totalPrice * 100)}
                   disabled={sending}
                 />
@@ -1848,8 +1980,13 @@ export function CartDrawer({
                     setDeliveryLongitude(longitude);
                     setDeliveryPostalCode(postalCode);
                   }}
+                  onAddressInvalidated={invalidarDireccion}
                   disabled={sending}
                 />
+              )}
+
+              {showDireccionDetalle(deliveryAddress, deliveryMethod, modalidadEntregaTipo) && (
+                <DireccionDetalle value={direccionDetalle} onChange={setDireccionDetalle} disabled={sending} language={language} />
               )}
 
               {/* Discount Code Section — hidden in mesa mode */}
@@ -1881,6 +2018,11 @@ export function CartDrawer({
               {isDeliveryIncomplete && (
                 <output className="block text-xs text-muted-foreground text-center mb-2">
                   {t('deliverySelectValidAddress', language)}
+                </output>
+              )}
+              {showAvisoDatosIncompletos(mesaToken, datosIncompletos, ageConfirmed, isDeliveryIncomplete) && (
+                <output className="block text-xs text-muted-foreground text-center mb-2">
+                  {t('cartCompleteRequired', language)}
                 </output>
               )}
 
@@ -1918,7 +2060,7 @@ export function CartDrawer({
                    className="w-full rounded-[3px] bg-foreground text-background hover:bg-foreground/85 py-3 text-base font-semibold transition-colors duration-150 min-h-[48px]"
                    size="lg"
                    onClick={handleSendOrder}
-                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete, ageConfirmed)}
+                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete, ageConfirmed, datosIncompletos)}
                  >
                    {orderButtonLabel(sending, mesaToken, t, language)}
                  </Button>

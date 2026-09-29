@@ -20,6 +20,12 @@ interface DeliveryMethodSelectorProps {
   orderTotalCents: number;
   disabled?: boolean;
   deliveryHabilitado?: boolean;
+  /**
+   * El texto del buscador cambió tras elegir: la dirección y la tarifa que ya
+   * tiene el carrito dejan de valer. Sin esto solo se limpiaba el estado de este
+   * selector y el pedido salía con la dirección anterior.
+   */
+  onAddressInvalidated?: () => void;
 }
 
 
@@ -29,6 +35,7 @@ export function DeliveryMethodSelector({
   orderTotalCents,
   disabled,
   deliveryHabilitado = false,
+  onAddressInvalidated,
 }: Readonly<DeliveryMethodSelectorProps>) {
   const { language } = useLanguage();
 
@@ -168,6 +175,7 @@ export function DeliveryMethodSelector({
               setSelectedAddress('');
               setEstimatedFeeCents(null);
               setFeeError(null);
+              onAddressInvalidated?.();
             }}
             onSelect={({ address, latitude, longitude, postalCode }) => {
               setSelectedAddress(address);

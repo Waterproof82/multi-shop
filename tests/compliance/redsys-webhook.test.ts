@@ -48,6 +48,11 @@ vi.mock('@/core/infrastructure/services/telegram.service', () => ({
   sendTelegramWithQuickReplies: (...a: unknown[]) => telegramSpy(...(a as [])),
 }));
 
+const confirmacionSpy = vi.fn(async () => 'enviado' as const);
+vi.mock('@/core/infrastructure/database', () => ({
+  getEnviarConfirmacionPedido: () => confirmacionSpy,
+}));
+
 const { processRedsysWebhookUseCase } = await import(
   '@/core/application/use-cases/payment/processRedsysWebhookUseCase'
 );
@@ -79,6 +84,7 @@ beforeEach(() => {
   firmaValida = true;
   glovoSpy.mockClear();
   telegramSpy.mockClear();
+  confirmacionSpy.mockClear();
 });
 
 describe('barreras previas: nada se procesa sin superarlas', () => {
@@ -326,6 +332,38 @@ describe('camino 2 — pago completo del pedido', () => {
     expect(telegramSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('el aviso a Telegram lleva entrega, dirección, gastos, pago y complementos', async () => {
+    // Antes el pedido para Telegram se construía sin nada de esto: quien lo
+    // preparaba no sabía a dónde enviarlo, y los complementos se perdían.
+    fake = crearFakeSupabase({
+      tablas: {
+        ...pedidoBase({
+          origen: null,
+          modalidad_entrega_tipo: 'domicilio',
+          modalidad_entrega_nombre: 'SEUR 24h',
+          modalidad_entrega_precio_cents: 490,
+          direccion_entrega: 'Calle Mayor 1, Puerta 501',
+          detalle_pedido: [{ nombre: 'Tarta', precio: 10, cantidad: 1, complementos: [{ nombre: 'Nata', precio: 1 }] }],
+        }),
+        'empresas.select': { data: { redsys_secret_key: 'k', telegram_chat_id: 'chat-1', tipo: 'tienda' } },
+      },
+    });
+    await invocar();
+
+    expect(telegramSpy).toHaveBeenCalledTimes(1);
+    const enviado = (telegramSpy.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(enviado).toMatchObject({
+      modalidad_entrega_tipo: 'domicilio',
+      modalidad_entrega_nombre: 'SEUR 24h',
+      modalidad_entrega_precio_cents: 490,
+      direccion_entrega: 'Calle Mayor 1, Puerta 501',
+      paymentStatus: 'paid',
+    });
+    expect(enviado.detalle_pedido).toEqual([
+      expect.objectContaining({ nombre: 'Tarta', complementos: [{ nombre: 'Nata', precio: 1 }] }),
+    ]);
+  });
+
   it('NO avisa por Telegram si el pago se rechaza', async () => {
     fake = crearFakeSupabase({
       tablas: {
@@ -364,6 +402,35 @@ describe('camino 2 — pago completo del pedido', () => {
     expect(llamadasDe(fake, 'mesa_sesiones').some(
       (l) => (l.payload as Record<string, unknown>)?.['pago_en_curso'] === false,
     )).toBe(true);
+  });
+
+  it('cobro aceptado: manda al cliente la confirmación con el pago confirmado', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase() });
+    await invocar();
+
+    expect(confirmacionSpy).toHaveBeenCalledTimes(1);
+    expect(confirmacionSpy).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: 'p1', empresaId: EMPRESA, pagado: true }));
+  });
+
+  it('cobro rechazado: NO manda confirmación — un pago fallido no es un pedido', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase() });
+    await invocar(parametros({ Ds_Response: '0190' }));
+
+    expect(confirmacionSpy).not.toHaveBeenCalled();
+  });
+
+  it('IDEMPOTENCIA: un reintento sobre un pedido ya pagado no reenvía la confirmación', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase({ payment_status: 'paid' }) });
+    await invocar();
+
+    expect(confirmacionSpy).not.toHaveBeenCalled();
+  });
+
+  it('con sesión de mesa NO manda confirmación por email', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase({ sesion_id: 's9' }) });
+    await invocar();
+
+    expect(confirmacionSpy).not.toHaveBeenCalled();
   });
 
   it('con sesión de mesa NO manda Telegram: de eso se encarga cocina/bar', async () => {

@@ -44,19 +44,19 @@ export function parseLangParam(value: string | string[] | undefined): LangKey | 
   return isLangKey(raw) ? raw : null;
 }
 
-export function getPrimaryLang(empresa: EmpresaPublic | null): LangKey {
-  if (!empresa?.descripcion) return "es";
-  for (const lang of LANG_KEYS) {
-    if (empresa.descripcion[lang]) return lang;
-  }
+/**
+ * Idioma de la URL sin `?lang=`: siempre español, porque es el que pinta
+ * LanguageProvider por defecto. Deducirlo de "la primera descripción cargada"
+ * ponía el <title> en inglés con la UI en español en un tenant que solo tenía
+ * descripción en inglés.
+ */
+export function getPrimaryLang(_empresa: EmpresaPublic | null): LangKey {
   return "es";
 }
 
-/** Idiomas con descripción propia del tenant (siempre al menos el principal). */
+/** El principal más los idiomas con descripción propia del tenant. */
 export function getAvailableLangs(empresa: EmpresaPublic | null): LangKey[] {
-  if (!empresa?.descripcion) return ["es"];
-  const available = LANG_KEYS.filter((l) => empresa.descripcion?.[l]);
-  return available.length > 0 ? available : ["es"];
+  return LANG_KEYS.filter((l) => l === "es" || empresa?.descripcion?.[l]);
 }
 
 /**

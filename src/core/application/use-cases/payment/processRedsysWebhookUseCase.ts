@@ -9,6 +9,8 @@ export interface ProcessRedsysWebhookInput {
   dsSignature: string; // raw signature from POST body
   dsSignatureVersion: string;
   empresaId: string;
+  /** Origen de la petición, para los enlaces del email si el tenant no tiene dominio propio. */
+  origen?: string;
 }
 
 export interface ProcessRedsysWebhookResult {
@@ -211,7 +213,7 @@ function construirPedidoParaTelegram(
   empresaId: string,
   cliente: DatosCliente,
 ): Pedido {
-  const rawItems = p['detalle_pedido'] as { producto_id?: string; nombre: string; precio: number; cantidad: number }[] | null;
+  const rawItems = p['detalle_pedido'] as Pedido['detalle_pedido'] | null;
   return {
     id: p['id'] as string,
     empresa_id: empresaId,
@@ -222,6 +224,7 @@ function construirPedidoParaTelegram(
       nombre: item.nombre,
       precio: item.precio,
       cantidad: item.cantidad,
+      complementos: item.complementos,
     })),
     total: (p['total'] as number | null) ?? 0,
     moneda: null,
@@ -231,6 +234,15 @@ function construirPedidoParaTelegram(
     estimated_minutes: null,
     estimated_ready_at: null,
     clientes: { nombre: cliente.nombre, email: cliente.email, telefono: cliente.telefono },
+    // Cómo y a dónde se entrega: sin esto el aviso solo decía qué, no a dónde.
+    origen: (p['origen'] as string | null) ?? null,
+    modalidad_entrega_tipo: (p['modalidad_entrega_tipo'] as Pedido['modalidad_entrega_tipo']) ?? null,
+    modalidad_entrega_nombre: (p['modalidad_entrega_nombre'] as string | null) ?? null,
+    modalidad_entrega_precio_cents: (p['modalidad_entrega_precio_cents'] as number | null) ?? null,
+    delivery_fee_cents: (p['delivery_fee_cents'] as number | null) ?? null,
+    direccion_entrega: (p['direccion_entrega'] as string | null) ?? null,
+    // Este aviso solo sale tras un cobro aceptado.
+    paymentStatus: 'paid',
   };
 }
 
@@ -311,6 +323,18 @@ async function aplicarEfectosDelCobro(
   if (origen === 'delivery') {
     despacharGlovo(p, input.empresaId, dsOrder, cliente);
   }
+  // Confirmación al cliente con el pago ya cobrado. Nunca lanza, y el candado
+  // de `confirmacion_email_enviado_at` evita el duplicado cuando llegan el
+  // webhook y la vuelta del navegador (confirm-pedido) para el mismo cobro.
+  if (!sesionId) {
+    const { getEnviarConfirmacionPedido } = await import('@/core/infrastructure/database');
+    await getEnviarConfirmacionPedido()({
+      pedidoId: p['id'] as string,
+      empresaId: input.empresaId,
+      pagado: true,
+      origen: input.origen ?? '',
+    });
+  }
 }
 
 /** Camino 2 — pago completo, localizado por `pedidos.payment_order_ref`. */
@@ -323,7 +347,7 @@ async function procesarPedidoCompleto(
 ): Promise<Salida> {
   const { data, error } = await supabase
     .from('pedidos')
-    .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, sesion_id, direccion_entrega, latitude_entrega, longitude_entrega, origen, detalle_pedido, tracking_token, clientes(nombre, telefono, email)')
+    .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, sesion_id, direccion_entrega, latitude_entrega, longitude_entrega, origen, detalle_pedido, tracking_token, modalidad_entrega_tipo, modalidad_entrega_nombre, modalidad_entrega_precio_cents, delivery_fee_cents, clientes(nombre, telefono, email)')
     .eq('payment_order_ref', dsOrder)
     .eq('empresa_id', input.empresaId)
     .maybeSingle();
