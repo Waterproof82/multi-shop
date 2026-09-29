@@ -32,6 +32,7 @@ interface NavItemDef {
   requiresTgtg?: boolean;
   requiresRestaurant?: boolean;
   requiresDelivery?: boolean;
+  requiresLanding?: boolean;
 }
 
 interface NavGroupDef {
@@ -50,6 +51,7 @@ interface FilterCtx {
   isRestaurant: boolean;
   deliveryHabilitado: boolean;
   isTienda: boolean;
+  landingHabilitada: boolean;
 }
 
 // ── Color config (must use complete Tailwind class strings) ───────────────────
@@ -166,7 +168,7 @@ const NAV_ENTRIES: NavEntry[] = [
   },
   { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresRestaurant: true } },
   { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresRestaurant: true } },
-  { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate } },
+  { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate, requiresLanding: true } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
 ];
 
@@ -184,6 +186,9 @@ export function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
   // false y no hay forma de llegar a la pantalla que lo prende, aunque el
   // resto de la feature esté bien implementada.
   if (item.requiresDelivery && !ctx.deliveryHabilitado && !ctx.isTienda) return false;
+  // Con la landing desactivada desde superadmin, "/" redirige a la carta:
+  // editarla no tendría efecto visible.
+  if (item.requiresLanding && !ctx.landingHabilitada) return false;
   return true;
 }
 
@@ -366,6 +371,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     mostrarTgtg,
     mesasHabilitadas,
     deliveryHabilitado,
+    landingHabilitada,
   } = useAdmin();
   const { language } = useLanguage();
 
@@ -388,6 +394,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     isRestaurant: empresaTipo === 'restaurante' && mesasHabilitadas,
     deliveryHabilitado,
     isTienda: empresaTipo === 'tienda',
+    landingHabilitada,
   };
 
   const visibleEntries = NAV_ENTRIES
