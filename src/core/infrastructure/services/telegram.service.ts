@@ -1,6 +1,7 @@
 import { Pedido } from '@/core/domain/entities/types';
 import { Result, AppError } from '@/core/domain/entities/types';
 import { logger } from '@/core/infrastructure/logging/logger';
+import { tipoEntregaDelPedido } from '@/lib/pedido/entrega';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -9,7 +10,47 @@ const sanitizeForMarkdown = (text: string | number | null | undefined): string =
   return textAsString.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
 };
 
-const buildOrderMessage = (pedido: Pedido): string => {
+const euros = (cents: number): string => sanitizeForMarkdown((cents / 100).toFixed(2));
+
+/** Tienda cobra la modalidad elegida; restaurante, la tarifa de Glovo. */
+function gastosEnvioCents(pedido: Pedido): number | null {
+  const cents = pedido.modalidad_entrega_precio_cents ?? pedido.delivery_fee_cents ?? null;
+  return cents !== null && cents > 0 ? cents : null;
+}
+
+function lineaEntrega(pedido: Pedido): string | null {
+  const tipo = tipoEntregaDelPedido(pedido);
+  if (tipo === null) return null;
+  if (tipo === 'recogida') return '*Entrega:* 🏬 Recogida en el local';
+  const modalidad = pedido.modalidad_entrega_nombre ? ` — ${sanitizeForMarkdown(pedido.modalidad_entrega_nombre)}` : '';
+  return `*Entrega:* 🛵 Envío a domicilio${modalidad}`;
+}
+
+function lineaPago(pedido: Pedido): string | null {
+  if (pedido.paymentStatus === 'paid') return '*Pago:* ✅ Pagado online';
+  if (pedido.paymentStatus === undefined) return null;
+  return '*Pago:* ⏳ Sin pago online';
+}
+
+/**
+ * Cómo y a dónde se entrega, y si ya está cobrado. Es lo que necesita quien
+ * prepara el pedido; los botones de tiempo reutilizan este texto (callbacks.ts).
+ */
+function lineasEntregaYPago(pedido: Pedido): string[] {
+  const lines: string[] = [];
+  const entrega = lineaEntrega(pedido);
+  if (entrega) lines.push(entrega);
+  if (tipoEntregaDelPedido(pedido) === 'domicilio' && pedido.direccion_entrega) {
+    lines.push(`*Dirección:* ${sanitizeForMarkdown(pedido.direccion_entrega)}`);
+  }
+  const gastos = gastosEnvioCents(pedido);
+  if (gastos !== null) lines.push(`*Gastos de envío:* ${euros(gastos)} €`);
+  const pago = lineaPago(pedido);
+  if (pago) lines.push(pago);
+  return lines;
+}
+
+export const buildOrderMessage = (pedido: Pedido): string => {
   const { clientes: cliente, detalle_pedido: items, total, numero_pedido } = pedido;
   const lines = [
     `*Nuevo Pedido: \\#${numero_pedido}*`,
@@ -19,6 +60,7 @@ const buildOrderMessage = (pedido: Pedido): string => {
   if (cliente?.email) {
     lines.push(`*Email:* ${sanitizeForMarkdown(cliente.email)}`);
   }
+  lines.push(...lineasEntregaYPago(pedido));
   const itemLines: string[] = [];
   for (const item of items) {
     itemLines.push(`\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)} \\(${sanitizeForMarkdown(item.precio.toFixed(2))} €\\)`);

@@ -1,6 +1,7 @@
 import { escapeHtml } from '@/lib/html-utils';
 import { getLocaleForLang } from './promo-email.builder';
 import { filaItem, importeItem, type ItemEmailSeguimiento } from './seguimiento-email.builder';
+import { tipoEntregaDelPedido, type TipoEntrega } from '@/lib/pedido/entrega';
 
 /**
  * Email transaccional "hemos recibido tu pedido" con el número de pedido, el
@@ -15,7 +16,7 @@ import { filaItem, importeItem, type ItemEmailSeguimiento } from './seguimiento-
  * del servicio contratado, no marketing.
  */
 
-export type TipoEntrega = 'recogida' | 'domicilio';
+export { tipoEntregaDelPedido, type TipoEntrega };
 
 const TEXTOS: Record<string, {
   asunto: (empresa: string, numero: number) => string;
@@ -179,17 +180,6 @@ export interface DatosEmailConfirmacion {
   items: ItemEmailSeguimiento[];
   gastosEnvioCents: number | null;
   total: number;
-}
-
-/**
- * Tienda guarda la modalidad copiada en el pedido; restaurante, el `origen`.
- * Sin ninguno de los dos no se inventa un método: la fila simplemente no sale.
- */
-export function tipoEntregaDelPedido(p: { modalidad_entrega_tipo?: TipoEntrega | null; origen?: string | null }): TipoEntrega | null {
-  if (p.modalidad_entrega_tipo) return p.modalidad_entrega_tipo;
-  if (p.origen === 'delivery') return 'domicilio';
-  if (p.origen === 'recogida') return 'recogida';
-  return null;
 }
 
 function textoEntrega(d: DatosEmailConfirmacion, tx: Textos): string | null {

@@ -8,6 +8,8 @@ import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 import { formatPrice } from "@/lib/format-price";
+import { tipoEntregaDelPedido } from "@/lib/pedido/entrega";
+import { importeItem, gastosEnvioCents, totalDelPedido, estadoPagoVisible } from "@/lib/tracking/resumen-pedido";
 
 interface OrderItem {
   nombre: string;
@@ -36,6 +38,16 @@ interface OrderStatus {
   delivery_fee_cents: number | null;
   sesion_id: string | null;
   google_reviews_url: string | null;
+  // Opcionales: una respuesta cacheada de antes de este cambio no los trae.
+  total?: number | null;
+  payment_status?: string | null;
+  origen?: string | null;
+  modalidad_entrega_tipo?: 'recogida' | 'domicilio' | null;
+  modalidad_entrega_nombre?: string | null;
+  modalidad_entrega_precio_cents?: number | null;
+  direccion_entrega?: string | null;
+  numero_seguimiento?: string | null;
+  descuento_porcentaje?: number | null;
 }
 
 interface TrackingPageClientProps {
@@ -76,6 +88,15 @@ function normalizeStatus(data: OrderStatus): OrderStatus {
     delivery_fee_cents: data.delivery_fee_cents ?? null,
     sesion_id: data.sesion_id ?? null,
     google_reviews_url: data.google_reviews_url ?? null,
+    total: data.total == null ? null : Number(data.total),
+    payment_status: data.payment_status ?? null,
+    origen: data.origen ?? null,
+    modalidad_entrega_tipo: data.modalidad_entrega_tipo ?? null,
+    modalidad_entrega_nombre: data.modalidad_entrega_nombre ?? null,
+    modalidad_entrega_precio_cents: data.modalidad_entrega_precio_cents ?? null,
+    direccion_entrega: data.direccion_entrega ?? null,
+    numero_seguimiento: data.numero_seguimiento ?? null,
+    descuento_porcentaje: data.descuento_porcentaje ?? null,
     items: (data.items ?? []).map(item => ({
       ...item,
       cantidad: Number(item.cantidad),
@@ -114,14 +135,73 @@ function resolveItemName(item: OrderItem, language: string): string {
   return item.nombre;
 }
 
-function ItemsList({ items, language, deliveryFeeCents }: Readonly<{ items: OrderItem[]; language: string; deliveryFeeCents?: number | null }>) {
+function textoEntrega(status: OrderStatus, lang: Parameters<typeof t>[1]): string | null {
+  const tipo = tipoEntregaDelPedido(status);
+  if (tipo === null) return null;
+  if (tipo === 'recogida') return t('trackingPickupMethod', lang);
+  const base = t('trackingHomeDelivery', lang);
+  return status.modalidad_entrega_nombre ? `${base} — ${status.modalidad_entrega_nombre}` : base;
+}
+
+function textoPago(status: OrderStatus, lang: Parameters<typeof t>[1]): string | null {
+  const pago = estadoPagoVisible(status.payment_status ?? null);
+  if (pago === null) return null;
+  return t(pago === 'pagado' ? 'trackingPaymentPaid' : 'trackingPaymentPending', lang);
+}
+
+function FilaDetalle({ etiqueta, valor }: Readonly<{ etiqueta: string; valor: string }>) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
+      <dd className="text-sm text-foreground break-words">{valor}</dd>
+    </div>
+  );
+}
+
+/**
+ * Cómo y a dónde se entrega, si está pagado y el número de seguimiento del
+ * transportista. Solo lo que se sabe: sin dato, la fila no sale.
+ */
+function DetallesEntrega({ status, lang }: Readonly<{ status: OrderStatus; lang: Parameters<typeof t>[1] }>) {
+  const entrega = textoEntrega(status, lang);
+  const pago = textoPago(status, lang);
+  const direccion = status.direccion_entrega ?? null;
+  const seguimiento = status.numero_seguimiento ?? null;
+  if (!entrega && !pago && !direccion && !seguimiento) return null;
+  return (
+    <dl className="mb-3 pb-3 border-b border-border flex flex-col gap-2">
+      {entrega && <FilaDetalle etiqueta={t('trackingDeliveryMethod', lang)} valor={entrega} />}
+      {direccion && <FilaDetalle etiqueta={t('trackingAddress', lang)} valor={direccion} />}
+      {seguimiento && <FilaDetalle etiqueta={t('trackingShippingNumber', lang)} valor={seguimiento} />}
+      {pago && <FilaDetalle etiqueta={t('trackingPayment', lang)} valor={pago} />}
+    </dl>
+  );
+}
+
+function FilaDescuento({ porcentaje, lang }: Readonly<{ porcentaje: number | null | undefined; lang: Parameters<typeof t>[1] }>) {
+  if (!porcentaje) return null;
+  return (
+    <li className="flex items-center justify-between gap-2 text-sm">
+      <span className="text-muted-foreground">{t('trackingDiscount', lang)}</span>
+      <span className="text-muted-foreground shrink-0">−{porcentaje}%</span>
+    </li>
+  );
+}
+
+function ItemsList({ status, language }: Readonly<{ status: OrderStatus; language: string }>) {
+  const { items } = status;
   if (!items || items.length === 0) return null;
   const lang = language as Parameters<typeof t>[1];
-  const subtotal = items.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
-  const deliveryFee = deliveryFeeCents ? deliveryFeeCents / 100 : 0;
-  const total = subtotal + deliveryFee;
+  const envio = {
+    modalidad_entrega_precio_cents: status.modalidad_entrega_precio_cents ?? null,
+    delivery_fee_cents: status.delivery_fee_cents,
+  };
+  const gastosCents = gastosEnvioCents(envio);
+  // El total cobrado lo guarda el servidor (envío y descuento incluidos).
+  const total = totalDelPedido({ ...envio, total: status.total ?? null, items });
   return (
     <div className="w-full rounded-xl border border-border bg-card px-4 py-3">
+      <DetallesEntrega status={status} lang={lang} />
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
         {t('trackingOrderedItems', lang)}
       </p>
@@ -134,7 +214,7 @@ function ItemsList({ items, language, deliveryFeeCents }: Readonly<{ items: Orde
                 <span className="text-foreground">{resolveItemName(item, language)}</span>
               </span>
               <span className="text-muted-foreground shrink-0">
-                {formatPrice(item.precio * item.cantidad, 'EUR', lang)}
+                {formatPrice(importeItem(item), 'EUR', lang)}
               </span>
             </div>
             {item.complementos && item.complementos.length > 0 && (
@@ -146,14 +226,15 @@ function ItemsList({ items, language, deliveryFeeCents }: Readonly<{ items: Orde
             )}
           </li>
         ))}
-        {deliveryFee > 0 && (
+        {gastosCents !== null && (
           <li className="flex items-center justify-between gap-2 text-sm">
             <span className="text-muted-foreground">{t('trackingDeliveryFee', lang)}</span>
             <span className="text-muted-foreground shrink-0">
-              {formatPrice(deliveryFee, 'EUR', lang)}
+              {formatPrice(gastosCents / 100, 'EUR', lang)}
             </span>
           </li>
         )}
+        <FilaDescuento porcentaje={status.descuento_porcentaje} lang={lang} />
       </ul>
       <div className="mt-2 pt-2 border-t border-border flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('trackingTotal', lang)}</span>
@@ -310,7 +391,7 @@ function OrderCard({ order, language }: Readonly<{ order: OrderState; language: 
             </p>
           </div>
         </div>
-        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <ItemsList status={status} language={language} />
       </div>
     );
   }
@@ -328,7 +409,7 @@ function OrderCard({ order, language }: Readonly<{ order: OrderState; language: 
             <p className="text-xs text-muted-foreground mt-0.5">{getMesaCardStatusText(status.estado, lang)}</p>
           </div>
         </div>
-        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <ItemsList status={status} language={language} />
       </div>
     );
   }
@@ -345,7 +426,7 @@ function OrderCard({ order, language }: Readonly<{ order: OrderState; language: 
             <p className="text-xs text-muted-foreground mt-0.5">{t('trackingPickup', lang)}</p>
           </div>
         </div>
-        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <ItemsList status={status} language={language} />
       </div>
     );
   }
@@ -367,7 +448,7 @@ function OrderCard({ order, language }: Readonly<{ order: OrderState; language: 
           />
         </div>
       </div>
-      <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+      <ItemsList status={status} language={language} />
     </div>
   );
 }
@@ -416,7 +497,7 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
         <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
           <p className="text-secondary-foreground">{getTiendaPrimaryMsg(status.estado, lang)}</p>
         </div>
-        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <ItemsList status={status} language={language} />
         <GoogleReviewsWidget
           mesaId=""
           sesionId={null}
@@ -439,7 +520,7 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
             {getMesaNumberSuffix(status.mesa_numero, status.mesa_nombre, lang)}
           </p>
         </div>
-        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <ItemsList status={status} language={language} />
         <GoogleReviewsWidget
           mesaId={status.mesa_id ?? ''}
           sesionId={status.sesion_id}
@@ -462,7 +543,7 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
         <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
           <p className="text-secondary-foreground">{t('trackingPickup', lang)}</p>
         </div>
-        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <ItemsList status={status} language={language} />
         <GoogleReviewsWidget
           mesaId=""
           sesionId={null}
@@ -519,7 +600,7 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
           )}
         </div>
       )}
-      <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+      <ItemsList status={status} language={language} />
     </>
   );
 }

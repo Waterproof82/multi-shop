@@ -934,11 +934,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findByTrackingToken(
     token: string
-  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; payment_status: string | null; sesion_id: string | null; google_reviews_url: string | null; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
+  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; payment_status: string | null; sesion_id: string | null; google_reviews_url: string | null; total: number | null; modalidad_entrega_tipo: 'recogida' | 'domicilio' | null; modalidad_entrega_nombre: string | null; modalidad_entrega_precio_cents: number | null; direccion_entrega: string | null; origen: string | null; numero_seguimiento: string | null; descuento_porcentaje: number | null; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, payment_status, glovo_status, mesa_id, delivery_fee_cents, sesion_id, mesas(numero, nombre), empresas(telegram_chat_id, tipo, google_reviews_url)')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, payment_status, glovo_status, mesa_id, delivery_fee_cents, sesion_id, total, modalidad_entrega_tipo, modalidad_entrega_nombre, modalidad_entrega_precio_cents, direccion_entrega, origen, numero_seguimiento, descuento_porcentaje, mesas(numero, nombre), empresas(telegram_chat_id, tipo, google_reviews_url)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -986,6 +986,14 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           payment_status: (raw['payment_status'] as string | null) ?? null,
           sesion_id: (raw['sesion_id'] as string | null) ?? null,
           google_reviews_url: (empresa?.['google_reviews_url'] as string | null) ?? null,
+          total: raw['total'] == null ? null : Number(raw['total']),
+          modalidad_entrega_tipo: (raw['modalidad_entrega_tipo'] as 'recogida' | 'domicilio' | null) ?? null,
+          modalidad_entrega_nombre: (raw['modalidad_entrega_nombre'] as string | null) ?? null,
+          modalidad_entrega_precio_cents: (raw['modalidad_entrega_precio_cents'] as number | null) ?? null,
+          direccion_entrega: (raw['direccion_entrega'] as string | null) ?? null,
+          origen: (raw['origen'] as string | null) ?? null,
+          numero_seguimiento: (raw['numero_seguimiento'] as string | null) ?? null,
+          descuento_porcentaje: raw['descuento_porcentaje'] == null ? null : Number(raw['descuento_porcentaje']),
           items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number; complementos?: { nombre: string; precio: number }[] }[] | null) ?? []),
         },
       };

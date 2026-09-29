@@ -112,6 +112,16 @@ type DiscountResult = {
   applied: false;
 };
 
+/** Campos de entrega tal como se persisten (ver buildOrigenPayload / buildModalidadPayload). */
+interface EntregaPersistida {
+  origen?: string;
+  direccion_entrega?: string;
+  estimated_delivery_fee_cents?: number;
+  modalidad_entrega_tipo?: 'recogida' | 'domicilio';
+  modalidad_entrega_precio_cents?: number;
+  modalidad_entrega_nombre?: string | null;
+}
+
 export class PedidoUseCase {
   constructor(
     private readonly pedidoRepo: IPedidoRepository,
@@ -459,7 +469,8 @@ export class PedidoUseCase {
     numeroPedido: number,
     total: number,
     data: CreatePedidoDTO,
-    trackingToken: string | undefined
+    trackingToken: string | undefined,
+    entrega: EntregaPersistida
   ): Pedido {
     return {
       id: pedidoId,
@@ -481,6 +492,17 @@ export class PedidoUseCase {
       estimated_minutes: null,
       estimated_ready_at: null,
       clientes: { nombre: data.nombre, email: data.email ?? '', telefono: data.telefono },
+      // Lo MISMO que se persiste (tipo y precio validados, dirección solo a
+      // domicilio): el aviso no puede contar una entrega distinta a la guardada.
+      origen: entrega.origen ?? null,
+      modalidad_entrega_tipo: entrega.modalidad_entrega_tipo ?? null,
+      modalidad_entrega_nombre: entrega.modalidad_entrega_nombre ?? null,
+      modalidad_entrega_precio_cents: entrega.modalidad_entrega_precio_cents ?? null,
+      delivery_fee_cents: entrega.estimated_delivery_fee_cents ?? null,
+      direccion_entrega: entrega.direccion_entrega ?? null,
+      // Este aviso solo sale en pedidos SIN pago online; los que pasan por
+      // Redsys avisan desde el webhook, ya cobrados.
+      paymentStatus: 'not_required',
     };
   }
 
@@ -794,6 +816,10 @@ export class PedidoUseCase {
 
       // Step 4: Create the order
       // Pass origen for both delivery and recogida so the Redsys webhook can identify order type
+      const entrega: EntregaPersistida = {
+        ...this.buildOrigenPayload(data, isDelivery),
+        ...this.buildModalidadPayload(data, modalidadTipoValidado, modalidadPrecioCents, modalidadNombre),
+      };
       const pedidoResult = await this.pedidoRepo.create(
         empresaId,
         clienteResult.data.clienteId,
@@ -801,7 +827,7 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadTipoValidado, modalidadPrecioCents, modalidadNombre) },
+        entrega,
         idempotency
       );
       if (!pedidoResult.success) {
@@ -818,7 +844,7 @@ export class PedidoUseCase {
       const pedidoParaNotificar = this.buildTelegramPedido(
         pedidoResult.data.id, empresaId, clienteResult.data.clienteId,
         pedidoResult.data.numero_pedido, pedidoResult.data.total,
-        data, trackingToken
+        data, trackingToken, entrega
       );
       await this.notifyTelegramForCreate(
         telegramChatId, pedidoParaNotificar, empresaTipo, esPedidos,
