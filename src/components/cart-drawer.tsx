@@ -183,7 +183,7 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
 function validateEmailInput(email: string, obligatorio: boolean, translate: TranslateFn, language: Language): string | undefined {
   const trimmed = email.trim();
   if (!trimmed) return obligatorio ? translate("validationEmailRequired", language) : undefined;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return translate("validationEmailFormat", language);
+  if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(trimmed)) return translate("validationEmailFormat", language);
   return undefined;
 }
 
