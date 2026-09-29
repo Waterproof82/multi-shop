@@ -211,8 +211,15 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
 
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
     fireEvent.click(screen.getByRole('checkbox'));
-    // "Recoger en local" está preseleccionada por defecto — sin necesidad de
-    // tocar nada del selector, el pedido ya está en recogida.
+    // Desde 2026-09-29 el botón exige los datos del cliente y un método de
+    // entrega elegido (ver cart-boton-enviar.test.tsx). "Recoger en local" NO
+    // viene preseleccionada: se elige a mano.
+    const escribir = (sel: string, valor: string) =>
+      fireEvent.change(document.querySelector(sel) as HTMLElement, { target: { value: valor } });
+    escribir('#cart-nombre', 'Ana');
+    escribir('#cart-telefono', '600123123');
+    escribir('#cart-email', 'ana@example.com');
+    fireEvent.click(screen.getByRole('button', { name: /recoger en local/i }));
 
     expect(screen.getByRole('button', { name: /enviar pedido/i })).not.toBeDisabled();
     expect(screen.queryByText('Selecciona una dirección válida')).not.toBeInTheDocument();

@@ -1068,9 +1068,37 @@ function grandTotalColorClass(discountValid: { valid: boolean } | null): string 
   return discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 }
 
-function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean, ageConfirmed: boolean): boolean {
-  if (mesaToken === null && !ageConfirmed) return true;
+function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean, ageConfirmed: boolean, datosIncompletos: boolean): boolean {
+  if (mesaToken === null && (!ageConfirmed || datosIncompletos)) return true;
   return sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete;
+}
+
+/**
+ * Tienda con envío: hay que elegir recogida o una modalidad a domicilio. Solo
+ * cuando el selector se pinta (mismo filtro que `TiendaFulfillmentSelector`):
+ * sin modalidades activas no hay nada que elegir.
+ */
+function modalidadPendiente(
+  usaWizard: boolean,
+  modalidades: ModalidadEntregaPublica[],
+  tipo: ModalidadEntregaTipo,
+): boolean {
+  if (!usaWizard || tipo !== null) return false;
+  return modalidades.some((m) => m.tipo === 'domicilio' && m.activo);
+}
+
+/**
+ * Aviso bajo el botón deshabilitado. Si lo que falta es la dirección, ya lo
+ * explica su propio aviso (`deliverySelectValidAddress`): no se duplica.
+ */
+function showAvisoDatosIncompletos(
+  mesaToken: string | null,
+  datosIncompletos: boolean,
+  ageConfirmed: boolean,
+  isDeliveryIncomplete: boolean,
+): boolean {
+  if (mesaToken !== null || isDeliveryIncomplete) return false;
+  return datosIncompletos || !ageConfirmed;
 }
 
 function shouldShowQrGate(
@@ -1216,6 +1244,19 @@ function validarDatosDelCliente(datos: {
 
   if (!nombre && !telefono && !email && !delivery) return null;
   return { nombre, telefono, email, delivery };
+}
+
+/**
+ * Misma validación que al pulsar "Enviar", evaluada en cada render: el botón no
+ * se habilita hasta que el pedido la supera. En mesa no hay datos que pedir.
+ */
+function computeDatosIncompletos(
+  mesaToken: string | null,
+  datos: Parameters<typeof validarDatosDelCliente>[0],
+  faltaModalidad: boolean,
+): boolean {
+  if (mesaToken !== null) return false;
+  return faltaModalidad || validarDatosDelCliente(datos) !== null;
 }
 
 /**
@@ -1547,6 +1588,12 @@ export function CartDrawer({
     void fetch(`/api/mesas/${encodeURIComponent(mesaActivar)}/activate`, { method: 'POST' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
+
+  const datosIncompletos = computeDatosIncompletos(
+    mesaToken,
+    { nombre, telefono, email, emailObligatorio: emailEsObligatorio, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language, modalidadEntregaTipo },
+    modalidadPendiente(usaWizard, modalidadesEntrega, modalidadEntregaTipo),
+  );
 
   const isDeliveryIncomplete = computeIsDeliveryIncomplete(isRestaurant, mesaToken, deliveryMethod, deliveryLatitude, estimatedFeeCents, modalidadEntregaTipo, deliveryLongitude);
 
@@ -1917,6 +1964,11 @@ export function CartDrawer({
                   {t('deliverySelectValidAddress', language)}
                 </output>
               )}
+              {showAvisoDatosIncompletos(mesaToken, datosIncompletos, ageConfirmed, isDeliveryIncomplete) && (
+                <output className="block text-xs text-muted-foreground text-center mb-2">
+                  {t('cartCompleteRequired', language)}
+                </output>
+              )}
 
               {/* Aviso privacidad RGPD Art.13 — base jurídica: ejecución del contrato */}
               <p className="text-[10px] text-muted-foreground text-center leading-relaxed mb-1">
@@ -1952,7 +2004,7 @@ export function CartDrawer({
                    className="w-full rounded-[3px] bg-foreground text-background hover:bg-foreground/85 py-3 text-base font-semibold transition-colors duration-150 min-h-[48px]"
                    size="lg"
                    onClick={handleSendOrder}
-                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete, ageConfirmed)}
+                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete, ageConfirmed, datosIncompletos)}
                  >
                    {orderButtonLabel(sending, mesaToken, t, language)}
                  </Button>

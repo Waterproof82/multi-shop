@@ -1,16 +1,16 @@
 # Graph Report - multi_shop  (2026-09-29)
 
 ## Corpus Check
-- 1160 files · ~644,327 words
+- 1161 files · ~645,179 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 7601 nodes · 16961 edges · 570 communities (394 shown, 176 thin omitted)
+- 7612 nodes · 16988 edges · 591 communities (393 shown, 198 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 119 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2fdac0d5`
+- Built from commit: `13555f5e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -330,6 +330,10 @@
 - ItemEstado
 - 20260929000001_pedidos_confirmacion_email.sql
 - executeMesaOrder
+- eslint-config-next
+- @eslint/eslintrc
+- husky
+- jose
 - Content Security Policy (CSP)
 - Prompt: Búsqueda de Clientes Potenciales — multi_shop
 - route.ts
@@ -340,12 +344,14 @@
 - iva-property.test.ts
 - sw-network-timeout.test.ts
 - Skill Registry — multi-shop
+- next
 - jose
 - Funciones SECURITY DEFINER — Trampas Críticas
 - anon-realtime-column-privileges.spec.ts
 - route.ts
 - route.ts
 - datos-del-comensal.test.tsx
+- electron-store
 - analytics.use-case.ts
 - 20260801000005_pedidos_purga_pruebas.sql
 - cron-secret-timing-safe.test.ts
@@ -361,6 +367,8 @@
 - rgpd-purge-log.spec.ts
 - tpv-cobros-inalterabilidad.spec.ts
 - 20260928000001_pedidos_numero_seguimiento.sql
+- qrcode
+- @radix-ui/react-dialog
 - tpv-turnos-inalterabilidad.spec.ts
 - Testing & CI
 - page.tsx
@@ -389,9 +397,14 @@
 - iva-breakdown.test.ts
 - sw-network-timeout.test.ts
 - @types/bcryptjs
+- @radix-ui/react-slot
+- react-dom
+- recharts
 - Sistema de Bloqueo de Pago (`pago_en_curso`)
+- @playwright/test
 - @vercel/analytics
 - landing-accesibilidad.test.tsx
+- tsx
 - Liberación de Slots Pendientes (Cancelación / Abandono)
 - Webhook Redsys
 - pre-merge-commit
@@ -494,6 +507,14 @@
 - Verificación de Total (Anti-Race Condition)
 - Polling Adaptativo + Realtime
 - 20260928000002_pedidos_modalidad_entrega_nombre.sql
+- tw-animate-css
+- @types/node
+- @types/qrcode
+- @types/react-dom
+- typescript
+- @typescript-eslint/parser
+- vitest
+- @vitest/coverage-v8
 
 ## God Nodes (most connected - your core abstractions)
 1. `Result` - 722 edges
@@ -510,35 +531,35 @@
 ## Surprising Connections (you probably didn't know these)
 - `CategoriasPage()` --indirect_call--> `categoria()`  [INFERRED]
   src/app/admin/(protected)/categorias/page.tsx → tests/compliance/menu-subcategorias.test.ts
+- `useMesaActiva()` --indirect_call--> `sesion()`  [INFERRED]
+  src/hooks/tpv/useMesaActiva.ts → tests/compliance/mesa-manual-payment.test.ts
 - `jsonLd()` --indirect_call--> `nodo()`  [INFERRED]
   scripts/seed-landing-desde-web.ts → tests/compliance/menu-virtual-mapper.test.ts
 - `filterEntry()` --indirect_call--> `item()`  [INFERRED]
   src/app/admin/(protected)/admin-sidebar.tsx → tests/compliance/waiter-cierre-al-salir.test.ts
-- `ComplementosPage()` --indirect_call--> `grupo()`  [INFERRED]
-  src/app/admin/(protected)/complementos/page.tsx → tests/compliance/menu-agrupacion.test.ts
 - `MenusVirtualesPage()` --indirect_call--> `nodo()`  [INFERRED]
   src/app/admin/(protected)/menus-virtuales/page.tsx → tests/compliance/menu-virtual-mapper.test.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (570 total, 176 thin omitted)
+## Communities (591 total, 198 thin omitted)
 
 ### Community 0 - "TPV Cobros y Tickets"
 Cohesion: 0.18
 Nodes (7): Sheet(), SheetContent(), SheetDescription(), SheetFooter(), SheetHeader(), SheetOverlay(), SheetTitle()
 
 ### Community 1 - "Sistema de Pedidos Mesa"
-Cohesion: 0.03
-Nodes (16): CreateMesaPedidoDTO, PedidoUseCase, EmpleadoTpvLoginUseCase, CartItem, Pedido, Result, IEmpleadoTpvRepository, IPedidoRepository (+8 more)
+Cohesion: 0.05
+Nodes (7): PedidoUseCase, tieneDireccionValida(), Pedido, Result, IPedidoRepository, pedidoEffectiveDateMs(), SupabasePedidoRepository
 
 ### Community 2 - "Auth y Sesiones Admin"
-Cohesion: 0.08
-Nodes (25): CreateModalidadEntregaDTO, UpdateModalidadEntregaDTO, ModalidadEntregaUseCase, propagarError(), CreatePedidoDTO, DiscountResult, PedidoStats, tieneDireccionValida() (+17 more)
+Cohesion: 0.07
+Nodes (28): MenuPageProps, baseModalidadEntregaSchema, CreateModalidadEntregaDTO, createModalidadEntregaSchema, modalidadEntregaIdSchema, UpdateModalidadEntregaDTO, updateModalidadEntregaSchema, ModalidadEntregaUseCase (+20 more)
 
 ### Community 3 - "Realtime Waiter Panel"
-Cohesion: 0.04
-Nodes (94): GET(), querySchema, PATCH(), RouteParams, AnonimizarSchema, POST(), GET(), QuerySchema (+86 more)
+Cohesion: 0.05
+Nodes (67): GET(), querySchema, AnonimizarSchema, POST(), GET(), QuerySchema, POST(), schema (+59 more)
 
 ### Community 4 - "Catálogo y Menú Público"
 Cohesion: 0.11
@@ -549,48 +570,48 @@ Cohesion: 0.18
 Nodes (10): 1. Árbol — jerarquía visual clara (opción A del brainstorming), 2. Reordenar — drag & drop real con `@dnd-kit`, 3. Crear — diálogo modal en vez de creación inmediata, 4. Feedback — banner inline + diálogo de confirmación, sin `alert`/`confirm`, Contexto, Decisiones (aprobadas visualmente por el usuario — opción A + modal + drag&drop real), Diseño: rediseño del árbol de Menús Virtuales (admin), Fuera de alcance (+2 more)
 
 ### Community 6 - "Complementos Productos"
-Cohesion: 0.07
+Cohesion: 0.08
 Nodes (14): CreateTgtgResult, SendEmailsResult, TgtgUseCase, TgtgWithItems, TgtgItem, TgtgPromocion, TgtgReserva, CreateTgtgItemData (+6 more)
 
 ### Community 7 - "Delivery y Recogida"
-Cohesion: 0.09
-Nodes (32): AnyGroupValue, COUNTDOWN_COLOR, CountdownCard(), CountdownCardProps, formatTimer(), getElapsedMinutes(), getMergedActionLabel(), getTimeColor() (+24 more)
+Cohesion: 0.10
+Nodes (30): AnyGroupValue, COUNTDOWN_COLOR, CountdownCard(), CountdownCardProps, formatTimer(), getElapsedMinutes(), getMergedActionLabel(), getTimeColor() (+22 more)
 
 ### Community 8 - "Infraestructura DB y Repos"
-Cohesion: 0.05
-Nodes (23): MesaSesionUseCase, MesaUseCase, IMesaRepository, Mesa, MesaWithSession, DeferredItem, IMesaSesionRepository, MesaSesion (+15 more)
+Cohesion: 0.04
+Nodes (37): cerrarMesaPagada(), FooterProps, getMesaColors(), MesaColors, MesaFooter(), MesasGrid(), Props, TpvMesaCard() (+29 more)
 
 ### Community 9 - "UI Componentes TPV"
 Cohesion: 0.09
-Nodes (22): agruparYaPagados(), bebidasPrimero(), BotonDePago(), buildGroupedItems(), buildRemainingAndPaidMaps(), buildSeleccion(), CustomSelectionView(), CustomTurno (+14 more)
+Nodes (22): BotonDePago(), buildRemainingAndPaidMaps(), CustomTurno, CustomWaitingView(), DivisionState, DivisionTypeModal(), getStoredToken(), GroupedSelectorItem (+14 more)
 
 ### Community 10 - "Módulo 10"
-Cohesion: 0.22
-Nodes (9): BcgScatterChartProps, LEGEND_ITEMS, QUADRANT_BG, QUADRANT_COLOR, TooltipPayload, TooltipProps, TranslationKey, BcgItem (+1 more)
+Cohesion: 0.15
+Nodes (18): classifyBcg(), computeMedian(), resolveQuadrant(), OcupacionPage(), BcgScatterChart(), BcgScatterChartProps, LEGEND_ITEMS, QUADRANT_BG (+10 more)
 
 ### Community 11 - "Módulo 11"
-Cohesion: 0.03
-Nodes (77): POST(), schema, GET(), GET(), getTpvRelease(), GithubAsset, GithubRelease, parsed (+69 more)
+Cohesion: 0.06
+Nodes (44): POST(), schema, GET(), GET(), getTpvRelease(), GithubAsset, GithubRelease, parsed (+36 more)
 
 ### Community 12 - "Módulo 12"
-Cohesion: 0.08
+Cohesion: 0.09
 Nodes (15): ComplementoGrupoUseCase, ComplementoGrupo, ComplementoOpcion, ProductoComplementoAsignacion, CreateComplementoGrupoData, CreateComplementoOpcionData, IComplementoGrupoRepository, UpdateComplementoGrupoData (+7 more)
 
 ### Community 13 - "Módulo 13"
-Cohesion: 0.20
-Nodes (14): mesaIdSchema, POST(), aplicarCobro(), asentarResultado(), cargarSesionCobrable(), cobrarParteIgual(), cobrarTurnoPersonalizado(), Cobro (+6 more)
+Cohesion: 0.24
+Nodes (12): aplicarCobro(), asentarResultado(), cargarSesionCobrable(), cobrarParteIgual(), cobrarTurnoPersonalizado(), Cobro, fallo(), RegisterManualMesaPaymentInput (+4 more)
 
 ### Community 14 - "Módulo 14"
-Cohesion: 0.06
-Nodes (41): CategoryNav(), claseCategoria(), languages, LanguageSelector(), Badge(), badgeVariants, DialogOverlay(), DropdownMenu() (+33 more)
+Cohesion: 0.07
+Nodes (44): AddItemForm, AlbaranDetailPage(), defaultTaxRate(), emptyAddFormBase, formatEuros(), selectedCatalogoItem(), AlbaranesPage(), EstadoBadge() (+36 more)
 
 ### Community 15 - "Módulo 15"
-Cohesion: 0.16
-Nodes (16): DeliveryPage(), GET(), PUT(), DELETE(), GET(), POST(), PUT(), UpdateDeliverySettingsDto (+8 more)
+Cohesion: 0.08
+Nodes (19): UpdateDeliverySettingsDto, createProveedorUseCase(), schema, CerrarTurnoInput, registrarMovimientoCajaUseCase(), TpvMovimientoCajaPayload, AppError, ErrorModule (+11 more)
 
 ### Community 16 - "Módulo 16"
-Cohesion: 0.05
-Nodes (64): GET(), getR2Bucket(), getS3Client(), POST(), Snapshot, SnapshotRow, DELETE(), Params (+56 more)
+Cohesion: 0.08
+Nodes (38): DELETE(), PATCH(), PatchSchema, CreateSchema, GET(), POST(), DELETE(), GET() (+30 more)
 
 ### Community 17 - "Módulo 17"
 Cohesion: 0.13
@@ -602,43 +623,43 @@ Nodes (14): CreateClienteDTO, UpdateClienteDTO, anonymizeEmail(), ClienteUseCase
 
 ### Community 19 - "Módulo 19"
 Cohesion: 0.04
-Nodes (64): addItemToAlbaranUseCase(), buildTrazabilidadError(), isFechaCaducidadValida(), schema, validateTrazabilidad(), schema, hasValidTrazabilidad(), isFechaCaducidadValida() (+56 more)
+Nodes (68): addItemToAlbaranUseCase(), buildTrazabilidadError(), isFechaCaducidadValida(), schema, validateTrazabilidad(), createAlbaranUseCase(), schema, hasValidTrazabilidad() (+60 more)
 
 ### Community 20 - "Módulo 20"
-Cohesion: 0.10
-Nodes (22): AdminDashboardClientProps, CategoryNavProps, MenuSectionProps, ComplementGroupVM, MenuCategoryVM, MenuSubcategoryVM, ProductoTablaVM, TablaCeldaVM (+14 more)
+Cohesion: 0.07
+Nodes (32): AdminDashboardClientProps, CategoryNavProps, MenuSectionProps, ComplementGroupVM, ComplementVM, MenuCategoryVM, MenuSubcategoryVM, ProductoTablaVM (+24 more)
 
 ### Community 21 - "Módulo 21"
-Cohesion: 0.04
-Nodes (80): CategoriasPage(), Category, CategoryFormData, CategoryRowActions(), CategoryStatusToggle(), CategorySubcategoriasBadge(), CategoryTypeBadges(), compararCategoriasPorActivoYOrden() (+72 more)
+Cohesion: 0.05
+Nodes (43): AdminCharts, AvgTicketCard(), ChartTheme, ClientsCard(), ComparisonCard(), DEFAULT_CHART_THEME, EstadisticasPage(), getChartTheme() (+35 more)
 
 ### Community 22 - "Módulo 22"
-Cohesion: 0.04
-Nodes (87): LoginForm(), LoginFormProps, TpvPinCard(), ComplementosPage(), Cliente, Promocion, PromocionesPage(), buildProductosUrl() (+79 more)
+Cohesion: 0.03
+Nodes (94): buildQrUrl(), Mesa, MesasPage(), Cliente, Promocion, PromocionesPage(), Cliente, createEmptyItem() (+86 more)
 
 ### Community 23 - "Módulo 23"
-Cohesion: 0.07
-Nodes (45): ConfiguracionPage(), AdminDashboard(), configDeEmpresa(), GET(), querySchema, GET(), GET(), querySchema (+37 more)
+Cohesion: 0.05
+Nodes (71): ConfiguracionPage(), AdminDashboard(), configDeEmpresa(), DELETE(), enviarEmailSchema, generateOrderEmail(), OrderItem, POST() (+63 more)
 
 ### Community 24 - "Módulo 24"
-Cohesion: 0.08
-Nodes (41): MenuSection, QuantitySelectorDialogProps, ComplementVM, MenuItemVM, TranslationEntry, claveCarritoGuardado(), debePersistirCarrito(), esLineaValida() (+33 more)
+Cohesion: 0.07
+Nodes (38): QuantitySelectorDialogProps, MenuItemVM, claveCarritoGuardado(), debePersistirCarrito(), esLineaValida(), leerLineas(), LineaGuardada, LineaRestaurada (+30 more)
 
 ### Community 25 - "Módulo 25"
-Cohesion: 0.11
-Nodes (27): LandingAdminLayout(), landingHabilitadaParaAdminActual(), GET(), ALLOWED_ROLES, LaborControlLayout(), CierreTurnoPage(), TpvAnalyticsPage(), buildDetalleItemsSSR() (+19 more)
+Cohesion: 0.12
+Nodes (25): LandingAdminLayout(), landingHabilitadaParaAdminActual(), GET(), ALLOWED_ROLES, LaborControlLayout(), CierreTurnoPage(), TpvAnalyticsPage(), CobroPage() (+17 more)
 
 ### Community 26 - "Módulo 26"
-Cohesion: 0.12
-Nodes (24): formatTimer(), getElapsedMinutes(), getGroupedItems(), getMergedItems(), getOldestCreatedAt(), GroupedPendienteItem, makeCleanupMap(), MergedItem (+16 more)
+Cohesion: 0.11
+Nodes (26): formatTimer(), getElapsedMinutes(), getGroupedItems(), getMergedItems(), getOldestCreatedAt(), GroupedPendienteItem, makeCleanupMap(), MergedItem (+18 more)
 
 ### Community 27 - "Módulo 27"
 Cohesion: 0.06
 Nodes (32): dom, dom.iterable, esnext, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules, ./src/* (+24 more)
 
 ### Community 28 - "Módulo 28"
-Cohesion: 0.05
-Nodes (37): ALLERGEN_ICON_MAP, ALLERGEN_KEYS, ALLERGEN_TRANSLATION_KEY, AllergenBadges(), AllergenIcon(), AllergenList(), baseProps, SvgProps (+29 more)
+Cohesion: 0.08
+Nodes (35): Producto, ImageZoomDialog(), ImageZoomDialogProps, getCardAriaLabel(), getComplementCategoryDisplay(), ItemDetailDialog(), LanguageKey, MenuItemCard (+27 more)
 
 ### Community 29 - "Módulo 29"
 Cohesion: 0.14
@@ -646,59 +667,59 @@ Nodes (13): Admin panel: gestión de empleados, Archivos clave, Arqueo ciego par
 
 ### Community 30 - "Módulo 30"
 Cohesion: 0.12
-Nodes (13): CreateCategoryDTO, UpdateCategoryDTO, CategoryUseCase, IndiceComplementos, Category, CreateCategoryData, ICategoryRepository, UpdateCategoryData (+5 more)
+Nodes (14): baseCategorySchema, categoryIdSchema, CreateCategoryDTO, createCategorySchema, UpdateCategoryDTO, updateCategorySchema, CategoryUseCase, Category (+6 more)
 
 ### Community 31 - "Módulo 31"
 Cohesion: 0.04
-Nodes (55): @aws-sdk/client-s3, @capacitor/android, @capacitor/app, @capacitor/core, @capacitor/preferences, @capacitor/push-notifications, class-variance-authority, @dnd-kit/core (+47 more)
+Nodes (47): bcryptjs, @capacitor/android, @capacitor/app, @capacitor/preferences, class-variance-authority, clsx, @dnd-kit/core, @dnd-kit/utilities (+39 more)
 
 ### Community 32 - "Módulo 32"
-Cohesion: 0.14
-Nodes (20): LandingAdminPage(), seccionesIniciales(), SeccionState, seccionVacia(), tabClass(), TIPO_LABELS, CintaCampo(), CintaCampoProps (+12 more)
+Cohesion: 0.13
+Nodes (21): LandingAdminPage(), seccionesIniciales(), SeccionState, seccionVacia(), tabClass(), TIPO_LABELS, CintaCampo(), CintaCampoProps (+13 more)
 
 ### Community 33 - "Módulo 33"
-Cohesion: 0.09
-Nodes (36): generateMetadata(), getMimeType(), inter, playfair, RootLayout(), viewport, LazyPromoToast, LazyTgtgReservaPopup (+28 more)
+Cohesion: 0.08
+Nodes (28): generateMetadata(), getMimeType(), inter, playfair, RootLayout(), viewport, AnaliticaVercel(), esNavegadorAutomatizado() (+20 more)
 
 ### Community 34 - "Módulo 34"
-Cohesion: 0.05
-Nodes (34): POST(), LoginDTO, loginSchema, anonymizeEmail(), AuthAdminUseCase, getTokenSecret(), LoginResult, SuperAdminUseCase (+26 more)
+Cohesion: 0.06
+Nodes (44): POST(), LoginDTO, loginSchema, anonymizeEmail(), AuthAdminUseCase, getTokenSecret(), LoginResult, createErrorResponse() (+36 more)
 
 ### Community 35 - "Módulo 35"
-Cohesion: 0.10
-Nodes (34): ClientesPage(), AccionesPedido(), CancelOrderDialog(), Cliente, comparePedidos(), computePedidoStats(), DeleteAllOrdersDialog(), ESTADO_TRANSLATION_KEYS (+26 more)
+Cohesion: 0.06
+Nodes (50): ClientesPage(), AdminMinimo, ConfigEmpresa, AccionesPedido(), CancelOrderDialog(), Cliente, comparePedidos(), computePedidoStats() (+42 more)
 
 ### Community 36 - "Módulo 36"
-Cohesion: 0.13
-Nodes (17): metadata, Props, CartDrawer, getCategoryTab(), MenuPage(), MesaOrderHistory, WelcomeDiscountPopup, MesaOrderHistory() (+9 more)
+Cohesion: 0.05
+Nodes (52): metadata, Props, metadata, CartDrawer, getCategoryTab(), MenuPage(), MesaOrderHistory, WelcomeDiscountPopup (+44 more)
 
 ### Community 37 - "Módulo 37"
 Cohesion: 0.10
 Nodes (19): Columnas de base de datos, Configuración, Documentación: Notificaciones de Pedidos por Telegram, `empresas`, Endpoints, Flujo — Modo Restaurante (subdomain pedidos / takeaway), Flujo — Modo Tienda, Flujo — Tienda / Recogida con pago online (`pagos_pickup_habilitados`) (+11 more)
 
 ### Community 38 - "Módulo 38"
-Cohesion: 0.08
-Nodes (32): Pedido, PedidoItem, BarOrderItem, KitchenBarCounts, KitchenItemRecord, KitchenOrderItem, PendienteValidacionItem, PendienteValidacionMesa (+24 more)
+Cohesion: 0.07
+Nodes (35): Pedido, CartItem, PedidoItem, BarOrderItem, KitchenBarCounts, KitchenItemRecord, KitchenOrderItem, PendienteValidacionItem (+27 more)
 
 ### Community 40 - "Módulo 40"
-Cohesion: 0.10
-Nodes (30): checkMesaPaymentLock(), contextoPago(), createPedidoSchema, DefaultData, defaultPedidoSchema, EmpresaOrderData, handleDefaultOrder(), handleMesaOrder() (+22 more)
+Cohesion: 0.14
+Nodes (21): checkMesaPaymentLock(), contextoPago(), createPedidoSchema, DefaultData, defaultPedidoSchema, EmpresaOrderData, handleDefaultOrder(), handleMesaOrder() (+13 more)
 
 ### Community 41 - "Módulo 41"
 Cohesion: 0.10
 Nodes (11): MenuVirtualUseCase, MenuVirtual, CreateMenuVirtualData, IMenuVirtualRepository, MenuVirtualProductoAsignacion, UpdateMenuVirtualData, findAsignacionesConRetry(), findAsignacionesQuery() (+3 more)
 
 ### Community 42 - "Módulo 42"
-Cohesion: 0.11
-Nodes (27): applyLeftSwipeDrag(), applyRightSwipeDrag(), applySwipeDragVisuals(), BarOrder, BarPage(), cancelBarItems(), clearServedKeysForOrder(), COUNTDOWN_COLOR (+19 more)
+Cohesion: 0.12
+Nodes (25): applyLeftSwipeDrag(), applyRightSwipeDrag(), applySwipeDragVisuals(), BarOrder, BarPage(), cancelBarItems(), clearServedKeysForOrder(), COUNTDOWN_COLOR (+17 more)
 
 ### Community 43 - "Módulo 43"
-Cohesion: 0.14
-Nodes (21): GET(), mesaIdSchema, addToIndexMap(), calculateTotal(), fetchEmpresaSettings(), fetchItemEstados(), fetchPaymentState(), getMesaOrdersUseCase() (+13 more)
+Cohesion: 0.16
+Nodes (18): addToIndexMap(), calculateTotal(), fetchEmpresaSettings(), fetchItemEstados(), fetchPaymentState(), getMesaOrdersUseCase(), isPersonalizedPaymentComplete(), ItemEstadoMaps (+10 more)
 
 ### Community 44 - "Módulo 44"
-Cohesion: 0.11
-Nodes (29): Props, buildQuickAmounts(), CobroEfectivo(), fmt(), NUMPAD, Props, CobroFlow(), Props (+21 more)
+Cohesion: 0.09
+Nodes (35): APARIENCIA, buildAeatUrl(), CobroConfirmado(), EstadoConfirmacion, fmt(), Props, buildQuickAmounts(), CobroEfectivo() (+27 more)
 
 ### Community 45 - "Módulo 45"
 Cohesion: 0.05
@@ -713,8 +734,8 @@ Cohesion: 0.05
 Nodes (43): Authentication, Auto-close on Payment, Call Waiter, Cart flags, Cart UX (Waiter Mode), DB storage, Deferred Items ("Para servir después"), `DeferredItem` type (+35 more)
 
 ### Community 48 - "Módulo 48"
-Cohesion: 0.11
-Nodes (21): applyPendingDeleteOverlay(), buildPaidByMergeKey(), canDeleteItem(), createMesaBroadcastChannel(), createMesaChannel(), getManualPayLabel(), getStoredActiveTurno(), getStoredHidingActions() (+13 more)
+Cohesion: 0.12
+Nodes (20): applyPendingDeleteOverlay(), buildPaidByMergeKey(), canDeleteItem(), createMesaChannel(), getManualPayLabel(), getStoredActiveTurno(), getStoredHidingActions(), isExternalPaymentActive() (+12 more)
 
 ### Community 50 - "Módulo 50"
 Cohesion: 0.12
@@ -729,20 +750,20 @@ Cohesion: 0.10
 Nodes (21): LandingSeccionApi, ctaCartaContenidoSchema, galeriaContenidoSchema, heroContenidoSchema, nosotrosContenidoSchema, setActivoLandingSeccionSchema, testimonioContenidoSchema, translatableTextSchema (+13 more)
 
 ### Community 53 - "Módulo 53"
-Cohesion: 0.08
-Nodes (34): .next, ref_server_only, AdminLoginPage(), metadata, GET(), CartaPageProps, generateMetadata(), GET() (+26 more)
+Cohesion: 0.07
+Nodes (46): .next, ref_server_only, AdminLoginPage(), metadata, GET(), CartaPageProps, generateMetadata(), GET() (+38 more)
 
 ### Community 54 - "Módulo 54"
 Cohesion: 0.10
-Nodes (26): Props, Props, AbrirTurnoInput, abrirTurnoUseCase(), CerrarTurnoInput, cerrarTurnoUseCase(), registrarMovimientoCajaUseCase(), GetAnalyticsParams (+18 more)
+Nodes (20): Props, AbrirTurnoInput, abrirTurnoUseCase(), GetAnalyticsParams, InformeZDesglosePago, TipoEventoTurno, TpvAnalytics, TpvCobro (+12 more)
 
 ### Community 55 - "Módulo 55"
-Cohesion: 0.11
-Nodes (20): NavFlatItemProps, AdminChartsProps, Paso, PasoConfirmar(), PasoNumero(), PasoSinEmail(), pasoTrasGuardar(), PedidoSeguimiento (+12 more)
+Cohesion: 0.08
+Nodes (37): paramsSchema, POST(), CreateGlovoOrderInput, CreateGlovoOrderOutput, GetDeliveryQuoteInput, GetDeliveryQuoteOutput, CommitCustomPaymentInput, CommitCustomPaymentResult (+29 more)
 
 ### Community 56 - "Módulo 56"
-Cohesion: 0.12
-Nodes (11): RegistrarCorreccionUseCase, derivarEstado(), isOrphan(), RegistrarFichajeUseCase, CreateReviewItemInput, IReviewQueueRepository, ReviewEstado, ReviewQueueItem (+3 more)
+Cohesion: 0.20
+Nodes (10): CreateReviewItemInput, IReviewQueueRepository, Compensacion, FichajeAccion, FichajeTipo, ReviewEstado, ReviewQueueItem, ReviewTipo (+2 more)
 
 ### Community 57 - "Módulo 57"
 Cohesion: 0.21
@@ -758,7 +779,7 @@ Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 mor
 
 ### Community 60 - "Módulo 60"
 Cohesion: 0.04
-Nodes (43): BannerSliderManager(), BannerSliderManagerProps, SortableSlide(), SortableSlideProps, NuevoMenuVirtualDialog(), DeliveryData, DeliveryMethodSelector(), DeliveryMethodSelectorProps (+35 more)
+Nodes (47): BannerCarta(), BannerCartaProps, DeliveryData, DeliveryMethodSelector(), DeliveryMethodSelectorProps, ErrorBoundary, Props, State (+39 more)
 
 ### Community 61 - "Módulo 61"
 Cohesion: 0.09
@@ -766,23 +787,23 @@ Nodes (21): 1. Informe Z (cierre de turno), 2. Desglose de Ítems en Ticket (`de
 
 ### Community 62 - "Módulo 62"
 Cohesion: 0.12
-Nodes (14): mapComplementoGrupoToGroupVM(), agruparComplementosPorProducto(), agruparPor(), GetMenuUseCase, indexarCategoriasComplemento(), porOrden(), grupo(), asignacionVirtual (+6 more)
+Nodes (13): agruparComplementosPorProducto(), agruparPor(), GetMenuUseCase, indexarCategoriasComplemento(), IndiceComplementos, porOrden(), asignacionVirtual, categoria1 (+5 more)
 
 ### Community 63 - "Módulo 63"
-Cohesion: 0.09
-Nodes (23): CheckItemProps, CobroCount, getCobroStats(), getLastPurge(), getVerifactuMode(), LastPurge, TpvLegalPage(), VerifactuMode (+15 more)
+Cohesion: 0.13
+Nodes (15): CheckItemProps, CobroCount, getCobroStats(), getLastPurge(), getVerifactuMode(), LastPurge, TpvLegalPage(), VerifactuMode (+7 more)
 
 ### Community 64 - "Módulo 64"
-Cohesion: 0.16
+Cohesion: 0.14
 Nodes (9): buildEmailHtml(), DescuentoUseCase, generateCodigo(), getEmailSubject(), CodigoDescuento, CreateCodigoDescuentoData, ICodigoDescuentoRepository, mapRow() (+1 more)
 
 ### Community 65 - "Módulo 65"
-Cohesion: 0.20
-Nodes (16): bloqueResumen(), construirEmailConfirmacion(), DatosEmailConfirmacion, direccionVisible(), gastosDeEnvio(), textoEntrega(), textoPlano(), TEXTOS (+8 more)
+Cohesion: 0.12
+Nodes (26): ajusteSchema, POST(), RouteContext, CobrosRow, POST(), schema, POST(), MermaSchema (+18 more)
 
 ### Community 66 - "Módulo 66"
-Cohesion: 0.15
-Nodes (18): construirTextoPlanoPromo(), enviarPromoACadaDestinatario(), emailSchema, GET(), getBaseUrl(), uuidSchema, emailSchema, GET() (+10 more)
+Cohesion: 0.25
+Nodes (9): emailSchema, GET(), getBaseUrl(), uuidSchema, emailSchema, GET(), getBaseUrl(), uuidSchema (+1 more)
 
 ### Community 67 - "Módulo 67"
 Cohesion: 0.09
@@ -797,24 +818,24 @@ Cohesion: 0.05
 Nodes (41): 1. RLS, 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB), 3. Funcion auxiliar de aislamiento de tenant, 4. Como aplicar la migracion (OBLIGATORIO — nunca MCP suelto), Arquitectura y Capas, Base de Datos (Trampas Comunes), Capacitor Android PDA — Trampas Criticas, CLAUDE.md - Contexto multi_shop (+33 more)
 
 ### Community 70 - "Módulo 70"
-Cohesion: 0.03
-Nodes (59): baseline-browser-mapping, @capacitor/cli, dotenv, electron, electron-builder, electron-builder-squirrel-windows, electron-rebuild, esbuild (+51 more)
+Cohesion: 0.09
+Nodes (23): baseline-browser-mapping, cross-env, electron, electron-builder, electron-builder-squirrel-windows, fast-check, jsdom, @next/bundle-analyzer (+15 more)
 
 ### Community 71 - "Módulo 71"
-Cohesion: 0.05
-Nodes (55): IMAGE_EXTENSIONS, isValidImageUrl(), ProductosPage(), ModalidadEntregaRow, ModalidadesEntregaForm(), ModalidadesEntregaFormProps, AllergenSelector(), AllergenSelectorProps (+47 more)
+Cohesion: 0.04
+Nodes (47): ModalidadesEntregaForm(), ModalidadesEntregaFormProps, AllergenSelector(), AllergenSelectorProps, Categoria, DeleteConfirmDialogProps, ImageFit, ProductComplementosSection() (+39 more)
 
 ### Community 72 - "Módulo 72"
 Cohesion: 0.15
 Nodes (11): metadata, metadata, KitchenOfflineBanner(), reloadWhenReady(), KitchenPinGate(), KitchenSwRegistrar(), OfflineBanner(), reloadWhenReady() (+3 more)
 
 ### Community 73 - "Módulo 73"
-Cohesion: 0.07
-Nodes (42): enviarEmailSchema, generateOrderEmail(), OrderItem, POST(), ASUNTOS_PROMO, ContenidoPromo, ContextoEnvioPromo, createPromocionSchema (+34 more)
+Cohesion: 0.06
+Nodes (60): construirTextoPlanoPromo(), enviarPromoACadaDestinatario(), buildTgtgEmailHtml(), CampanaBase, ContextoEnvio, Destinatario, enviarACadaDestinatario(), enviarSchema (+52 more)
 
 ### Community 74 - "Módulo 74"
-Cohesion: 0.12
-Nodes (15): BannerCarta(), BannerCartaProps, MenuPageProps, HeroBannerProps, JsonLdProps, LandingHeaderProps, LandingPageProps, RenderContext (+7 more)
+Cohesion: 0.13
+Nodes (8): SuperAdminUseCase, DEFAULT_EMPRESA_COLORES, EmpresaStats, EmpresaWithStats, ISuperAdminRepository, SuperAdminGlobalStats, EmpresaRow, SupabaseSuperAdminRepository
 
 ### Community 75 - "Módulo 75"
 Cohesion: 0.09
@@ -829,20 +850,20 @@ Cohesion: 0.05
 Nodes (36): 10. Verificación de Cadena, 11. Retenciones Legales (Bloqueo RGPD), 12. Perfil Laboral, 13. Trampas Críticas, 1. Propósito, 2. Arquitectura, 3. Base de Datos, 4. Tipos de Evento (+28 more)
 
 ### Community 78 - "Módulo 78"
-Cohesion: 0.24
-Nodes (14): AnalyticsClient(), buildDailySummaryHtml(), calcDesdeHasta(), calcPrevDesdeHasta(), delta(), DOW_LABELS, fmt(), fmtDate() (+6 more)
+Cohesion: 0.20
+Nodes (16): AnalyticsClient(), buildDailySummaryHtml(), calcDesdeHasta(), calcPrevDesdeHasta(), delta(), DOW_LABELS, fmt(), fmtDate() (+8 more)
 
 ### Community 79 - "Módulo 79"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (13): CreateProductDTO, UpdateProductDTO, ProductUseCase, ImageFit, Product, ProductoTabla, CreateProductData, IProductRepository (+5 more)
 
 ### Community 80 - "Módulo 80"
-Cohesion: 0.18
-Nodes (12): componer(), crearEnviarConfirmacionPedido(), DepsConfirmacion, EmpresaParaEmail, EntradaConfirmacion, ResultadoConfirmacion, tipoEntregaDelPedido(), itemsParaEmail() (+4 more)
+Cohesion: 0.14
+Nodes (18): NavItemDef, metadata, nombreDeEmpresa(), TpvLayout(), TURNO_OPTIONAL_PREFIXES, EMPTY_STATS, TurnoCerrarPage(), TpvSwRegistrar() (+10 more)
 
 ### Community 81 - "Módulo 81"
 Cohesion: 0.06
-Nodes (54): applySessionStorageWaiter(), bloqueoPrevioDescuento(), camposTrasCambioDeEntrega(), CartDrawer(), CartDrawerProps, CartItemResumen(), computeCartTotals(), computeIsDeliveryIncomplete() (+46 more)
+Nodes (54): applySessionStorageWaiter(), bloqueoPrevioDescuento(), camposTrasCambioDeEntrega(), CartDrawer(), CartDrawerProps, CartItemResumen(), computeCartTotals(), computeDatosIncompletos() (+46 more)
 
 ### Community 82 - "Módulo 82"
 Cohesion: 0.40
@@ -853,8 +874,8 @@ Cohesion: 0.06
 Nodes (34): 1. Crear campaña, 2. Seleccionar y enviar campañas, 3. Estados de una campaña activa, 4. Vista de campañas — dos secciones acordeón, 5. Acciones en campañas, 6. Historial, API Routes — resumen, Archivos relevantes (+26 more)
 
 ### Community 84 - "Módulo 84"
-Cohesion: 0.04
-Nodes (69): ComparativaPage(), ComparisonMode, PeriodBounds, resolvePeriodBoundsForMode(), classifyBcg(), computeMedian(), MenuEngineeringPage(), resolveQuadrant() (+61 more)
+Cohesion: 0.03
+Nodes (92): LoginForm(), LoginFormProps, TpvPinCard(), ComparativaPage(), ComparisonMode, PeriodBounds, resolvePeriodBoundsForMode(), MenuEngineeringPage() (+84 more)
 
 ### Community 85 - "Módulo 85"
 Cohesion: 0.10
@@ -885,20 +906,20 @@ Cohesion: 0.17
 Nodes (11): ./tsconfig.json, vitest.config.ts, compilerOptions, incremental, noEmit, extends, include, src/**/*.ts (+3 more)
 
 ### Community 92 - "Módulo 92"
-Cohesion: 0.13
-Nodes (13): cerrarMesaPagada(), FooterProps, getMesaColors(), MesaColors, MesaFooter(), MesasGrid(), Props, TpvMesaCard() (+5 more)
+Cohesion: 0.24
+Nodes (12): GET(), PUT(), PATCH(), RouteParams, GET(), PUT(), RouteParams, GET() (+4 more)
 
 ### Community 93 - "Módulo 93"
 Cohesion: 0.10
 Nodes (19): Accessibility, Assess Animation Opportunities, Context Gathering (Do This First), CSS Animations, Delight Moments, Entrance Animations, Feedback & Guidance, Implement Animations (+11 more)
 
 ### Community 94 - "Módulo 94"
-Cohesion: 0.18
-Nodes (20): absoluta(), construirSecciones(), crearSubidorR2(), decodeEntities(), direccionDeLd(), es(), esImagenDeContenido(), extraerConFirecrawl() (+12 more)
+Cohesion: 0.06
+Nodes (40): serviceHeaders(), serviceKey(), ref_node_crypto, absoluta(), construirSecciones(), crearSubidorR2(), decodeEntities(), direccionDeLd() (+32 more)
 
 ### Community 95 - "Módulo 95"
-Cohesion: 0.09
-Nodes (21): libereBloqueo(), marcoSesionPagada(), ItemReescrito, pedidosDeSesion, updateOrderItemsSpy, consultar(), escenario(), mesaRpc() (+13 more)
+Cohesion: 0.21
+Nodes (8): ItemReescrito, pedidosDeSesion, updateOrderItemsSpy, consultar(), escenario(), mesaRpc(), crearFakeSupabase(), FakeSupabase
 
 ### Community 96 - "Módulo 96"
 Cohesion: 0.06
@@ -917,12 +938,12 @@ Cohesion: 0.12
 Nodes (22): ActionBadge(), ActionBadgeProps, actionLabel(), ACTOR_CONFIG, ACTOR_TIPOS, ActorBadgeProps, AUDIT_ACTIONS, AuditLogPage() (+14 more)
 
 ### Community 100 - "Módulo 100"
-Cohesion: 0.10
-Nodes (29): addItemBackIfMissing(), applyKitchenSwipeVisuals(), applyLeftSwipe(), applyRightSwipe(), formatTimer(), getElapsedMinutes(), getItemCardColor(), getItemHintText() (+21 more)
+Cohesion: 0.09
+Nodes (31): KitchenItem, MergedItem, addItemBackIfMissing(), applyKitchenSwipeVisuals(), applyLeftSwipe(), applyRightSwipe(), formatTimer(), getElapsedMinutes() (+23 more)
 
 ### Community 102 - "Módulo 102"
-Cohesion: 0.21
-Nodes (8): CatalogResponse, CatalogStatus, useWaiterCatalog(), WaiterCatalogContext, WaiterCatalogProvider(), WaiterCatalogValue, CATALOG_OK, Probe()
+Cohesion: 0.22
+Nodes (9): getSupabaseAnonClient(), CatalogResponse, CatalogStatus, useWaiterCatalog(), WaiterCatalogContext, WaiterCatalogProvider(), isResumeSignal(), CATALOG_OK (+1 more)
 
 ### Community 103 - "Módulo 103"
 Cohesion: 0.11
@@ -937,12 +958,12 @@ Cohesion: 0.10
 Nodes (21): API Routes, Clean Architecture Flow, Client Components, Database Schema, Design Rationale, Domain Layer, `IMesaClientTokenRepository`, Known Limitations (+13 more)
 
 ### Community 106 - "Módulo 106"
-Cohesion: 0.19
-Nodes (7): CreatePerfilLaboralInput, IPerfilLaboralRepository, UpdatePerfilLaboralInput, PerfilLaboral, TipoContrato, mapRow(), SupabasePerfilLaboralRepository
+Cohesion: 0.15
+Nodes (11): derivarEstado(), ObtenerEstadoSupervisorUseCase, segundosDesde(), CreatePerfilLaboralInput, IPerfilLaboralRepository, UpdatePerfilLaboralInput, EstadoSupervisor, PerfilLaboral (+3 more)
 
 ### Community 107 - "Módulo 107"
-Cohesion: 0.10
-Nodes (16): ColoresFormProps, ConfiguracionPageClientProps, EmpresaThemeProviderProps, UpdateEmpresaDTO, EmpresaUseCase, normalizePhone(), Empresa, EmpresaColores (+8 more)
+Cohesion: 0.09
+Nodes (17): ColoresFormProps, ConfiguracionPageClientProps, EmpresaThemeProviderProps, httpsUrl, httpsUrlMax500, UpdateEmpresaDTO, EmpresaUseCase, normalizePhone() (+9 more)
 
 ### Community 108 - "Módulo 108"
 Cohesion: 0.07
@@ -973,8 +994,8 @@ Cohesion: 0.27
 Nodes (10): AttemptRecord, attempts, cachePin(), clearPinCache(), getPinStore(), incrementAttempts(), isRateLimited(), LcPinStore (+2 more)
 
 ### Community 115 - "Módulo 115"
-Cohesion: 0.09
-Nodes (22): FichajeDialog(), Props, RGPD_KEY(), TIPO_LABEL, derivarEstado(), ObtenerEstadoSupervisorUseCase, segundosDesde(), FichajeConEstado (+14 more)
+Cohesion: 0.11
+Nodes (15): FichajeConEstado, ObtenerMisFichajesUseCase, RegistrarCorreccionInput, RegistrarCorreccionUseCase, derivarEstado(), isOrphan(), RegistrarFichajeInput, RegistrarFichajeOutput (+7 more)
 
 ### Community 116 - "Módulo 116"
 Cohesion: 0.39
@@ -985,16 +1006,16 @@ Cohesion: 0.10
 Nodes (38): aplicarCobroSiProcede(), GET(), POST(), procesarYRedirigir(), GET(), POST(), processAndRedirect(), OK() (+30 more)
 
 ### Community 118 - "Módulo 118"
-Cohesion: 0.11
-Nodes (30): botonesRespuestaRapida(), botonesTiempoFijado(), BotonTelegram, cancelarEntregado(), Contexto, escaparMarkdown(), fijarTiempo(), Manejador (+22 more)
+Cohesion: 0.09
+Nodes (38): GET(), tokenSchema, botonesRespuestaRapida(), botonesTiempoFijado(), BotonTelegram, cancelarEntregado(), Contexto, escaparMarkdown() (+30 more)
 
 ### Community 119 - "Módulo 119"
 Cohesion: 0.15
 Nodes (12): 1. `src/lib/menu/subcategorias.ts` (nuevo), 2. `src/components/category-nav.tsx`, 3. `src/components/menu-section.tsx`, 4. `src/lib/translations.ts`, Animación — "nace del botón", Cambios de código, Comportamiento, Diseño: desplegable de subcategorías en la navegación del menú (+4 more)
 
 ### Community 120 - "Módulo 120"
-Cohesion: 0.13
-Nodes (6): serviceHeaders(), serviceKey(), ref_node_crypto, BASE_PARAMS, DEVICE_KEY, DUMMY_COBROS
+Cohesion: 0.26
+Nodes (9): DELETE(), GET(), POST(), tablaCeldaSchema, TablaInfoDTO, tablaInfoShapeSchema, createTablaPlantillaSchema, tablaPlantillaIdSchema (+1 more)
 
 ### Community 121 - "Módulo 121"
 Cohesion: 0.08
@@ -1009,12 +1030,12 @@ Cohesion: 0.12
 Nodes (16): Code Quality, Color & Contrast, Content & Copy, Edge Cases & Error States, Final Verification, Forms & Inputs, Icons & Images, Interaction States (+8 more)
 
 ### Community 124 - "Módulo 124"
-Cohesion: 0.16
-Nodes (14): AdminMinimo, ConfigEmpresa, AdminDashboardClient(), DashboardPedido, DashboardPromoSummary, DashboardStats, DashboardTgtgSummary, ScrollOnMount() (+6 more)
+Cohesion: 0.33
+Nodes (8): GET(), isLandingSeccionTipo(), Params, PATCH(), PUT(), parseContenidoPorTipo(), getLandingSeccionRepository(), getLandingSeccionUseCase()
 
 ### Community 125 - "Módulo 125"
 Cohesion: 0.04
-Nodes (89): Cliente, LANGUAGES, AddItemForm, AlbaranDetailPage(), defaultTaxRate(), emptyAddFormBase, formatEuros(), selectedCatalogoItem() (+81 more)
+Nodes (90): Cliente, LANGUAGES, EstadoBadge(), estadoLabel(), ESTADOS, Lang, PedidosPage(), ActivoBadge() (+82 more)
 
 ### Community 126 - "Módulo 126"
 Cohesion: 0.12
@@ -1053,8 +1074,8 @@ Cohesion: 0.08
 Nodes (23): Acrónimos y Conceptos Normativos, Arqueo Ciego (Blind Cash Count), Audit Trail (Registro de Auditoría Inalterable), Clean Architecture (Arquitectura Limpia), Estándares de Calidad de Software, Estándares de Seguridad, Factura Rectificativa, Glosario de Términos Legales, Normativos y de Calidad (+15 more)
 
 ### Community 135 - "Módulo 135"
-Cohesion: 0.25
-Nodes (14): buildClientAssertion(), checkRateLimit(), createGlovoOrder(), estimateDeliveryFee(), getAccessToken(), getApiBaseUrl(), getStsUrl(), GlovoCredentials (+6 more)
+Cohesion: 0.31
+Nodes (7): InitialMesa, Props, ESTADO_COLOR, ESTADO_LABEL, fmt(), paseShortLabel(), TicketPanel()
 
 ### Community 138 - "Módulo 138"
 Cohesion: 0.29
@@ -1081,8 +1102,8 @@ Cohesion: 0.18
 Nodes (16): CobroRow, CobrosList(), ESTADO_COLOR, ESTADO_LABEL, etiquetaOriginal(), fmt(), fmtDate(), fmtTime() (+8 more)
 
 ### Community 144 - "Módulo 144"
-Cohesion: 0.20
-Nodes (7): VerificarCadenaUseCase, CreateAuditEntryInput, IAuditRepository, AuditEntry, ChainVerifyResult, mapRow(), SupabaseAuditRepository
+Cohesion: 0.11
+Nodes (11): VerificarCadenaUseCase, CreateAuditEntryInput, IAuditRepository, IChainRepository, AuditEntry, ChainAnchor, ChainVerifyResult, mapRow() (+3 more)
 
 ### Community 145 - "Módulo 145"
 Cohesion: 0.14
@@ -1101,8 +1122,8 @@ Cohesion: 0.15
 Nodes (12): Assess Current State, Color Refinement, Composition Refinement, Context Gathering (Do This First), MANDATORY PREPARATION, Motion Reduction, Plan Refinement, Refine the Design (+4 more)
 
 ### Community 149 - "Módulo 149"
-Cohesion: 0.31
-Nodes (10): APARIENCIA, buildAeatUrl(), CobroConfirmado(), EstadoConfirmacion, fmt(), usePrinter(), numeroConCeros(), numserieAeat() (+2 more)
+Cohesion: 0.67
+Nodes (4): numeroConCeros(), numserieAeat(), refTicketVisible(), urlValidacion()
 
 ### Community 150 - "Módulo 150"
 Cohesion: 0.17
@@ -1113,8 +1134,8 @@ Cohesion: 0.17
 Nodes (11): Accessibility Resilience, Assess Hardening Needs, Edge Cases & Boundary Conditions, Error Handling, Hardening Dimensions, Input Validation & Sanitization, Internationalization (i18n), Performance Resilience (+3 more)
 
 ### Community 152 - "Módulo 152"
-Cohesion: 0.09
-Nodes (21): PlantillaResumen, createProductSchema, imageFitValues, productIdSchema, tablaInfoSchema, updateProductSchema, tablaCeldaSchema, TablaInfoDTO (+13 more)
+Cohesion: 0.17
+Nodes (10): PlantillaResumen, CreateTablaPlantillaDTO, propagarError(), TablaPlantillaUseCase, TablaCelda, TablaPlantilla, CreateTablaPlantillaData, ITablaPlantillaRepository (+2 more)
 
 ### Community 153 - "Módulo 153"
 Cohesion: 0.11
@@ -1125,48 +1146,48 @@ Cohesion: 0.18
 Nodes (10): Adenda (post-implementación), Alcance, Cambios, Cart Access Token — Eliminación del flujo legacy, Contexto, Código, Documentación, Fuera de alcance (+2 more)
 
 ### Community 156 - "Módulo 156"
-Cohesion: 0.12
-Nodes (25): DISALLOW_PATHS, robots(), JsonLd(), CRAWLERS_IA_BUSQUEDA, CRAWLERS_IA_ENTRENAMIENTO, buildBusinessNode(), buildJsonLdGraph(), buildMenuNode() (+17 more)
+Cohesion: 0.09
+Nodes (36): DISALLOW_PATHS, robots(), JsonLd(), JsonLdProps, CRAWLERS_IA_BUSQUEDA, CRAWLERS_IA_ENTRENAMIENTO, buildBusinessNode(), buildJsonLdGraph() (+28 more)
 
 ### Community 157 - "Módulo 157"
 Cohesion: 0.07
-Nodes (36): closeSesionSchema, createMesaSchema, DELETE(), deleteMesaSchema, GET(), PATCH(), POST(), GET() (+28 more)
+Nodes (34): GET(), querySchema, GET(), GET(), querySchema, GET(), closeSesionSchema, createMesaSchema (+26 more)
 
 ### Community 158 - "Módulo 158"
 Cohesion: 0.13
 Nodes (14): 1. Base de datos, 2. Domain (`core/domain/entities/types.ts`), 3. Application, 4. Infrastructure (`SupabaseProductRepository.ts`), 5. Admin (`product-form-dialog.tsx`), 6. Público — View Model, 7. Público — componente compartido `ProductImageGallery`, 8. Traducciones (+6 more)
 
 ### Community 159 - "Módulo 159"
-Cohesion: 0.36
-Nodes (8): DELETE(), PATCH(), PatchSchema, CreateSchema, GET(), POST(), getEmpleadoTpvRepository(), hashPin()
+Cohesion: 0.28
+Nodes (8): ELECTRON_DIR, EXCLUDED_PATHS, getSourceFiles(), INCLUDED_EXTENSIONS, ROOT, SECRET_PATTERNS, SRC_DIR, walkDir()
 
 ### Community 160 - "Módulo 160"
-Cohesion: 0.05
-Nodes (70): getBannerHeight(), HeroBanner(), CtaCartaSection(), CtaCartaSectionProps, altGaleria(), claseEscritorio(), claseMovil(), GaleriaSection() (+62 more)
+Cohesion: 0.04
+Nodes (77): getBannerHeight(), HeroBanner(), HeroBannerProps, CtaCartaSection(), CtaCartaSectionProps, altGaleria(), claseEscritorio(), claseMovil() (+69 more)
 
 ### Community 161 - "Módulo 161"
-Cohesion: 0.20
-Nodes (14): ExistingOrder, ESTADO_COLOR, ESTADO_LABEL, fmt(), paseShortLabel(), Props, TicketPanel(), buildInitial() (+6 more)
+Cohesion: 0.33
+Nodes (9): MesaData, ExistingOrder, Props, buildInitial(), calcExistingTotal(), calcPendingTotal(), InitialMesa, MesaActiva (+1 more)
 
 ### Community 162 - "Módulo 162"
 Cohesion: 0.18
 Nodes (10): Breakpoints: Content-Driven, Detect Input Method, Not Just Screen Size, Layout Adaptation Patterns, Mobile-First: Write It Right, Picture Element for Art Direction, Responsive Design, Responsive Images: Get It Right, Safe Areas: Handle the Notch (+2 more)
 
 ### Community 163 - "Módulo 163"
-Cohesion: 0.16
-Nodes (12): metadata, fetchMesas(), getMesaColors(), getMesaStatus(), MesaCard(), MesaCardProps, MesaColors, MesaFooter() (+4 more)
+Cohesion: 0.29
+Nodes (5): createMesaBroadcastChannel(), mesaSesionChannel(), MIGRACION, RAIZ, SRC
 
 ### Community 164 - "Módulo 164"
-Cohesion: 0.13
-Nodes (6): Archivos clave, Campos de BBDD usados, Features implementadas, GEO (asistentes de IA: ChatGPT, Perplexity, Claude, Gemini), SEO Multi-Tenant, Trampas criticas
+Cohesion: 0.14
+Nodes (5): Archivos clave, Banner flotante en modo superadmin, Cambios en APIs para soportar superadmin, Flujo de edición de empresa, Panel Superadmin
 
 ### Community 166 - "Módulo 166"
 Cohesion: 0.09
 Nodes (22): "¿Cuál es la fuente de verdad del estado de un item?", En `/waiter/pendientes`, Estados y swipe, Estados y swipe, Estados y swipe, `/kitchen` — Pantalla Standalone de Cocina, Kitchen Screens — Comparación Completa, Merge key incluye nota (+14 more)
 
 ### Community 167 - "Módulo 167"
-Cohesion: 0.20
-Nodes (15): qrcode, qrcode, printer, UsePrinterResult, BrowserPrinter, buildAeatBlock(), buildAeatUrl(), buildDesgloseRows() (+7 more)
+Cohesion: 0.23
+Nodes (13): printer, UsePrinterResult, BrowserPrinter, buildAeatBlock(), buildAeatUrl(), buildDesgloseRows(), buildImpuestoRows(), buildReceiptHtml() (+5 more)
 
 ### Community 168 - "Módulo 168"
 Cohesion: 0.22
@@ -1177,8 +1198,8 @@ Cohesion: 0.09
 Nodes (22): 1. UI optimista: la interfaz no espera al servidor, 2. Cola de comandos offline, 3. Idempotencia de pedidos (`b571c07`), 4. Resiliencia de Realtime, 5. Por qué hubo que escribir tantos tests, 6. Lo que la suite E2E NO estaba cubriendo, Colapso por destino, Detección de caída y sondeo (`45bb30e`) (+14 more)
 
 ### Community 170 - "Módulo 170"
-Cohesion: 0.15
-Nodes (17): formatCents(), formatDateTime(), InformeZModal(), Props, splitHash(), Props, TurnoAbrirForm(), fmt() (+9 more)
+Cohesion: 0.16
+Nodes (16): formatCents(), formatDateTime(), InformeZModal(), Props, splitHash(), Props, TurnoAbrirForm(), fmt() (+8 more)
 
 ### Community 171 - "Módulo 171"
 Cohesion: 0.20
@@ -1205,16 +1226,16 @@ Cohesion: 0.09
 Nodes (21): 10. Backup Fiscal Local (Electron), 1.1 Inalterabilidad e Integridad de registros, 1.2 Cadena de Hashes (Trazabilidad), 1.3 Accesibilidad para inspectores (Volcado de datos), 1.4 Código QR / URL de verificación AEAT, 1.5 Declaración de Responsabilidad del fabricante, 1.5b Declaración modo No-VeriFactu (Art. 12 RD 1007/2023) — **Fase 1 completada**, 1. Ley Antifraude + Reglamento Verifactu (RD 1007/2023) (+13 more)
 
 ### Community 177 - "Módulo 177"
-Cohesion: 0.18
-Nodes (15): bodySchema, buildOverridesByPedido(), buildSynthesizedEstado(), GET(), isRetenidoReadyToSynthesize(), ItemEstadoRow, itemSchema, normalizePedidoOrder() (+7 more)
+Cohesion: 0.16
+Nodes (17): bodySchema, buildOverridesByPedido(), buildSynthesizedEstado(), GET(), isRetenidoReadyToSynthesize(), ItemEstadoRow, itemSchema, normalizePedidoOrder() (+9 more)
 
 ### Community 178 - "Módulo 178"
 Cohesion: 0.17
 Nodes (12): ContextoVistaMesa, EstadoTurno, Regla, REGLAS, SesionParaVista, TurnoPersonalizado, VistaMesa, vistaParaMesa() (+4 more)
 
 ### Community 179 - "Módulo 179"
-Cohesion: 0.14
-Nodes (12): attachDeliveryFields(), attachModalidadFields(), AttemptKey, groupItemsByPase(), mapCartItemPayload(), postPedido(), processStandardOrderResponse(), redirectToTracking() (+4 more)
+Cohesion: 0.20
+Nodes (8): attachDeliveryFields(), attachModalidadFields(), AttemptKey, postPedido(), processStandardOrderResponse(), redirectToTracking(), sendStandardOrderFlow(), submitRedsysPayment()
 
 ### Community 180 - "Módulo 180"
 Cohesion: 0.20
@@ -1225,8 +1246,8 @@ Cohesion: 0.10
 Nodes (20): API, Base de datos, División personalizada (modo `personalizado`), Flujo de pago, `GET /api/mesas/[mesaId]/orders` — respuesta, i18n, `mesa_sesiones` (delta), Migración (+12 more)
 
 ### Community 182 - "Módulo 182"
-Cohesion: 0.23
-Nodes (7): nextIndex(), prefersReducedMotion(), previousIndex(), SliderBanner(), SliderBannerProps, slideVariants, slides
+Cohesion: 0.25
+Nodes (6): ClaveRespuesta, ConfigFake, LlamadaRegistrada, QueryBuilder, RespuestaPreparada, VACIO
 
 ### Community 183 - "Módulo 183"
 Cohesion: 0.10
@@ -1249,28 +1270,28 @@ Cohesion: 0.22
 Nodes (8): Archivos fuente, Arquitectura, Electron TPV Windows, Pendiente verificable solo con impresora real, Proceso de build, Seguridad, Trampas, Versiones
 
 ### Community 188 - "Módulo 188"
-Cohesion: 0.27
-Nodes (9): EMPTY_MESA_DATA, loadMesaData(), mapPedido(), MesaData, MostradorPage(), normComplement(), RawComplement, RawItem (+1 more)
+Cohesion: 0.31
+Nodes (8): EMPTY_MESA_DATA, loadMesaData(), mapPedido(), MostradorPage(), normComplement(), RawComplement, RawItem, RawPedido
 
 ### Community 189 - "Módulo 189"
-Cohesion: 0.14
-Nodes (21): blockDangerousShortcuts(), checkForPortableUpdate(), createWindow(), EmpleadoIdSchema, FiscalSnapshotPayload, FiscalSnapshotSchema, isNewerVersion(), PinCacheSchema (+13 more)
+Cohesion: 0.15
+Nodes (19): blockDangerousShortcuts(), checkForPortableUpdate(), createWindow(), EmpleadoIdSchema, FiscalSnapshotPayload, FiscalSnapshotSchema, isNewerVersion(), PinCacheSchema (+11 more)
 
 ### Community 190 - "Módulo 190"
 Cohesion: 0.22
 Nodes (9): Color & Theme, Frontend Aesthetics Guidelines, Interaction, Layout & Space, Motion, Responsive, Typography, UX Writing (+1 more)
 
 ### Community 191 - "Módulo 191"
-Cohesion: 0.08
-Nodes (21): MovimientosResponse, AlertsResponse, buildLabel(), LowStockBadge(), Props, rehabilitarProductosSiUmbralSuperado(), registrarMermaUseCase(), AjustarStockPayload (+13 more)
+Cohesion: 0.07
+Nodes (28): buildQueryString(), FiltersState, formatDate(), MovimientosPage(), MovimientosResponse, TIPO_COLORS, TIPOS, AlertsResponse (+20 more)
 
 ### Community 192 - "Módulo 192"
 Cohesion: 0.10
 Nodes (20): Admin Orders Panel — Mesa Behavior, API Routes, Component: `MesaOrderHistory`, Component: `MesaOrdersClient`, `consolidateSesionOrders` logic, Customer Flow, Database Schema, `empresas` (delta) (+12 more)
 
 ### Community 193 - "Módulo 193"
-Cohesion: 0.31
-Nodes (9): DELETE(), GET(), PATCH(), POST(), clienteIdSchema, createClienteSchema, idiomaSchema, updateClienteSchema (+1 more)
+Cohesion: 0.29
+Nodes (5): DOMICILIO, escribir(), ITEM, rellenar(), SembrarCarritoAbierto()
 
 ### Community 194 - "Módulo 194"
 Cohesion: 0.10
@@ -1278,7 +1299,7 @@ Nodes (20): Architecture, Cache Strategies, CacheFirst — `/_next/static/`, Cap
 
 ### Community 197 - "Módulo 197"
 Cohesion: 0.09
-Nodes (39): POST(), POST(), GetDeliveryQuoteSchema, POST(), mesaIdSchema, POST(), mesaIdSchema, POST() (+31 more)
+Nodes (41): POST(), POST(), GetDeliveryQuoteSchema, POST(), mesaIdSchema, POST(), mesaIdSchema, POST() (+33 more)
 
 ### Community 198 - "Módulo 198"
 Cohesion: 0.25
@@ -1289,32 +1310,32 @@ Cohesion: 0.24
 Nodes (10): formatCents(), getMonthRange(), getWeekRange(), PeriodType, RentabilidadPage(), resolveMarginClass(), SortDir, SortField (+2 more)
 
 ### Community 200 - "Módulo 200"
-Cohesion: 0.15
-Nodes (22): KioskSchema, POST(), sugerirTipo(), POST(), RouteSchema, PATCH(), PatchSchema, GET() (+14 more)
+Cohesion: 0.14
+Nodes (25): KioskSchema, POST(), sugerirTipo(), POST(), RouteSchema, PATCH(), PatchSchema, getEmpleadoTpvLoginUseCase() (+17 more)
 
 ### Community 201 - "Módulo 201"
 Cohesion: 0.22
 Nodes (7): Acciones Instrumentadas, Archivos Clave, Arquitectura, Patrón de Uso en Rutas, Propósito, Sistema de Auditoría (Audit Log), Trampas
 
 ### Community 204 - "Módulo 204"
-Cohesion: 0.46
-Nodes (7): DELETE(), GET(), getMesaId(), LockRow, mesaIdSchema, POST(), requireMesaInOwnTenant()
+Cohesion: 0.29
+Nodes (6): Archivos clave, Campos de BBDD usados, Features implementadas, GEO (asistentes de IA: ChatGPT, Perplexity, Claude, Gemini), SEO Multi-Tenant, Trampas criticas
 
 ### Community 207 - "Módulo 207"
 Cohesion: 0.43
 Nodes (7): FoodCostPage(), formatCents(), getMonthRange(), getWeekRange(), PeriodType, resolveDeviationClass(), resolveDeviationLabel()
 
 ### Community 208 - "Módulo 208"
-Cohesion: 0.22
+Cohesion: 0.18
 Nodes (5): MesaClientTokenUseCase, IMesaClientTokenRepository, MesaClientToken, TokenValidationResult, SupabaseMesaClientTokenRepository
 
 ### Community 209 - "Módulo 209"
-Cohesion: 0.52
-Nodes (6): AnaliticaVercel(), esNavegadorAutomatizado(), esRutaDePersonal(), filtrarEventoDeAudiencia(), rutaDe(), RUTAS_DE_PERSONAL
+Cohesion: 0.48
+Nodes (6): GET(), getR2Bucket(), getS3Client(), POST(), Snapshot, SnapshotRow
 
 ### Community 210 - "Módulo 210"
-Cohesion: 0.10
-Nodes (39): GET(), POST(), ALLOWED_MIME_TYPES, MIME_TO_EXT, POST(), validateImageMagicBytes(), LoginSchema, POST() (+31 more)
+Cohesion: 0.23
+Nodes (12): GET(), POST(), POST(), setupSchema, POST(), LoginSchema, POST(), rateLimitLogin() (+4 more)
 
 ### Community 211 - "Módulo 211"
 Cohesion: 0.33
@@ -1328,21 +1349,29 @@ Nodes (10): ESTADO_CHIP, ESTADO_LABEL, ExportFichajes(), ESTADO_CHIP, ESTADO_DOT
 Cohesion: 0.33
 Nodes (3): Design Direction, Implementation Principles, The AI Slop Test
 
+### Community 214 - "Módulo 214"
+Cohesion: 0.29
+Nodes (6): construirPayloadEstandar(), groupItemsByPase(), mapCartItemPayload(), sendMesaOrderFlow(), COUNTRY_CODES, CountryCode
+
 ### Community 215 - "Módulo 215"
-Cohesion: 0.05
-Nodes (62): DELETE(), PATCH(), POST(), POST(), GET(), GET(), POST(), POST() (+54 more)
+Cohesion: 0.06
+Nodes (62): DeliveryPage(), DELETE(), GET(), PATCH(), POST(), DELETE(), PATCH(), POST() (+54 more)
 
 ### Community 216 - "Módulo 216"
-Cohesion: 0.27
-Nodes (3): EmpleadoTpv, mapRow(), SupabaseEmpleadoTpvRepository
+Cohesion: 0.12
+Nodes (6): EmpleadoTpvLoginUseCase, CreateEmpleadoTpvDto, EmpleadoTpv, IEmpleadoTpvRepository, mapRow(), SupabaseEmpleadoTpvRepository
 
 ### Community 217 - "Módulo 217"
 Cohesion: 0.22
 Nodes (8): categorias, clientes, empresas, log_errors, pedidos, perfiles_admin, productos, promociones
 
 ### Community 218 - "Módulo 218"
-Cohesion: 0.38
-Nodes (7): buildAndPrint(), centsToEur(), padEnd(), padStart(), ReceiptData, electron, ref_node_thermal_printer
+Cohesion: 0.30
+Nodes (9): listPrinters(), printReceipt(), buildAndPrint(), centsToEur(), padEnd(), padStart(), ReceiptData, electron (+1 more)
+
+### Community 219 - "Módulo 219"
+Cohesion: 0.29
+Nodes (4): confirmacionSpy, EMPRESA_OK, glovoSpy, telegramSpy
 
 ### Community 220 - "Módulo 220"
 Cohesion: 0.36
@@ -1353,16 +1382,16 @@ Cohesion: 0.50
 Nodes (3): Clean Up, Execute, Plan
 
 ### Community 222 - "Módulo 222"
-Cohesion: 0.31
-Nodes (6): metadata, Props, PaymentKoCleaner(), addTrackingToken(), getTrackingTokens(), removeTrackingToken()
+Cohesion: 0.17
+Nodes (12): metadata, Props, PaymentKoCleaner(), executeMesaOrder(), getMesaClientToken(), isMesaClientTokenExpired(), MESA_CLIENT_TOKEN_KEY(), MesaOrderHandlers (+4 more)
 
 ### Community 224 - "Módulo 224"
 Cohesion: 0.25
 Nodes (7): Cambios visuales, Diseño: mejora visual del diálogo de subcategorías, Fuera de alcance, Lo que NO cambia, Objetivo, Riesgos / notas, Testing
 
 ### Community 225 - "Módulo 225"
-Cohesion: 0.09
-Nodes (26): NavItemDef, buildEmptyForm(), fetchIngredientes(), fetchTurno(), FormState, MermasPage(), MOTIVOS, submitMerma() (+18 more)
+Cohesion: 0.11
+Nodes (22): buildEmptyForm(), fetchIngredientes(), fetchTurno(), FormState, MermasPage(), MOTIVOS, submitMerma(), AccionesPanel() (+14 more)
 
 ### Community 226 - "Módulo 226"
 Cohesion: 0.32
@@ -1371,6 +1400,10 @@ Nodes (7): EmpresasTable(), Empresa, EmpresaStats, getData(), getPositionClasses
 ### Community 227 - "Módulo 227"
 Cohesion: 0.36
 Nodes (7): public.tpv_turno_eventos, tpv_turno_audit_trigger, tpv_turno_auto_audit_events(), tpv_turno_evento_block_delete(), tpv_turno_evento_block_update(), tpv_turno_evento_no_delete, tpv_turno_evento_no_update
+
+### Community 228 - "Módulo 228"
+Cohesion: 0.47
+Nodes (4): libereBloqueo(), marcoSesionPagada(), sesion(), llamadasDe()
 
 ### Community 229 - "Módulo 229"
 Cohesion: 0.22
@@ -1381,12 +1414,12 @@ Cohesion: 0.25
 Nodes (8): Database Schema, `empresas` (delta), `mesa_division_pagos` (nueva tabla), `mesa_sesiones` (delta), `pedidos` (delta — preexistente, usado por esta feature), RPC: `claim_and_create_division_pago(p_sesion_id, p_empresa_id, p_payment_order_ref, p_session_total_cents)`, RPC: `get_mesas_with_sessions(p_empresa_id UUID)`, RPC: `increment_division_pagos(p_sesion_id UUID)`
 
 ### Community 231 - "Módulo 231"
-Cohesion: 0.33
-Nodes (8): GET(), logPurgeExecution(), GET(), GET(), purgeExpiredClientesUseCase(), getChainRepo(), getLcChainRepo(), verifyCronSecret()
+Cohesion: 0.62
+Nodes (4): GET(), GET(), getLcChainRepo(), verifyCronSecret()
 
 ### Community 232 - "Módulo 232"
-Cohesion: 0.21
-Nodes (6): HeatmapGridProps, AnalyticsUseCase, AnalyticsPeriodParams, OcupacionHeatmapRow, IAnalyticsRepository, SupabaseAnalyticsRepository
+Cohesion: 0.16
+Nodes (10): HeatmapGridProps, aggregateKpis(), AnalyticsUseCase, computeDeltaPercent(), AnalyticsPeriodParams, ComparisonPeriodParams, FoodCostAnalyticsResponse, OcupacionHeatmapRow (+2 more)
 
 ### Community 234 - "Módulo 234"
 Cohesion: 0.10
@@ -1413,8 +1446,12 @@ Cohesion: 0.29
 Nodes (7): buildTotalMismatch(), getExpectedCents(), getStoredMismatch(), getStoredPaymentLock(), submitRedsysForm(), usePagoDeMesa(), VistaDeTurno()
 
 ### Community 244 - "Módulo 244"
-Cohesion: 0.15
-Nodes (19): InitialMesa, MostradorClient(), Props, getSupabaseAnonClient(), mesaSesionChannel(), buildComplementoMap(), CatalogResponse, MesasResponse (+11 more)
+Cohesion: 0.16
+Nodes (16): buildComplementoMap(), CatalogResponse, MesasResponse, IMPORTANT: channel name MUST match exactly what the trigger broadcasts to ('wait, TpvCatalogContext, TpvCatalogContextValue, TpvCatalogProvider(), TpvCatalogProviderProps (+8 more)
+
+### Community 245 - "Módulo 245"
+Cohesion: 0.40
+Nodes (5): agruparYaPagados(), bebidasPrimero(), buildGroupedItems(), buildSeleccion(), CustomSelectionView()
 
 ### Community 247 - "Módulo 247"
 Cohesion: 0.47
@@ -1431,10 +1468,6 @@ Nodes (5): Funciones de trigger vs. funciones RPC, Funciones SECURITY DEFINER �
 ### Community 250 - "Módulo 250"
 Cohesion: 0.25
 Nodes (6): DatosDelComensal(), emailDescribedBy(), emailHintKey(), emailLabelKey(), BASE, Props
-
-### Community 251 - "Módulo 251"
-Cohesion: 0.50
-Nodes (5): getStoredToken(), isTokenExpired(), storeToken(), TOKEN_KEY(), useMesaToken()
 
 ### Community 252 - "Módulo 252"
 Cohesion: 0.31
@@ -1461,8 +1494,8 @@ Cohesion: 0.40
 Nodes (5): Camera permission, Mesa Client Tokens, `mesa_client_tokens` table, Rate limiter, Validation middleware
 
 ### Community 262 - "route.ts"
-Cohesion: 0.40
-Nodes (5): bodySchema, paramsSchema, PATCH(), selectionItemSchema, updateCustomSelectionUseCase()
+Cohesion: 0.28
+Nodes (7): bodySchema, paramsSchema, PATCH(), selectionItemSchema, SelectionItem, UpdateCustomSelectionInput, updateCustomSelectionUseCase()
 
 ### Community 263 - "Módulo 263"
 Cohesion: 0.67
@@ -1472,17 +1505,9 @@ Nodes (3): debeCachearse(), networkFirstConTimeout(), TIMEOUT
 Cohesion: 0.50
 Nodes (3): pedidos_prueba_purga_log_no_update, public.pedidos_prueba_purga_log, public.pedidos_prueba_purga_log_inmutable()
 
-### Community 267 - "NuevoPedidoPanel.tsx"
-Cohesion: 0.12
-Nodes (21): applyMesaAuthResponse(), applyWaiterMeResponse(), CountsPayload, didCountsIncrease(), handleLogout(), Mesa, playNotificationSound(), WaiterBanner() (+13 more)
-
 ### Community 268 - "TicketPanel.tsx"
-Cohesion: 0.48
-Nodes (5): ContextoPago, emailObligatorio(), pasaPorPasarela(), RESTAURANTE, TIENDA
-
-### Community 269 - "Panel Superadmin"
-Cohesion: 0.33
-Nodes (5): Archivos clave, Banner flotante en modo superadmin, Cambios en APIs para soportar superadmin, Flujo de edición de empresa, Panel Superadmin
+Cohesion: 0.39
+Nodes (6): requiresRedsysRedirect(), ContextoPago, emailObligatorio(), pasaPorPasarela(), RESTAURANTE, TIENDA
 
 ### Community 270 - "Módulo 270"
 Cohesion: 0.50
@@ -1504,10 +1529,6 @@ Nodes (17): `cart-drawer.tsx` — de 17 a 3 (2026-08-09), Cerradas — lo que de
 Cohesion: 0.11
 Nodes (17): 1. Electron main process, 2. Renderer (frontend TPV), 3. API Supabase, 4. Electron preload / contextBridge, Archivo físico de cierre de turno, Arquitectura propuesta: Local-First con dos series fiscales, Componentes a implementar, Decisión pendiente — BLOQUEANTE (+9 more)
 
-### Community 278 - "executeMesaOrder"
-Cohesion: 0.33
-Nodes (6): executeMesaOrder(), getMesaClientToken(), isMesaClientTokenExpired(), MESA_CLIENT_TOKEN_KEY(), MesaOrderHandlers, storeMesaClientToken()
-
 ### Community 279 - "MesaOrdersClient"
 Cohesion: 0.12
 Nodes (16): Archivos clave, Ciclo de vida de un fichaje, Conservación legal, Correcciones, ¿Cómo funciona?, Estado derivado (panel supervisor), Fichaje Digital — Registro de Jornada, La cadena de integridad (+8 more)
@@ -1523,10 +1544,6 @@ Nodes (16): API, Base de datos, Componentes afectados, ExistingOrder (MostradorC
 ### Community 282 - "Sistema de Alérgenos por Producto"
 Cohesion: 0.12
 Nodes (16): API Endpoints, Base de Datos, Componentes, Configuración Admin, Códigos de Error, Flujo, Overview, POST `/api/descuento/subscribe` (+8 more)
-
-### Community 283 - "analytics.use-case.ts"
-Cohesion: 0.47
-Nodes (4): aggregateKpis(), computeDeltaPercent(), ComparisonPeriodParams, FoodCostAnalyticsResponse
 
 ### Community 284 - "TPV — Sistema de empleados con PIN y permisos"
 Cohesion: 0.12
@@ -1550,7 +1567,7 @@ Nodes (3): codigos_descuento, empresas, pedidos
 
 ### Community 289 - "CobroConfirmado.tsx"
 Cohesion: 0.06
-Nodes (53): DELETE(), GET(), POST(), PUT(), toAdminCategory(), GET(), isLandingSeccionTipo(), Params (+45 more)
+Nodes (68): DELETE(), GET(), POST(), PUT(), toAdminCategory(), DELETE(), Params, PUT() (+60 more)
 
 ### Community 290 - "Patrones de API Admin — multi_shop"
 Cohesion: 0.67
@@ -1561,8 +1578,8 @@ Cohesion: 1.00
 Nodes (3): public.mesa_item_pagos, public.mesa_pagos_personalizados, public.mesa_sesiones
 
 ### Community 292 - "Trampas conocidas"
-Cohesion: 0.32
-Nodes (13): useCommandQueue(), enqueueCommand(), flushCommandQueue(), getQueuedCommands(), getQueuedCount(), isExpired(), isResumeSignal(), itemStatusKey() (+5 more)
+Cohesion: 0.29
+Nodes (13): useOnlineStatus(), useCommandQueue(), enqueueCommand(), flushCommandQueue(), getQueuedCommands(), getQueuedCount(), isExpired(), itemStatusKey() (+5 more)
 
 ### Community 294 - "page.tsx"
 Cohesion: 0.13
@@ -1609,8 +1626,8 @@ Cohesion: 0.17
 Nodes (12): Causa raíz encontrada — `ALTER DEFAULT PRIVILEGES` en `public` (2026-07-31, tercera pasada), Cuarta pasada (auditoría externa, 2026-07-31) — GRANTs heredados en las 53 tablas ya existentes, Función de auditoría — `check_public_function_grants()`, Función de auditoría — `check_rls_policy_hygiene()`, Incidente 2026-07-31 — fuga cross-tenant vía RLS PERMISSIVE + Realtime, Lecturas públicas, Otros defaults inseguros de Postgres cubiertos (misma meta-revisión), Políticas de denegación anónima (RESTRICTIVE) (+4 more)
 
 ### Community 311 - "rls-policy-hygiene.spec.ts"
-Cohesion: 0.35
-Nodes (10): b64(), enqueue(), fromB64(), getOrCreateKey(), getQueueCount(), idbCommit(), idbPut(), openDb() (+2 more)
+Cohesion: 0.19
+Nodes (15): FichajeDialog(), Props, RGPD_KEY(), TIPO_LABEL, TpvLoginForm(), b64(), enqueue(), fromB64() (+7 more)
 
 ### Community 313 - "@capacitor/preferences"
 Cohesion: 0.22
@@ -1689,20 +1706,20 @@ Cohesion: 0.50
 Nodes (3): anonHeaders(), anonKey(), TABLES
 
 ### Community 363 - "albaranes-immutable.spec.ts"
-Cohesion: 0.07
-Nodes (23): ref_node_fs, ref_node_path, API_DIR, EXCLUDED_PATHS, ROOT, MAIN_TS, PRELOAD_TS, ROOT (+15 more)
+Cohesion: 0.12
+Nodes (12): ref_node_fs, ref_node_path, API_DIR, EXCLUDED_PATHS, ROOT, MAIN_TS, PRELOAD_TS, ROOT (+4 more)
 
 ### Community 371 - "tpv-turnos-inalterabilidad.spec.ts"
-Cohesion: 0.08
-Nodes (26): AdminSidebar(), AdminSidebarProps, computeInitialOpenGroups(), FilterCtx, filterEntry(), GROUP_COLORS, GroupColor, isItemVisible() (+18 more)
+Cohesion: 0.06
+Nodes (37): AdminSidebar(), AdminSidebarProps, computeInitialOpenGroups(), FilterCtx, filterEntry(), GROUP_COLORS, GroupColor, isItemVisible() (+29 more)
 
 ### Community 372 - "Testing & CI"
 Cohesion: 0.29
 Nodes (7): CI (GitHub Actions), Contra qué corre el E2E (importante), Cómo agregar un test de regresión de seguridad nuevo, Git hooks (Husky), Los 5 tests que se saltan SIEMPRE, y por qué está bien, Suites de test, Testing & CI
 
 ### Community 384 - "Pago Manual por el Camarero"
-Cohesion: 0.09
-Nodes (28): cspReportSchema, POST(), sanitizeUri(), paramsSchema, POST(), DELETE(), paramsSchema, mesaIdSchema (+20 more)
+Cohesion: 0.11
+Nodes (25): cspReportSchema, POST(), sanitizeUri(), mesaIdSchema, POST(), GET(), getMesaSchema, authSchema (+17 more)
 
 ### Community 397 - "sw-network-timeout.test.ts"
 Cohesion: 0.33
@@ -1737,24 +1754,24 @@ Cohesion: 0.67
 Nodes (3): Polling adaptativo, Polling Adaptativo + Realtime, Supabase Realtime
 
 ## Knowledge Gaps
-- **2531 isolated node(s):** `husky.sh script`, `@upstash/context7-mcp`, `@playwright/mcp`, `graphify-mcp`, `@supabase/mcp-server-supabase` (+2526 more)
+- **2533 isolated node(s):** `husky.sh script`, `@upstash/context7-mcp`, `@playwright/mcp`, `graphify-mcp`, `@supabase/mcp-server-supabase` (+2528 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **176 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **198 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Result` connect `Sistema de Pedidos Mesa` to `Módulo 128`, `Auth y Sesiones Admin`, `Realtime Waiter Panel`, `Complementos Productos`, `Delivery y Recogida`, `Infraestructura DB y Repos`, `Módulo 11`, `Módulo 12`, `Módulo 13`, `Módulo 144`, `Módulo 18`, `Módulo 19`, `Módulo 152`, `analytics.use-case.ts`, `Módulo 30`, `Módulo 34`, `Módulo 38`, `Módulo 41`, `Módulo 170`, `Módulo 173`, `Módulo 46`, `Módulo 52`, `Módulo 54`, `Módulo 56`, `Módulo 191`, `Módulo 64`, `Módulo 75`, `Módulo 79`, `Módulo 208`, `Módulo 80`, `Módulo 87`, `Módulo 216`, `Módulo 97`, `Módulo 232`, `Módulo 106`, `Módulo 107`, `Módulo 113`, `Módulo 115`, `Módulo 117`?**
-  _High betweenness centrality (0.080) - this node is a cross-community bridge._
-- **Why does `t()` connect `Módulo 21` to `Catálogo y Menú Público`, `Delivery y Recogida`, `UI Componentes TPV`, `Módulo 10`, `Módulo 138`, `NuevoPedidoPanel.tsx`, `Módulo 14`, `Módulo 143`, `Módulo 22`, `executeMesaOrder`, `Módulo 26`, `Módulo 28`, `Módulo 156`, `Módulo 32`, `Módulo 33`, `Módulo 160`, `Módulo 35`, `Módulo 36`, `Módulo 42`, `Módulo 44`, `Módulo 48`, `Módulo 179`, `Módulo 53`, `Módulo 182`, `Módulo 55`, `Módulo 57`, `Módulo 60`, `Módulo 199`, `Módulo 71`, `Módulo 207`, `Módulo 81`, `Módulo 84`, `Módulo 225`, `Módulo 99`, `Módulo 100`, `tpv-turnos-inalterabilidad.spec.ts`, `Módulo 116`, `Módulo 243`, `Módulo 250`, `Módulo 124`, `Módulo 125`?**
-  _High betweenness centrality (0.057) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `Módulo 31` to `Módulo 228`, `Row Level Security (RLS)`, `Módulo 167`, `Módulo 233`, `Módulo 75`, `Módulo 235`, `Módulo 110`, `@types/bcryptjs`, `Módulo 239`, `@vercel/analytics`, `Atomicidad del Pago Completo (implementada 2026-07-30)`, `RGPD — Ciclo de vida de datos de clientes`, `Módulo 214`, `route.ts`, `@sentry/nextjs`, `Módulo 223`?**
+- **Why does `Result` connect `Sistema de Pedidos Mesa` to `Módulo 128`, `Auth y Sesiones Admin`, `Realtime Waiter Panel`, `route.ts`, `Complementos Productos`, `Infraestructura DB y Repos`, `Módulo 11`, `Módulo 12`, `Módulo 13`, `Módulo 15`, `Módulo 144`, `Módulo 18`, `Módulo 19`, `Módulo 152`, `Módulo 30`, `Módulo 34`, `Módulo 38`, `Módulo 41`, `Módulo 173`, `Módulo 46`, `Módulo 52`, `Módulo 54`, `Módulo 55`, `Módulo 56`, `Módulo 191`, `Módulo 64`, `Módulo 73`, `Módulo 74`, `Módulo 75`, `Módulo 79`, `Módulo 208`, `Módulo 87`, `Módulo 216`, `Módulo 97`, `Módulo 100`, `Módulo 232`, `Módulo 106`, `Módulo 107`, `Módulo 113`, `Módulo 115`, `Módulo 117`, `Módulo 118`?**
+  _High betweenness centrality (0.090) - this node is a cross-community bridge._
+- **Why does `t()` connect `Módulo 84` to `Catálogo y Menú Público`, `Delivery y Recogida`, `UI Componentes TPV`, `Módulo 10`, `Módulo 138`, `Módulo 14`, `Módulo 143`, `Módulo 21`, `Módulo 22`, `Módulo 26`, `Módulo 28`, `Módulo 156`, `Módulo 32`, `Módulo 33`, `Módulo 160`, `Módulo 35`, `Módulo 36`, `Módulo 42`, `Módulo 44`, `Módulo 48`, `Módulo 179`, `Módulo 53`, `Módulo 57`, `Módulo 60`, `Módulo 191`, `Módulo 199`, `Módulo 71`, `Módulo 207`, `Módulo 80`, `Módulo 81`, `Módulo 222`, `Módulo 225`, `Módulo 99`, `Módulo 100`, `tpv-turnos-inalterabilidad.spec.ts`, `Módulo 116`, `Módulo 245`, `Módulo 243`, `Módulo 250`, `Módulo 125`?**
+  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `Módulo 31` to `Panel Superadmin`, `@types/bcryptjs`, `@radix-ui/react-slot`, `react-dom`, `recharts`, `executeMesaOrder`, `analytics.use-case.ts`, `route.ts`, `Módulo 75`, `jose`, `next`, `electron-store`, `Módulo 223`, `Módulo 233`, `Módulo 235`, `Módulo 110`, `Módulo 239`, `qrcode`, `@radix-ui/react-dialog`, `Módulo 251`?**
   _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `t()` (e.g. with `InspectorPage()` and `MermasPage()`) actually correct?**
   _`t()` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `husky.sh script`, `@upstash/context7-mcp`, `@playwright/mcp` to the rest of the system?**
-  _2531 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2533 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Sistema de Pedidos Mesa` be split into smaller, more focused modules?**
-  _Cohesion score 0.03391472868217054 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.045655375552282766 - nodes in this community are weakly interconnected._
 - **Should `Auth y Sesiones Admin` be split into smaller, more focused modules?**
-  _Cohesion score 0.08080808080808081 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0670762928827445 - nodes in this community are weakly interconnected._
