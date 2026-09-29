@@ -41,6 +41,7 @@ import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-la
 import { IDEMPOTENCY_HEADER, buildIdempotencyKey } from "@/lib/idempotency";
 import { TiendaFulfillmentSelector, type ModalidadEntregaPublica } from "@/components/TiendaFulfillmentSelector";
 import { emailObligatorio, pasaPorPasarela } from "@/lib/pedido/email-del-cliente";
+import { direccionCompleta, DIRECCION_DETALLE_MAX } from "@/lib/pedido/direccion";
 import { useMesaId } from "@/lib/mesa/use-mesa-id";
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
@@ -1287,6 +1288,42 @@ function construirPayloadEstandar(datos: {
   };
 }
 
+/** Solo a domicilio y con la dirección ya elegida: antes no hay portal que completar. */
+function showDireccionDetalle(deliveryAddress: string, deliveryMethod: DeliveryMethod, modalidadEntregaTipo: ModalidadEntregaTipo): boolean {
+  if (!deliveryAddress) return false;
+  return deliveryMethod === 'delivery' || modalidadEntregaTipo === 'domicilio';
+}
+
+/**
+ * Piso, puerta, escalera. Mapbox geocodifica portales, no viviendas: esto lo
+ * escribe el cliente y se incrusta en la dirección (`direccionCompleta`).
+ */
+function DireccionDetalle({ value, onChange, disabled, language }: Readonly<{
+  value: string;
+  onChange: (valor: string) => void;
+  disabled: boolean;
+  language: Parameters<typeof t>[1];
+}>) {
+  return (
+    <div className="mb-4 space-y-1.5">
+      <label htmlFor="cart-direccion-detalle" className="block text-xs font-medium text-muted-foreground">
+        {t('addressDetailLabel', language)}
+      </label>
+      <Input
+        id="cart-direccion-detalle"
+        type="text"
+        placeholder={t('addressDetailPlaceholder', language)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-11 rounded-[3px]"
+        maxLength={DIRECCION_DETALLE_MAX}
+        autoComplete="address-line2"
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
 /** En modo mesa no se piden datos personales: la mesa ya identifica al pedido. */
 function DistintivoDeMesa({ mesaInfo, mesaError, language }: Readonly<{
   mesaInfo: MesaInfo | null;
@@ -1511,6 +1548,7 @@ export function CartDrawer({
   const [email, setEmail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [direccionDetalle, setDireccionDetalle] = useState('');
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
   const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null);
   const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null);
@@ -1557,7 +1595,7 @@ export function CartDrawer({
       isRestaurant,
       pagosPickupHabilitados,
       deliveryMethod,
-      deliveryAddress,
+      deliveryAddress: direccionCompleta(deliveryAddress, direccionDetalle),
       deliveryPostalCode,
       deliveryLatitude,
       deliveryLongitude,
@@ -1579,7 +1617,7 @@ export function CartDrawer({
       setSending,
       attemptKey,
     });
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, emailEsObligatorio, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, modalidadEntregaId, modalidadEntregaTipo, modalidadEntregaPrecioCents, clearCart, closeCart, openCart, router, attemptKey]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, emailEsObligatorio, deliveryMethod, deliveryAddress, direccionDetalle, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, modalidadEntregaId, modalidadEntregaTipo, modalidadEntregaPrecioCents, clearCart, closeCart, openCart, router, attemptKey]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
@@ -1607,6 +1645,7 @@ export function CartDrawer({
       setEmail('');
       setDeliveryMethod(null);
       setDeliveryAddress('');
+      setDireccionDetalle('');
       setDeliveryPostalCode('');
       setDeliveryLatitude(null);
       setDeliveryLongitude(null);
@@ -1655,6 +1694,17 @@ export function CartDrawer({
     setDeliveryLongitude(campos.longitude);
     setEstimatedFeeCents(campos.feeCents);
   }, [deliveryMethod]);
+
+  // Seguir escribiendo en el buscador tras elegir una sugerencia invalida la
+  // dirección: sin esto el pedido salía con la ANTERIOR mientras el cliente veía
+  // otra. Al quedar sin coordenadas, `isDeliveryIncomplete` bloquea el botón.
+  const invalidarDireccion = useCallback(() => {
+    setDeliveryAddress('');
+    setDeliveryPostalCode('');
+    setDeliveryLatitude(null);
+    setDeliveryLongitude(null);
+    setEstimatedFeeCents(null);
+  }, []);
 
   const isDelivery = deliveryMethod === 'delivery';
   const { deliveryFee, modalidadFee, grandTotal } = computeCartTotals(
@@ -1908,6 +1958,7 @@ export function CartDrawer({
                   value={deliveryMethod}
                   deliveryHabilitado={deliveryHabilitado}
                   onChange={handleDeliveryChange}
+                  onAddressInvalidated={invalidarDireccion}
                   orderTotalCents={Math.round(totalPrice * 100)}
                   disabled={sending}
                 />
@@ -1929,8 +1980,13 @@ export function CartDrawer({
                     setDeliveryLongitude(longitude);
                     setDeliveryPostalCode(postalCode);
                   }}
+                  onAddressInvalidated={invalidarDireccion}
                   disabled={sending}
                 />
+              )}
+
+              {showDireccionDetalle(deliveryAddress, deliveryMethod, modalidadEntregaTipo) && (
+                <DireccionDetalle value={direccionDetalle} onChange={setDireccionDetalle} disabled={sending} language={language} />
               )}
 
               {/* Discount Code Section — hidden in mesa mode */}
