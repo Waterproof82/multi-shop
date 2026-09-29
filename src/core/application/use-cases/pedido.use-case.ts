@@ -463,20 +463,18 @@ export class PedidoUseCase {
   }
 
   private buildTelegramPedido(
-    pedidoId: string,
+    creado: Readonly<{ id: string; numero_pedido: number; total: number }>,
     empresaId: string,
     clienteId: string,
-    numeroPedido: number,
-    total: number,
     data: CreatePedidoDTO,
     trackingToken: string | undefined,
     entrega: EntregaPersistida
   ): Pedido {
     return {
-      id: pedidoId,
+      id: creado.id,
       empresa_id: empresaId,
       cliente_id: clienteId,
-      numero_pedido: numeroPedido,
+      numero_pedido: creado.numero_pedido,
       detalle_pedido: data.items.map(ci => ({
         producto_id: ci.item?.id,
         nombre: ci.item?.name ?? '',
@@ -484,7 +482,7 @@ export class PedidoUseCase {
         cantidad: ci.quantity,
         complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
       })),
-      total,
+      total: creado.total,
       moneda: null,
       estado: 'pendiente',
       created_at: new Date().toISOString(),
@@ -842,8 +840,7 @@ export class PedidoUseCase {
       // Step 6: Send Telegram notification
       // Delivery/pickup-with-payment orders skip — webhook confirms payment first
       const pedidoParaNotificar = this.buildTelegramPedido(
-        pedidoResult.data.id, empresaId, clienteResult.data.clienteId,
-        pedidoResult.data.numero_pedido, pedidoResult.data.total,
+        pedidoResult.data, empresaId, clienteResult.data.clienteId,
         data, trackingToken, entrega
       );
       await this.notifyTelegramForCreate(
