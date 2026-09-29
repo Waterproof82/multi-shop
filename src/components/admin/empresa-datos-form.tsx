@@ -9,6 +9,7 @@ import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { useAdmin } from '@/lib/admin-context';
+import { extraerUrlMapa } from '@/lib/mapa/extraer-url-mapa';
 
 interface EmpresaDatosFormProps {
   readonly initialData: {
@@ -32,6 +33,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
   const [formData, setFormData] = useState(initialData);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     setFormData(initialData);
@@ -40,6 +42,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
   const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setSaved(false);
+    setError(false);
   };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -57,11 +60,11 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         }),
       });
 
-      if (res.ok) {
-        setSaved(true);
-      }
-    } catch (error) {
-      logClientError(error, 'handleSubmit');
+      setSaved(res.ok);
+      setError(!res.ok);
+    } catch (err) {
+      setError(true);
+      logClientError(err, 'handleSubmit');
     } finally {
       setSaving(false);
     }
@@ -255,7 +258,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             name="url_mapa"
             type="url"
             value={formData.url_mapa}
-            onChange={(e) => handleChange('url_mapa', e.target.value)}
+            onChange={(e) => handleChange('url_mapa', extraerUrlMapa(e.target.value))}
             placeholder="https://www.google.com/maps/embed?pb=..."
             aria-describedby="url_mapa_help"
           />
@@ -276,6 +279,9 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         </button>
         {saved && (
           <span className="text-primary text-sm">{t('contactDataSaved', language)}</span>
+        )}
+        {error && (
+          <span role="alert" className="text-destructive text-sm">{t('errorSaving', language)}</span>
         )}
       </div>
     </form>

@@ -93,7 +93,7 @@ export default async function AdminProtectedLayout({
       >
         {/* `dark`: la carcasa del admin es oscura; sin esto los tokens (text-foreground,
             bg-muted...) salen del tema claro de la tienda → texto oscuro sobre slate-900. */}
-        <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="dark text-foreground min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
           {isSuperAdminView && (
             <SuperadminBanner empresaNombre={empresa?.nombre ?? ''} />
           )}
