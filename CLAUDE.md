@@ -310,6 +310,17 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`findAllByTenant`** de categorías/productos/complementos reintenta una vez ante `/timeout|gateway/i` — ruido de fondo de PostgREST (Warp), mismo patrón que login y purga RGPD. Son SELECT puros, seguros de reintentar sin analizar idempotencia.
 - **LCP de imágenes de producto**: `MenuSection` decide `priority` (→ `loading="eager"`) por `index===0` de categoría + primeros 3 ítems (coincide con `lg:grid-cols-3`). Si la categoría usa subcategorías, se renderiza `SubcategorySection` — verificar que también reciba y propague `priority`; si no, toda categoría con subcategorías sirve su primera imagen en `lazy` sin importar el dispositivo.
 
+## Tienda — Envio a Domicilio y Seguimiento — Trampas Criticas
+
+> Ver doc completo: `docs/context/tienda-envios-seguimiento.md`
+
+- **`modalidad_entrega_nombre/tipo/precio_cents` son COPIAS en `pedidos`, no referencias.** La FK `modalidad_entrega_id` es `ON DELETE SET NULL`: con un JOIN, borrar o renombrar la modalidad cambiaria el transportista de pedidos ya enviados. La copia se hace en `buildModalidadPayload` con lo que devuelve `validarPrecioVigente` (BD), nunca con el body.
+- **Gastos de envio de tienda = `modalidad_entrega_precio_cents`** (el `total` ya lo incluye). `delivery_fee_cents` es el de Glovo/restaurante. Leer solo este ultimo oculta el envio en tienda.
+- **`puedeTenerSeguimiento()`** (domicilio && no cancelado) decide el boton del camion Y se repite en el `UPDATE` del repo. En un pedido cancelado la columna Acciones sale VACIA (tampoco hay boton de cancelar): no es un bug de render.
+- **Email de seguimiento: vista previa (GET) y envio (POST) usan la MISMA funcion** (`componerEmail`). No duplicar la composicion o la vista previa dejara de ser fiel. Todo campo de admin/cliente pasa por `escapeHtml` (test en `tests/compliance/pedido-seguimiento-email.test.ts`). Sin enlaces de baja: es transaccional.
+- **Si el email sale pero falla guardar `seguimiento_email_enviado_at`, el POST responde exito** — devolver error provoca reintento y email duplicado al cliente.
+- **Rellenar columnas de `pedidos` con UPDATE masivo es seguro** respecto a `notify_waiter_order_validated`/`push_on_pedido_validated` (saltan en todo UPDATE pero solo actuan si cambia `estado`). Verificar de nuevo si se anade otro trigger `AFTER UPDATE` sin columnas.
+
 ## SEO Multi-Tenant
 
 > Ver doc completo: `docs/context/seo-multitenant.md`

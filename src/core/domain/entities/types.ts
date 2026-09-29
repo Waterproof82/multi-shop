@@ -261,7 +261,15 @@ export interface Pedido {
     nombre: string;
     email: string;
     telefono: string;
+    idioma?: string | null;
   };
+  numero_seguimiento?: string | null;
+  // Filas crudas (`select('*')`) — mismos datos que modalidadEntregaTipo/direccionEntrega en snake_case
+  modalidad_entrega_tipo?: 'recogida' | 'domicilio' | null;
+  direccion_entrega?: string | null;
+  modalidad_entrega_precio_cents?: number | null;
+  modalidad_entrega_nombre?: string | null;
+  seguimiento_email_enviado_at?: string | null;
   // Delivery / rider fields
   riderId?: string | null;
   pickupEtaMinutes?: number | null;

@@ -26,6 +26,7 @@ Cada empresa tiene, además de la carta, una **landing configurable** en `/`: un
 - **Descuento de bienvenida**: popup a los 30 segundos, código único por email, porcentaje y duración configurables, validación server-side completa.
 - **Campañas TooGoodToGo**: paquetes sorpresa a precio reducido, emails masivos a suscriptores, gestión de cupones y reservas.
 - **Envío de promociones** por email a la base de clientes con imagen y texto personalizado.
+- **Envío a domicilio con número de seguimiento**: el admin guarda el código del transportista y, tras confirmar en un pop-up con vista previa, se envía al cliente un email con el número, el tipo de envío y el nombre de la modalidad (transportista) y el detalle completo del pedido.
 
 ### 🍽️ Modo Restaurante
 
@@ -433,6 +434,7 @@ WAITER_PIN_PEPPER=
 | [`docs/context/electron-tpv.md`](docs/context/electron-tpv.md) | Electron TPV: build, auto-update, impresora, trampas |
 | [`docs/context/capacitor-android-pda.md`](docs/context/capacitor-android-pda.md) | Capacitor Android: build, cookies, auto-update |
 | [`docs/context/delivery.md`](docs/context/delivery.md) | Delivery: zona, Glovo, Redsys, flujo end-to-end |
+| [`docs/context/tienda-envios-seguimiento.md`](docs/context/tienda-envios-seguimiento.md) | Tienda: modalidades de envío, número de seguimiento y email al cliente |
 | [`docs/context/mesa-ordering.md`](docs/context/mesa-ordering.md) | QR table ordering: flujo, API, rate limiting |
 | [`docs/context/mesa-payments.md`](docs/context/mesa-payments.md) | Pagos en mesa: Redsys, división, lock, race conditions |
 | [`docs/context/rgpd-clientes.md`](docs/context/rgpd-clientes.md) | RGPD: ciclo de vida de datos de clientes |

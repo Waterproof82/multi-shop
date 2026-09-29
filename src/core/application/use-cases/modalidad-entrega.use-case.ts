@@ -76,7 +76,7 @@ export class ModalidadEntregaUseCase {
    * intentar que el pedido se guarde como 'recogida' evitando la dirección de
    * envío, o viceversa.
    */
-  async validarPrecioVigente(modalidadId: string, empresaId: string): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' }>> {
+  async validarPrecioVigente(modalidadId: string, empresaId: string): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio'; nombre: string }>> {
     try {
       const result = await this.repo.findById(modalidadId, empresaId);
       if (!result.success) return propagarError(result, 'ModalidadEntregaUseCase.validarPrecioVigente');
@@ -86,7 +86,7 @@ export class ModalidadEntregaUseCase {
           error: { code: 'MODALIDAD_ENTREGA_INVALIDA', message: 'La modalidad de entrega seleccionada ya no está disponible', module: 'use-case', method: 'ModalidadEntregaUseCase.validarPrecioVigente' },
         };
       }
-      return { success: true, data: { precioCents: result.data.precioCents, tipo: result.data.tipo } };
+      return { success: true, data: { precioCents: result.data.precioCents, tipo: result.data.tipo, nombre: result.data.nombre } };
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'use-case', 'ModalidadEntregaUseCase.validarPrecioVigente', { empresaId }) };
     }

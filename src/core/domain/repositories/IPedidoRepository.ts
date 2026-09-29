@@ -115,6 +115,9 @@ export interface IPedidoRepository {
   findAllByTenantAndMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>>;
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   findById(id: string, empresaId: string): Promise<Result<Pedido | null>>;
+  /** Solo actualiza pedidos con envío a domicilio no cancelados. `false` = no había pedido elegible. */
+  updateNumeroSeguimiento(id: string, empresaId: string, numeroSeguimiento: string | null): Promise<Result<boolean>>;
+  markSeguimientoEmailEnviado(id: string, empresaId: string): Promise<Result<string>>;
   findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; sesion_id: string | null; google_reviews_url: string | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
   createMesaOrder(params: {
     empresaId: string;
@@ -158,6 +161,7 @@ export interface IPedidoRepository {
       modalidad_entrega_id?: string | null;
       modalidad_entrega_tipo?: string;
       modalidad_entrega_precio_cents?: number;
+      modalidad_entrega_nombre?: string | null;
     },
     idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;

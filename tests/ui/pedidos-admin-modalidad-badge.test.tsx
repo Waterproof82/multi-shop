@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import {
   getTiendaModalidadBadgeInfo,
   renderOrigenBadge,
+  TipoEnvioResumen,
 } from '@/app/admin/(protected)/pedidos/page';
 
 // Subconjunto mínimo de campos que consume la lógica bajo test — evita
@@ -84,5 +85,26 @@ describe('renderOrigenBadge — precedencia de modalidad de tienda', () => {
     const pedido = buildPedido({ tracking_token: 'abc123', modalidad_entrega_tipo: null });
     render(renderOrigenBadge(pedido, 'es'));
     expect(screen.getByText('Recogida')).toBeInTheDocument();
+  });
+});
+
+describe('TipoEnvioResumen — detalle ampliado del pedido', () => {
+  it('muestra el tipo de envío y el nombre de la modalidad (transportista)', () => {
+    const pedido = { ...buildPedido({ modalidad_entrega_tipo: 'domicilio' }), modalidad_entrega_nombre: 'Battery Express' };
+    render(<TipoEnvioResumen pedido={pedido} language="es" />);
+    const linea = screen.getByText(/Tipo de envío/).closest('p');
+    expect(linea?.textContent).toContain('Envío a domicilio');
+    expect(linea?.textContent).toContain('Battery Express');
+  });
+
+  it('sin nombre guardado muestra solo el tipo', () => {
+    const pedido = buildPedido({ modalidad_entrega_tipo: 'recogida' });
+    render(<TipoEnvioResumen pedido={pedido} language="es" />);
+    expect(screen.getByText(/Tipo de envío/).closest('p')?.textContent).toContain('Recogida');
+  });
+
+  it('no pinta nada en pedidos que no son de tienda', () => {
+    const { container } = render(<TipoEnvioResumen pedido={buildPedido({})} language="es" />);
+    expect(container.textContent).toBe('');
   });
 });
