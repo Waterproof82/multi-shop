@@ -48,6 +48,11 @@ vi.mock('@/core/infrastructure/services/telegram.service', () => ({
   sendTelegramWithQuickReplies: (...a: unknown[]) => telegramSpy(...(a as [])),
 }));
 
+const confirmacionSpy = vi.fn(async () => 'enviado' as const);
+vi.mock('@/core/infrastructure/database', () => ({
+  getEnviarConfirmacionPedido: () => confirmacionSpy,
+}));
+
 const { processRedsysWebhookUseCase } = await import(
   '@/core/application/use-cases/payment/processRedsysWebhookUseCase'
 );
@@ -79,6 +84,7 @@ beforeEach(() => {
   firmaValida = true;
   glovoSpy.mockClear();
   telegramSpy.mockClear();
+  confirmacionSpy.mockClear();
 });
 
 describe('barreras previas: nada se procesa sin superarlas', () => {
@@ -364,6 +370,35 @@ describe('camino 2 — pago completo del pedido', () => {
     expect(llamadasDe(fake, 'mesa_sesiones').some(
       (l) => (l.payload as Record<string, unknown>)?.['pago_en_curso'] === false,
     )).toBe(true);
+  });
+
+  it('cobro aceptado: manda al cliente la confirmación con el pago confirmado', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase() });
+    await invocar();
+
+    expect(confirmacionSpy).toHaveBeenCalledTimes(1);
+    expect(confirmacionSpy).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: 'p1', empresaId: EMPRESA, pagado: true }));
+  });
+
+  it('cobro rechazado: NO manda confirmación — un pago fallido no es un pedido', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase() });
+    await invocar(parametros({ Ds_Response: '0190' }));
+
+    expect(confirmacionSpy).not.toHaveBeenCalled();
+  });
+
+  it('IDEMPOTENCIA: un reintento sobre un pedido ya pagado no reenvía la confirmación', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase({ payment_status: 'paid' }) });
+    await invocar();
+
+    expect(confirmacionSpy).not.toHaveBeenCalled();
+  });
+
+  it('con sesión de mesa NO manda confirmación por email', async () => {
+    fake = crearFakeSupabase({ tablas: pedidoBase({ sesion_id: 's9' }) });
+    await invocar();
+
+    expect(confirmacionSpy).not.toHaveBeenCalled();
   });
 
   it('con sesión de mesa NO manda Telegram: de eso se encarga cocina/bar', async () => {

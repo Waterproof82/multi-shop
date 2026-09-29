@@ -555,6 +555,49 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async reclamarEmailConfirmacion(id: string, empresaId: string): Promise<Result<boolean>> {
+    try {
+      // UPDATE condicionado: atómico frente a dos caminos que llegan a la vez.
+      // Leer y luego escribir dejaría que ambos pasaran y el cliente recibiría
+      // el correo dos veces.
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .update({ confirmacion_email_enviado_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('empresa_id', empresaId)
+        .is('confirmacion_email_enviado_at', null)
+        .select('id');
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.reclamarEmailConfirmacion', { empresaId, details: { code: error.code, pedidoId: id } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al reclamar el email de confirmación', module: 'repository', method: 'reclamarEmailConfirmacion' } };
+      }
+      return { success: true, data: (data ?? []).length > 0 };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.reclamarEmailConfirmacion', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async liberarEmailConfirmacion(id: string, empresaId: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ confirmacion_email_enviado_at: null })
+        .eq('id', id)
+        .eq('empresa_id', empresaId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.liberarEmailConfirmacion', { empresaId, details: { code: error.code, pedidoId: id } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al liberar el email de confirmación', module: 'repository', method: 'liberarEmailConfirmacion' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.liberarEmailConfirmacion', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
   async deleteAllByTenant(empresaId: string): Promise<Result<number>> {
     try {
       const { data: pedidosAEliminar, error: countError } = await this.supabase

@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
-import { getEmpresaPublicRepository, getPedidoUseCase, getMesaUseCase } from '@/core/infrastructure/database';
+import { getEmpresaPublicRepository, getPedidoUseCase, getMesaUseCase, getEnviarConfirmacionPedido } from '@/core/infrastructure/database';
+import { emailObligatorio, pasaPorPasarela, type ContextoPago } from '@/lib/pedido/email-del-cliente';
 import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
@@ -211,12 +212,28 @@ async function handleMesaOrder(
   });
 }
 
+function contextoPago(empresa: EmpresaOrderData, data: DefaultData): ContextoPago {
+  return {
+    esRestaurante: empresa.tipo === 'restaurante',
+    pagosPickupHabilitados: empresa.pagos_pickup_habilitados ?? false,
+    origen: data.origen ?? null,
+  };
+}
+
 async function handleDefaultOrder(
   empresa: EmpresaOrderData,
   data: DefaultData,
   isPedidos: boolean,
-  idempotency: IdempotencyContext | undefined
+  idempotency: IdempotencyContext | undefined,
+  origenPeticion: string
 ): Promise<NextResponse> {
+  // Misma regla que el carrito (`emailObligatorio`). Aquí es la que cuenta: la
+  // del cliente se puede saltar mandando el POST a mano.
+  const contexto = contextoPago(empresa, data);
+  if (emailObligatorio(contexto) && !data.email?.trim()) {
+    return NextResponse.json({ error: 'El email es obligatorio para este pedido' }, { status: 400 });
+  }
+
   const pedidoResult = await getPedidoUseCase().create(
     empresa.id,
     data,
@@ -237,6 +254,14 @@ async function handleDefaultOrder(
   }
 
   const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
+
+  // Con pago online, la confirmación sale cuando Redsys confirma el cobro
+  // (processRedsysWebhookUseCase), no ahora: un pago rechazado no es un pedido.
+  // `after` para no retrasar la respuesta; el candado evita duplicados si el
+  // cliente reintenta con la misma clave de idempotencia.
+  if (!pasaPorPasarela(contexto)) {
+    after(() => getEnviarConfirmacionPedido()({ pedidoId, empresaId: empresa.id, pagado: false, origen: origenPeticion }));
+  }
   return NextResponse.json({
     success: true,
     numeroPedido,
@@ -285,5 +310,5 @@ export async function POST(request: Request) {
     : undefined;
 
   if (data.tipo === 'mesa') return handleMesaOrder(empresa, data, request, idempotency);
-  return handleDefaultOrder(empresa, data, isPedidos, idempotency);
+  return handleDefaultOrder(empresa, data, isPedidos, idempotency, new URL(request.url).origin);
 }
