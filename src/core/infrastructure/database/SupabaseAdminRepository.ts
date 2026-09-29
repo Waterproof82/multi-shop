@@ -210,6 +210,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       descuentoBienvenidaDuracion: Number(row.descuento_bienvenida_duracion ?? 30),
       deliveryHabilitado: (row.delivery_habilitado as boolean) ?? false,
       envioDomicilioHabilitado: (row.envio_domicilio_habilitado as boolean) ?? false,
+      landingHabilitada: (row.landing_habilitada as boolean) ?? true,
       googleReviewsUrl: (row.google_reviews_url as string | null) ?? null,
     };
   }

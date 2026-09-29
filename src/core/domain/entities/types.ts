@@ -146,6 +146,7 @@ export interface Empresa {
   descuentoBienvenidaDuracion?: number | null;
   deliveryHabilitado: boolean;
   envioDomicilioHabilitado: boolean;
+  landingHabilitada: boolean;
   googleReviewsUrl: string | null;
   nif?: string | null;
   tipoImpuesto?: 'iva' | 'igic';
