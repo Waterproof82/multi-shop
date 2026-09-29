@@ -9,6 +9,8 @@ export interface ProcessRedsysWebhookInput {
   dsSignature: string; // raw signature from POST body
   dsSignatureVersion: string;
   empresaId: string;
+  /** Origen de la petición, para los enlaces del email si el tenant no tiene dominio propio. */
+  origen?: string;
 }
 
 export interface ProcessRedsysWebhookResult {
@@ -310,6 +312,18 @@ async function aplicarEfectosDelCobro(
   }
   if (origen === 'delivery') {
     despacharGlovo(p, input.empresaId, dsOrder, cliente);
+  }
+  // Confirmación al cliente con el pago ya cobrado. Nunca lanza, y el candado
+  // de `confirmacion_email_enviado_at` evita el duplicado cuando llegan el
+  // webhook y la vuelta del navegador (confirm-pedido) para el mismo cobro.
+  if (!sesionId) {
+    const { getEnviarConfirmacionPedido } = await import('@/core/infrastructure/database');
+    await getEnviarConfirmacionPedido()({
+      pedidoId: p['id'] as string,
+      empresaId: input.empresaId,
+      pagado: true,
+      origen: input.origen ?? '',
+    });
   }
 }
 

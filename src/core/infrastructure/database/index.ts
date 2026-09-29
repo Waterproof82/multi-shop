@@ -28,6 +28,8 @@ import { SuperAdminUseCase } from '@/core/application/use-cases/superadmin.use-c
 import { DescuentoUseCase } from '@/core/application/use-cases/descuento.use-case';
 import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client-token.use-case';
 import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-case';
+import { crearEnviarConfirmacionPedido } from '@/core/application/use-cases/pedido/enviar-confirmacion-pedido.use-case';
+import { sendEmail } from '@/lib/brevo-email';
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
 import { SupabaseMenuVirtualRepository } from './SupabaseMenuVirtualRepository';
@@ -308,4 +310,29 @@ let _auditLogRepository: IAuditLogRepository | undefined;
 export function getAuditLogRepository(): IAuditLogRepository {
   _auditLogRepository ??= new SupabaseAuditLogRepository();
   return _auditLogRepository;
+}
+
+let _enviarConfirmacionPedido: ReturnType<typeof crearEnviarConfirmacionPedido> | undefined;
+/** Email "hemos recibido tu pedido" al cliente. Nunca lanza. */
+export function getEnviarConfirmacionPedido(): ReturnType<typeof crearEnviarConfirmacionPedido> {
+  _enviarConfirmacionPedido ??= crearEnviarConfirmacionPedido({
+    buscarPedido: (id, empresaId) => getPedidoRepository().findById(id, empresaId),
+    reclamarEnvio: (id, empresaId) => getPedidoRepository().reclamarEmailConfirmacion(id, empresaId),
+    liberarEnvio: (id, empresaId) => getPedidoRepository().liberarEmailConfirmacion(id, empresaId),
+    buscarEmpresa: async (empresaId) => {
+      const result = await getEmpresaUseCase().getById(empresaId);
+      if (!result.success || !result.data) return null;
+      const empresa = result.data;
+      return {
+        nombre: empresa.nombre || 'Tienda',
+        logoUrl: empresa.logoUrl || '',
+        primaryColor: empresa.colores?.primary || '#18181B',
+        primaryForeground: empresa.colores?.primaryForeground || '#FFFFFF',
+        dominio: empresa.dominio ?? null,
+        emailNotification: empresa.emailNotification ?? null,
+      };
+    },
+    enviar: sendEmail,
+  });
+  return _enviarConfirmacionPedido;
 }

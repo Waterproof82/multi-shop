@@ -118,6 +118,10 @@ export interface IPedidoRepository {
   /** Solo actualiza pedidos con envío a domicilio no cancelados. `false` = no había pedido elegible. */
   updateNumeroSeguimiento(id: string, empresaId: string, numeroSeguimiento: string | null): Promise<Result<boolean>>;
   markSeguimientoEmailEnviado(id: string, empresaId: string): Promise<Result<string>>;
+  /** Reclama el envío del email de confirmación. `false` = ya estaba reclamado. */
+  reclamarEmailConfirmacion(id: string, empresaId: string): Promise<Result<boolean>>;
+  /** Suelta el reclamo tras un envío fallido, para que otro camino lo reintente. */
+  liberarEmailConfirmacion(id: string, empresaId: string): Promise<Result<void>>;
   findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; sesion_id: string | null; google_reviews_url: string | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
   createMesaOrder(params: {
     empresaId: string;

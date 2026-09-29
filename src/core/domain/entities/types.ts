@@ -271,6 +271,8 @@ export interface Pedido {
   modalidad_entrega_precio_cents?: number | null;
   modalidad_entrega_nombre?: string | null;
   seguimiento_email_enviado_at?: string | null;
+  confirmacion_email_enviado_at?: string | null;
+  mesa_id?: string | null;
   // Delivery / rider fields
   riderId?: string | null;
   pickupEtaMinutes?: number | null;

@@ -170,12 +170,12 @@ export function itemsParaEmail(detalle: PedidoItem[]): ItemEmailSeguimiento[] {
   }));
 }
 
-function importeItem(item: ItemEmailSeguimiento): number {
+export function importeItem(item: ItemEmailSeguimiento): number {
   const complementos = item.complementos.reduce((sum, c) => sum + c.precio, 0);
   return (item.precio + complementos) * item.cantidad;
 }
 
-function filaItem(item: ItemEmailSeguimiento, precio: (n: number) => string): string {
+export function filaItem(item: ItemEmailSeguimiento, precio: (n: number) => string): string {
   const complementos = item.complementos.length === 0
     ? ''
     : `<div style="margin-top:4px;font-size:12px;color:#6b7280;">${item.complementos

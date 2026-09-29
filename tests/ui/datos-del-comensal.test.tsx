@@ -27,6 +27,7 @@ const BASE: Props = {
   email: '',
   countryCode: '+34',
   errors: {},
+  emailObligatorio: false,
   onNombre: () => {},
   onTelefono: () => {},
   onEmail: () => {},
@@ -121,12 +122,41 @@ describe('DatosDelComensal — los errores llegan a lectores de pantalla', () =>
     expect(input).toHaveAttribute('aria-describedby', 'telefono-error');
   });
 
-  it('el correo no bloquea el pedido: no admite estado de error', () => {
-    // Es opcional a proposito — solo sirve para la promocion. Si algun dia se
-    // valida, este test falla y obliga a decidirlo, en vez de que se cuele.
+  it('los errores de nombre y telefono no marcan el correo como invalido', () => {
+    // Antes el correo era siempre opcional y no admitia error. Desde 2026-09-29
+    // es obligatorio en tienda y en pedidos con pago online (ver
+    // `emailObligatorio`), asi que tiene su propio error — pero solo el suyo.
     pintar({ errors: { nombre: 'x', telefono: 'y' } });
 
     const input = document.querySelector('#cart-email') as HTMLInputElement;
-    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+  });
+});
+
+describe('DatosDelComensal — email obligatorio u opcional', () => {
+  const email = () => document.querySelector('#cart-email') as HTMLInputElement;
+
+  it('obligatorio: se marca como requerido y dice para qué se usa', () => {
+    pintar({ emailObligatorio: true });
+
+    expect(email()).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText('Tu email')).toBe(email());
+    expect(screen.getByText('Te enviaremos aquí la confirmación de tu pedido.')).toBeInTheDocument();
+  });
+
+  it('opcional: no es requerido y se sugiere para recibir el número de pedido', () => {
+    pintar({ emailObligatorio: false });
+
+    expect(email()).not.toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText('Tu email (opcional)')).toBe(email());
+    expect(screen.getByText('Déjanos tu email y te enviaremos el número de tu pedido.')).toBeInTheDocument();
+  });
+
+  it('el error del email se muestra y se asocia al campo', () => {
+    pintar({ emailObligatorio: true, errors: { email: 'El email es obligatorio' } });
+
+    expect(email()).toHaveAttribute('aria-invalid', 'true');
+    expect(email().getAttribute('aria-describedby')).toContain('email-error');
+    expect(screen.getByText('El email es obligatorio')).toBeInTheDocument();
   });
 });

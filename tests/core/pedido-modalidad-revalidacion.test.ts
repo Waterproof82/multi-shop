@@ -67,6 +67,8 @@ function buildPedidoRepoMock(): { repo: IPedidoRepository; create: ReturnType<ty
     findById: vi.fn(),
     updateNumeroSeguimiento: vi.fn(),
     markSeguimientoEmailEnviado: vi.fn(),
+    reclamarEmailConfirmacion: vi.fn(),
+    liberarEmailConfirmacion: vi.fn(),
     findByTrackingToken: vi.fn(),
     createMesaOrder: vi.fn(),
     updateItemPase: vi.fn(),
