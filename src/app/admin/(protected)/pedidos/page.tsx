@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Clock, Ban, ShoppingCart, Calendar, Trash, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Check, Clock, Ban, ShoppingCart, Calendar, Trash, AlertTriangle, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
-import { PEDIDO_ESTADO_COLORS, ESTADOS_POR_ORIGEN, getOrigenPedido, type PedidoEstado } from '@/core/domain/constants/pedido';
+import { PEDIDO_ESTADO_COLORS, ESTADOS_POR_ORIGEN, getOrigenPedido, puedeTenerSeguimiento, type PedidoEstado } from '@/core/domain/constants/pedido';
+import { SeguimientoDialog } from '@/components/admin/pedidos/seguimiento-dialog';
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,10 @@ interface Pedido {
   origen?: string | null;
   modalidad_entrega_tipo?: 'recogida' | 'domicilio' | null;
   direccion_entrega?: string | null;
+  modalidad_entrega_precio_cents?: number | null;
+  modalidad_entrega_nombre?: string | null;
+  numero_seguimiento?: string | null;
+  seguimiento_email_enviado_at?: string | null;
 }
 
 const ORIGEN_ORDER: Record<string, number> = { mesa: 0, recogida: 1, delivery: 2, web: 3 };
@@ -388,6 +393,97 @@ function StatsSection({
   );
 }
 
+function AccionesPedido({
+  pedido,
+  language,
+  onSeguimiento,
+  onCancelar,
+}: Readonly<{
+  pedido: Pedido;
+  language: Language;
+  onSeguimiento: (pedido: Pedido) => void;
+  onCancelar: (id: string, numero: number) => void;
+}>) {
+  const numero = pedido.numero_seguimiento ?? null;
+  const colorSeguimiento = numero === null
+    ? 'text-sky-400 hover:bg-sky-500/10'
+    : 'text-emerald-400 hover:bg-emerald-500/10';
+  const etiquetaSeguimiento = numero === null
+    ? t("trackingNumberAction", language)
+    : `${t("trackingNumberAction", language)}: ${numero}`;
+  return (
+    <div className="flex items-center gap-1">
+      {puedeTenerSeguimiento(pedido) && (
+        <button type="button"
+          onClick={(e) => { e.stopPropagation(); onSeguimiento(pedido); }}
+          className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${colorSeguimiento}`}
+          aria-label={etiquetaSeguimiento}
+          title={etiquetaSeguimiento}
+        >
+          <Truck className="w-4 h-4" />
+        </button>
+      )}
+      {pedido.estado !== 'cancelado' && (
+        <button type="button"
+          onClick={(e) => { e.stopPropagation(); onCancelar(pedido.id, pedido.numero_pedido); }}
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label={t("cancelOrder", language)}
+          title={t("cancelOrder", language)}
+        >
+          <Ban className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Coste de envío: tienda (precio de la modalidad) o delivery con rider. En céntimos. */
+function gastosEnvioCents(pedido: Pedido): number {
+  return pedido.modalidad_entrega_precio_cents ?? pedido.delivery_fee_cents ?? 0;
+}
+
+/**
+ * Tipo de envío + nombre de la modalidad (el transportista). El nombre es la
+ * copia guardada en el pedido al comprar, no la modalidad actual: sobrevive a
+ * que la modalidad se renombre o se borre.
+ */
+export function TipoEnvioResumen({
+  pedido,
+  language,
+}: Readonly<{
+  pedido: Pick<Pedido, 'modalidad_entrega_tipo' | 'direccion_entrega' | 'modalidad_entrega_nombre'>;
+  language: Language;
+}>) {
+  const info = getTiendaModalidadBadgeInfo(pedido);
+  if (info === null) return null;
+  return (
+    <p className="mb-2 text-sm text-muted-foreground">
+      <span className="font-medium text-foreground">{t('shippingMethodLabel', language)}:</span>{' '}
+      {t(info.labelKey, language)}
+      {pedido.modalidad_entrega_nombre && (
+        <> — <span className="font-medium text-foreground">{pedido.modalidad_entrega_nombre}</span></>
+      )}
+    </p>
+  );
+}
+
+function SeguimientoResumen({ pedido, language }: Readonly<{ pedido: Pedido; language: Language }>) {
+  if (!pedido.numero_seguimiento) return null;
+  return (
+    <p className="mb-2 text-sm text-muted-foreground">
+      <span className="font-medium text-foreground">{t('trackingNumberAction', language)}:</span>{' '}
+      <span className="font-mono">{pedido.numero_seguimiento}</span>
+      {pedido.seguimiento_email_enviado_at && (
+        <span className="ml-2 text-xs text-emerald-400">
+          · {t('trackingEmailSentAt', language)} {formatDate(pedido.seguimiento_email_enviado_at, {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          }, language)}
+        </span>
+      )}
+    </p>
+  );
+}
+
 export default function PedidosPage() {
   const { empresaId, overrideEmpresaId, isSuperAdmin } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
@@ -401,6 +497,7 @@ export default function PedidosPage() {
   const [deleteAllConfirm, setDeleteAllConfirm] = useState<{ show: boolean; confirmText: string }>({ show: false, confirmText: '' });
   const [deletingAll, setDeletingAll] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
+  const [seguimientoPedido, setSeguimientoPedido] = useState<Pedido | null>(null);
   const { language } = useLanguage();
 
   const lang = language;
@@ -490,6 +587,14 @@ export default function PedidosPage() {
       setDeletingAll(false);
     }
   };
+
+  const onSeguimientoGuardado = useCallback((id: string, numeroSeguimiento: string | null) => {
+    setPedidos(prev => prev.map(p => p.id === id ? { ...p, numero_seguimiento: numeroSeguimiento } : p));
+  }, []);
+
+  const onSeguimientoEmailEnviado = useCallback((id: string, enviadoAt: string) => {
+    setPedidos(prev => prev.map(p => p.id === id ? { ...p, seguimiento_email_enviado_at: enviadoAt } : p));
+  }, []);
 
   const openDeleteAllDialog = () => {
     setDeleteAllConfirm({ show: true, confirmText: '' });
@@ -691,16 +796,12 @@ export default function PedidosPage() {
                         }, language)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {pedido.estado !== 'cancelado' && (
-                          <button type="button"
-                            onClick={(e) => { e.stopPropagation(); askCancelPedido(pedido.id, pedido.numero_pedido); }}
-                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            aria-label={t("cancelOrder", language)}
-                            title={t("cancelOrder", language)}
-                          >
-                            <Ban className="w-4 h-4" />
-                          </button>
-                        )}
+                        <AccionesPedido
+                          pedido={pedido}
+                          language={language}
+                          onSeguimiento={setSeguimientoPedido}
+                          onCancelar={askCancelPedido}
+                        />
                       </td>
                     </tr>
                     {expandedPedido === pedido.id && (
@@ -708,11 +809,13 @@ export default function PedidosPage() {
                         <td colSpan={8} className="px-4 py-4 bg-muted/30">
                           <div className="max-w-2xl">
                             <h4 className="font-medium mb-2 text-foreground">{t("orderDetails", language)}</h4>
+                            <TipoEnvioResumen pedido={pedido} language={language} />
                             {pedido.modalidad_entrega_tipo === 'domicilio' && pedido.direccion_entrega && (
                               <p className="mb-2 text-sm text-muted-foreground">
                                 <span className="font-medium text-foreground">{t('deliveryAddress', language)}:</span> {pedido.direccion_entrega}
                               </p>
                             )}
+                            <SeguimientoResumen pedido={pedido} language={language} />
                             <ul className="space-y-2 text-sm text-foreground">
                               {groupPedidoItems(pedido.detalle_pedido ?? []).map((item) => {
                                 const complementoTotal = item.complementos.reduce((sum, comp) => sum + (comp.precio || comp.price || 0), 0);
@@ -733,10 +836,10 @@ export default function PedidosPage() {
                                   </li>
                                 );
                               })}
-                              {pedido.delivery_fee_cents != null && pedido.delivery_fee_cents > 0 && (
+                              {gastosEnvioCents(pedido) > 0 && (
                                 <li className="flex justify-between pt-1 border-t border-border text-muted-foreground">
                                   <span>{t('trackingDeliveryFee', language)}</span>
-                                  <span>{formatPrice(pedido.delivery_fee_cents / 100)}</span>
+                                  <span>{formatPrice(gastosEnvioCents(pedido) / 100)}</span>
                                 </li>
                               )}
                             </ul>
@@ -751,6 +854,16 @@ export default function PedidosPage() {
           </table>
         </div>
       </div>
+
+      <SeguimientoDialog
+        key={seguimientoPedido?.id ?? 'cerrado'}
+        pedido={seguimientoPedido}
+        empresaId={effectiveEmpresaId}
+        language={language}
+        onClose={() => setSeguimientoPedido(null)}
+        onSaved={onSeguimientoGuardado}
+        onEmailSent={onSeguimientoEmailEnviado}
+      />
 
       <CancelOrderDialog
         show={cancelConfirm.show}

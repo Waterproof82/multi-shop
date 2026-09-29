@@ -16,6 +16,7 @@ type DeliveryData = {
   modalidad_entrega_id?: string | null;
   modalidad_entrega_tipo?: string;
   modalidad_entrega_precio_cents?: number;
+  modalidad_entrega_nombre?: string | null;
 };
 
 /**
@@ -130,6 +131,7 @@ function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData):
   if (d.modalidad_entrega_id !== undefined) payload.modalidad_entrega_id = d.modalidad_entrega_id;
   if (d.modalidad_entrega_tipo) payload.modalidad_entrega_tipo = d.modalidad_entrega_tipo;
   if (d.modalidad_entrega_precio_cents !== undefined) payload.modalidad_entrega_precio_cents = d.modalidad_entrega_precio_cents;
+  if (d.modalidad_entrega_nombre !== undefined) payload.modalidad_entrega_nombre = d.modalidad_entrega_nombre;
 }
 
 // ── findPendientesValidacion helpers ──────────────────────────────────────────
@@ -483,7 +485,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .from('pedidos')
         .select(`
           *,
-          clientes:cliente_id (nombre, email, telefono),
+          clientes:cliente_id (nombre, email, telefono, idioma),
           mesas:mesa_id (numero, nombre)
         `)
         .eq('id', id)
@@ -510,6 +512,48 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: false, error: appError };
     }
    }
+
+  async updateNumeroSeguimiento(id: string, empresaId: string, numeroSeguimiento: string | null): Promise<Result<boolean>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .update({ numero_seguimiento: numeroSeguimiento })
+        .eq('id', id)
+        .eq('empresa_id', empresaId)
+        .eq('modalidad_entrega_tipo', 'domicilio')
+        .neq('estado', 'cancelado')
+        .select('id');
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.updateNumeroSeguimiento', { empresaId, details: { code: error.code, pedidoId: id } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar el número de seguimiento', module: 'repository', method: 'updateNumeroSeguimiento' } };
+      }
+      return { success: true, data: (data ?? []).length > 0 };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.updateNumeroSeguimiento', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async markSeguimientoEmailEnviado(id: string, empresaId: string): Promise<Result<string>> {
+    try {
+      const enviadoAt = new Date().toISOString();
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ seguimiento_email_enviado_at: enviadoAt })
+        .eq('id', id)
+        .eq('empresa_id', empresaId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.markSeguimientoEmailEnviado', { empresaId, details: { code: error.code, pedidoId: id } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al registrar el envío del email', module: 'repository', method: 'markSeguimientoEmailEnviado' } };
+      }
+      return { success: true, data: enviadoAt };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.markSeguimientoEmailEnviado', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
 
   async deleteAllByTenant(empresaId: string): Promise<Result<number>> {
     try {
@@ -624,6 +668,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       modalidad_entrega_id?: string | null;
       modalidad_entrega_tipo?: string;
       modalidad_entrega_precio_cents?: number;
+      modalidad_entrega_nombre?: string | null;
     },
     idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {

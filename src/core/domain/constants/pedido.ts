@@ -31,6 +31,22 @@ export function getOrigenPedido(mesaId: string | null, trackingToken: string | n
   return 'web';
 }
 
+/** Máximo del número de seguimiento del transportista (mismo tope que el CHECK de BD). */
+export const NUMERO_SEGUIMIENTO_MAX = 100;
+
+/**
+ * Solo un envío a domicilio de tienda lleva número de seguimiento del
+ * transportista. `modalidad_entrega_tipo` solo existe en pedidos de tienda, así
+ * que recogida, mesa y delivery propio (rider) quedan fuera. Un cancelado no se
+ * envía.
+ */
+export function puedeTenerSeguimiento(pedido: {
+  modalidad_entrega_tipo?: string | null;
+  estado: string;
+}): boolean {
+  return pedido.modalidad_entrega_tipo === 'domicilio' && pedido.estado !== 'cancelado';
+}
+
 export const PEDIDO_ESTADO_LABELS: Record<PedidoEstado, string> = {
   pendiente:  'Pendiente',
   anotado:    'Anotado',

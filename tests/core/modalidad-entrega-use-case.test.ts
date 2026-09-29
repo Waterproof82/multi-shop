@@ -33,7 +33,7 @@ describe('ModalidadEntregaUseCase', () => {
     const repo = repoMock();
     const useCase = new ModalidadEntregaUseCase(repo);
     const result = await useCase.validarPrecioVigente('m1', 'e1');
-    expect(result).toEqual({ success: true, data: { precioCents: 350, tipo: 'domicilio' } });
+    expect(result).toEqual({ success: true, data: { precioCents: 350, tipo: 'domicilio', nombre: 'Envío estándar' } });
   });
 
   it('validarPrecioVigente falla si la modalidad no existe', async () => {

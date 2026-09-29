@@ -34,6 +34,8 @@ describe('Revalidación de precio de modalidad al crear un pedido', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.precioCents).toBe(350); // NO el que mandaría el cliente
+      // El nombre viaja con el precio: el pedido guarda copia del transportista.
+      expect(result.data.nombre).toBe('Envío');
     }
   });
 
@@ -63,6 +65,8 @@ function buildPedidoRepoMock(): { repo: IPedidoRepository; create: ReturnType<ty
     findAllByTenantAndMonth: vi.fn(),
     updateStatus: vi.fn(),
     findById: vi.fn(),
+    updateNumeroSeguimiento: vi.fn(),
+    markSeguimientoEmailEnviado: vi.fn(),
     findByTrackingToken: vi.fn(),
     createMesaOrder: vi.fn(),
     updateItemPase: vi.fn(),
@@ -166,7 +170,7 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     const modalidadEntregaUseCase = {
       validarPrecioVigente: vi.fn().mockResolvedValue({
         success: true,
-        data: { precioCents: 550, tipo: 'domicilio' },
+        data: { precioCents: 550, tipo: 'domicilio', nombre: 'Battery Express' },
       }),
     } as unknown as ModalidadEntregaUseCase;
     const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
@@ -201,6 +205,9 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     expect(payload.modalidad_entrega_tipo).toBe('domicilio');
     expect(payload.modalidad_entrega_precio_cents).toBe(550);
     expect(payload.modalidad_entrega_id).toBe('m1');
+    // Copia del nombre en el momento de la compra: si la modalidad se renombra
+    // o se borra (FK ON DELETE SET NULL), el pedido sigue diciendo quién lo lleva.
+    expect(payload.modalidad_entrega_nombre).toBe('Battery Express');
   });
 
   it('un pedido de tienda sin modalidad_entrega_id en el body persiste recogida implícita, gratis, sin id', async () => {
@@ -220,6 +227,7 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     expect(payload.modalidad_entrega_tipo).toBe('recogida');
     expect(payload.modalidad_entrega_id).toBeNull();
     expect(payload.modalidad_entrega_precio_cents).toBe(0);
+    expect(payload.modalidad_entrega_nombre).toBeNull();
   });
 
   it('falla sin crear el pedido si la modalidad ya no está disponible (inactiva o de otra empresa)', async () => {

@@ -6,7 +6,7 @@ import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRep
 import { ModalidadEntregaUseCase } from "@/core/application/use-cases/modalidad-entrega.use-case";
 import { AppError, Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
-import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
+import { IDEMPOTENCY_REPLAY_CODE, puedeTenerSeguimiento } from "@/core/domain/constants/pedido";
 import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } from '@/core/infrastructure/services/telegram.service';
 
 /**
@@ -351,6 +351,66 @@ export class PedidoUseCase {
   }
 
   /**
+   * Guarda (o borra, con cadena vacía) el número de seguimiento del
+   * transportista. El repositorio solo actualiza envíos a domicilio no
+   * cancelados de la empresa; si no tocó ninguna fila, es NOT_FOUND.
+   */
+  async guardarNumeroSeguimiento(id: string, empresaId: string, numeroSeguimiento: string): Promise<Result<void>> {
+    try {
+      const numero = numeroSeguimiento.trim() || null;
+      const result = await this.pedidoRepo.updateNumeroSeguimiento(id, empresaId, numero);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.guardarNumeroSeguimiento' } };
+      }
+      if (!result.data) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Pedido con envío a domicilio no encontrado', module: 'use-case', method: 'PedidoUseCase.guardarNumeroSeguimiento' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.guardarNumeroSeguimiento', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  /**
+   * Comprueba que el pedido puede recibir el email de seguimiento y devuelve lo
+   * necesario para componerlo. No envía nada: el envío lo hace la ruta con el
+   * builder, y después llama a `marcarEmailSeguimientoEnviado`.
+   */
+  async prepararEmailSeguimiento(id: string, empresaId: string): Promise<Result<{ pedido: Pedido; numeroSeguimiento: string; destinatario: string }>> {
+    const invalido = (message: string): Result<never> => ({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message, module: 'use-case', method: 'PedidoUseCase.prepararEmailSeguimiento' },
+    });
+    try {
+      const result = await this.pedidoRepo.findById(id, empresaId);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.prepararEmailSeguimiento' } };
+      }
+      const pedido = result.data;
+      if (pedido === null) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Pedido no encontrado', module: 'use-case', method: 'PedidoUseCase.prepararEmailSeguimiento' } };
+      }
+      if (!puedeTenerSeguimiento(pedido)) return invalido('El pedido no es un envío a domicilio activo');
+      if (!pedido.numero_seguimiento) return invalido('El pedido no tiene número de seguimiento');
+      const destinatario = pedido.clientes?.email?.trim();
+      if (!destinatario) return invalido('El cliente no tiene email');
+      return { success: true, data: { pedido, numeroSeguimiento: pedido.numero_seguimiento, destinatario } };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.prepararEmailSeguimiento', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async marcarEmailSeguimientoEnviado(id: string, empresaId: string): Promise<Result<string>> {
+    const result = await this.pedidoRepo.markSeguimientoEmailEnviado(id, empresaId);
+    if (!result.success) {
+      return { success: false, error: { ...result.error, method: 'PedidoUseCase.marcarEmailSeguimientoEnviado' } };
+    }
+    return result;
+  }
+
+  /**
    * Determine if order requires tracking token based on type and origin
    */
   private shouldGenerateTrackingToken(
@@ -490,16 +550,16 @@ export class PedidoUseCase {
     data: CreatePedidoDTO,
     empresaId: string,
     empresaTipo: string
-  ): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' | undefined }>> {
+  ): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' | undefined; nombre: string | null }>> {
     // Sin modalidad_entrega_id, un pedido de tienda es recogida implícita —
     // el cliente nunca manda nada para recogida (no existe fila que
     // referenciar desde que se eliminó del admin). Restaurante/mesa siguen
     // sin marcar nada (`undefined`), es un concepto exclusivo de tienda.
     if (empresaTipo !== 'tienda') {
-      return { success: true, data: { precioCents: 0, tipo: undefined } };
+      return { success: true, data: { precioCents: 0, tipo: undefined, nombre: null } };
     }
     if (!data.modalidad_entrega_id) {
-      return { success: true, data: { precioCents: 0, tipo: 'recogida' } };
+      return { success: true, data: { precioCents: 0, tipo: 'recogida', nombre: null } };
     }
     const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
     if (!modalidadResult.success) {
@@ -516,7 +576,7 @@ export class PedidoUseCase {
         },
       };
     }
-    return { success: true, data: { precioCents: modalidadResult.data.precioCents, tipo: modalidadResult.data.tipo } };
+    return { success: true, data: { precioCents: modalidadResult.data.precioCents, tipo: modalidadResult.data.tipo, nombre: modalidadResult.data.nombre } };
   }
 
   /**
@@ -533,7 +593,8 @@ export class PedidoUseCase {
   private buildModalidadPayload(
     data: CreatePedidoDTO,
     modalidadTipoValidado: 'recogida' | 'domicilio' | undefined,
-    modalidadPrecioCents: number
+    modalidadPrecioCents: number,
+    modalidadNombre: string | null
   ) {
     // Ya no se exige `data.modalidad_entrega_id` — recogida implícita no
     // tiene id (no existe fila que referenciar), pero igual se persiste
@@ -544,6 +605,9 @@ export class PedidoUseCase {
       modalidad_entrega_id: data.modalidad_entrega_id ?? null,
       modalidad_entrega_tipo: modalidadTipoValidado,
       modalidad_entrega_precio_cents: modalidadPrecioCents,
+      // Copia del nombre, como el precio: si la modalidad se renombra o se
+      // borra (FK ON DELETE SET NULL), el pedido sigue diciendo quién lo lleva.
+      modalidad_entrega_nombre: modalidadNombre,
       ...(modalidadTipoValidado === 'domicilio' ? {
         direccion_entrega: data.direccion_entrega,
         codigo_postal: data.codigo_postal,
@@ -689,7 +753,7 @@ export class PedidoUseCase {
       if (!modalidadResult.success) {
         return { success: false, error: modalidadResult.error };
       }
-      const { precioCents: modalidadPrecioCents, tipo: modalidadTipoValidado } = modalidadResult.data;
+      const { precioCents: modalidadPrecioCents, tipo: modalidadTipoValidado, nombre: modalidadNombre } = modalidadResult.data;
 
       // Step 3: Apply discount if provided
       let finalTotal = priceResult.data.serverTotal;
@@ -737,7 +801,7 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadTipoValidado, modalidadPrecioCents) },
+        { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadTipoValidado, modalidadPrecioCents, modalidadNombre) },
         idempotency
       );
       if (!pedidoResult.success) {
