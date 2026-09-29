@@ -122,7 +122,7 @@ export interface IPedidoRepository {
   reclamarEmailConfirmacion(id: string, empresaId: string): Promise<Result<boolean>>;
   /** Suelta el reclamo tras un envío fallido, para que otro camino lo reintente. */
   liberarEmailConfirmacion(id: string, empresaId: string): Promise<Result<void>>;
-  findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; sesion_id: string | null; google_reviews_url: string | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
+  findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; sesion_id: string | null; google_reviews_url: string | null; total: number | null; modalidad_entrega_tipo: 'recogida' | 'domicilio' | null; modalidad_entrega_nombre: string | null; modalidad_entrega_precio_cents: number | null; direccion_entrega: string | null; origen: string | null; numero_seguimiento: string | null; descuento_porcentaje: number | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
   createMesaOrder(params: {
     empresaId: string;
     mesaId: string;

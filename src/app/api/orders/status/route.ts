@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getPedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitTracking } from '@/core/infrastructure/api/rate-limit';
 import { editMessageReplyMarkup } from '@/core/infrastructure/services/telegram.service';
+import { vistaPublicaSeguimiento } from '@/lib/tracking/vista-publica';
 
 const tokenSchema = z.uuid();
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
   }
 
-  const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id, items, tipo, estado, glovo_status, delivery_fee_cents, mesa_id, mesa_numero, mesa_nombre, sesion_id, google_reviews_url } = result.data;
+  const { id, estimated_ready_at, telegram_message_id, telegram_chat_id } = result.data;
 
   // If order is ready and has a pending Telegram message, edit it and clear the id (fire-and-forget)
   const isReady = estimated_ready_at && new Date(estimated_ready_at) <= new Date();
@@ -43,5 +44,5 @@ export async function GET(request: Request) {
     ]);
   }
 
-  return NextResponse.json({ numero_pedido, estimated_minutes, estimated_ready_at, items, tipo, estado, glovo_status, delivery_fee_cents, mesa_id, mesa_numero, mesa_nombre, sesion_id, google_reviews_url });
+  return NextResponse.json(vistaPublicaSeguimiento(result.data));
 }
