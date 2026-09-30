@@ -62,7 +62,7 @@ El Encargado implementa y mantiene las siguientes medidas técnicas y organizati
 - Control de acceso: RBAC por rol (admin / cajero / encargado / camarero). Autenticación por PIN con hash bcrypt.
 - Aislamiento de tenant: Row Level Security (RLS) en PostgreSQL — cada restaurante solo accede a sus propios datos.
 - Logs de auditoría inmutables: tabla `audit_log` con trigger AFTER INSERT; imposible borrar o modificar entradas.
-- Copias de seguridad: copia completa diaria de la base de datos, cifrada con AES-256 y almacenada en Cloudflare R2; se conservan las diarias de los últimos 30 días y una mensual durante 6 años. Procedimiento de restauración documentado y probado periódicamente. (Supabase plan Free NO incluye copias propias; ver `docs/context/copias-de-seguridad.md`. No firmar este DPA con esta cláusula hasta que la copia completa esté activa y restaurada con éxito al menos una vez.)
+- Copias de seguridad: copia completa diaria de la base de datos, cifrada con AES-256 y almacenada en Cloudflare R2; se conservan las diarias de los últimos 30 días y una mensual durante 6 años. Procedimiento de restauración documentado y probado periódicamente. Los datos suprimidos o anonimizados permanecen bloqueados en las copias anteriores hasta su caducidad (art. 32 LOPDGDD). (Supabase plan Free NO incluye copias propias: esta es la única; ver `docs/context/copias-de-seguridad.md`.)
 
 ### 3.2 Organizativas
 - Acceso a producción restringido a personal técnico autorizado con autenticación MFA.

@@ -96,4 +96,4 @@ psql --single-transaction --variable ON_ERROR_STOP=1 \
 - [x] Passphrase guardada en un gestor de contraseñas (2026-09-30).
 - [ ] Valorar Supabase Pro (copias diarias propias 7 días) o PITR si el volumen de pedidos lo justifica. NO sustituye a `db-backup.yml`: 7 días no cubren la conservación legal.
 - [ ] Ciclo de vida del bucket R2 revisado (que ninguna regla borre `db/monthly/` antes de 6 años).
-- [ ] Solo entonces: mencionar "copias de seguridad" en `/privacidad` (sección Seguridad) y firmar DPAs con la cláusula 3.1 de `docs/legal/dpa-template.md`.
+- [x] "Copias de seguridad" mencionadas en `/privacidad` (sección Seguridad, con el bloqueo de datos suprimidos, art. 32 LOPDGDD) y cláusula 3.1 del DPA vigente (2026-09-30).
