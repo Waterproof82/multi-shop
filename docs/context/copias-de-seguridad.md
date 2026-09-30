@@ -1,6 +1,8 @@
 # Copias de seguridad
 
-> Estado a 2026-09-30. **La copia completa (`db-backup.yml`) está escrita pero NO ACTIVA hasta configurar sus secretos** (ver "Puesta en marcha"). Hasta entonces, la única copia existente es la del catálogo, que NO cubre pedidos, cobros, clientes ni fichajes.
+> Estado a 2026-09-30: **copia completa ACTIVA**. Primera ejecución correcta (run 36734722312): volcado de 94 tablas, 796 KB cifrado, subido a `db/daily/2026-09-30` y `db/monthly/2026-09`. **Verificado** que se descarga y descifra con la passphrase y que contiene `pedidos`, `clientes`, `empresas`, `productos`. **Pendiente**: restauración completa en un proyecto de pruebas (ver checklist).
+>
+> La passphrase está en `.env.local` (`BACKUP_ENCRYPTION_PASSPHRASE`) y en GitHub. Debe estar TAMBIÉN en un gestor de contraseñas: si se pierde el equipo, sin ella las copias son irrecuperables.
 
 ## Por qué importa
 
@@ -52,6 +54,13 @@ En GitHub → Settings → Secrets and variables → Actions:
 
 Después: Actions → "DB Backup" → Run workflow, y **probar una restauración** (abajo). Una copia que nunca se ha restaurado no es una copia.
 
+### Lecciones de la puesta en marcha (2026-09-30)
+
+- **"password authentication failed for user postgres"** con la cadena bien formada = la contraseña guardada no es la actual. En Supabase, *Generate* solo propone una contraseña: no se aplica hasta pulsar **Reset password**. El `user "postgres"` del mensaje es cómo lo reporta el pooler, no un fallo del usuario `postgres.<ref>`.
+- El job valida la forma de `SUPABASE_DB_URL` (sin imprimir la contraseña) y prueba la conexión con `psql` ANTES del volcado: si falla `psql`, el problema es la cadena/contraseña; si falla solo el volcado, es el CLI.
+- `supabase db dump` descarga una imagen Docker de `ghcr.io`; puede dar `toomanyrequests: Data limit exceeded`. El CLI reintenta y en la primera ejecución bastó. Si se vuelve habitual: instalar `postgresql-client-17` (PGDG) y usar `pg_dump`/`pg_dumpall` directamente.
+- En `.env.local` y `.env`, `R2_BACKUP_BUCKET_NAME` tenía un espacio final que el SDK rechaza (`InvalidBucketName`). Recortar SIEMPRE los valores al leerlos.
+
 ## Restaurar
 
 ```bash
@@ -70,10 +79,12 @@ psql --single-transaction --variable ON_ERROR_STOP=1 \
 
 ## Cuando haya tenants en producción (checklist)
 
-- [ ] Secretos configurados y primera ejecución de `db-backup.yml` en verde.
-- [ ] Restauración probada en un proyecto de pruebas; repetir cada trimestre.
-- [ ] Borradas de R2 las copias de catálogo anteriores al 2026-09-30 (llevan credenciales en claro).
-- [ ] Telegram de avisos configurado.
+- [x] Secretos configurados y primera ejecución de `db-backup.yml` en verde (2026-09-30).
+- [x] Descarga + descifrado verificados (2026-09-30).
+- [ ] Restauración completa probada en un proyecto de pruebas; repetir cada trimestre.
+- [x] Borradas de R2 las copias de catálogo anteriores al 2026-09-30 (143 objetos con credenciales en claro).
+- [ ] Telegram de avisos: falta el secreto `OPS_TELEGRAM_CHAT_ID` (el bot ya está configurado).
+- [ ] Passphrase guardada en un gestor de contraseñas.
 - [ ] Valorar Supabase Pro (copias diarias propias 7 días) o PITR si el volumen de pedidos lo justifica. NO sustituye a `db-backup.yml`: 7 días no cubren la conservación legal.
 - [ ] Ciclo de vida del bucket R2 revisado (que ninguna regla borre `db/monthly/` antes de 6 años).
 - [ ] Solo entonces: mencionar "copias de seguridad" en `/privacidad` (sección Seguridad) y firmar DPAs con la cláusula 3.1 de `docs/legal/dpa-template.md`.
