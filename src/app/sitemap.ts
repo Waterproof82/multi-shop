@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { resolverEmpresaPublica } from "@/lib/server-services";
 import { buildAlternates, getAvailableLangs, getPrimaryLang } from "@/lib/seo/tenant-seo";
+import { paginasLegalesDe } from "@/lib/legal/paginas-legales";
 
 // Sin `lastModified` a proposito: no hay una fecha real de ultima edicion de
 // la landing/carta, y Google deja de fiarse del <lastmod> de un sitemap que
@@ -15,8 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const primaryLang = getPrimaryLang(empresa);
   const availableLangs = getAvailableLangs(empresa);
 
-  // `multilingue`: la pagina tiene variantes `?lang=` (las de cliente; la
-  // politica de privacidad se sirve solo en castellano).
+  // `multilingue`: la pagina tiene variantes `?lang=` (las de cliente; las
+  // paginas legales se sirven solo en castellano).
   function entrada(path: string, priority: number, multilingue: boolean): MetadataRoute.Sitemap[number] {
     const langs = multilingue ? availableLangs : [primaryLang];
     const { canonical, languages } = buildAlternates(path, langs, primaryLang, primaryLang);
@@ -31,5 +32,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   }
 
-  return [entrada("/", 1, true), entrada("/carta", 0.9, true), entrada("/privacidad", 0.2, false)];
+  const legales = paginasLegalesDe(empresa).map((p) => entrada(p.href, 0.2, false));
+  return [entrada("/", 1, true), entrada("/carta", 0.9, true), ...legales];
 }

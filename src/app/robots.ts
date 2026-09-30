@@ -3,7 +3,8 @@ import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { CRAWLERS_IA_BUSQUEDA, CRAWLERS_IA_ENTRENAMIENTO } from "@/lib/seo/crawlers-ia";
 
 // Zonas privadas o efimeras: paneles internos, API, sesiones de mesa y
-// resultados de pago. Solo `/`, `/carta` y `/privacidad` son indexables.
+// resultados de pago. Son indexables `/`, `/carta` y las páginas legales
+// (ver src/lib/legal/paginas-legales.ts).
 const DISALLOW_PATHS = [
   "/admin/",
   "/api/",
