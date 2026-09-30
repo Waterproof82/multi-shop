@@ -1,0 +1,137 @@
+name: DB Backup (completa y cifrada)
+
+# Copia COMPLETA de la base de datos (roles + esquema + datos), cifrada con
+# AES-256 y subida a R2. Es la única copia de pedidos, cobros, clientes y
+# fichajes: el plan Free de Supabase no guarda copias propias
+# (`supabase backups list` → "backups": [], "pitr_enabled": false).
+#
+# La otra copia (tenant-backup.yml) solo guarda el catálogo de cada tenant en
+# JSON sin cifrar, para deshacer cambios desde el admin. No sirve para un
+# desastre. Ver docs/context/copias-de-seguridad.md.
+
+on:
+  schedule:
+    - cron: '30 2 * * *'   # 02:30 UTC diario (GitHub puede retrasarlo u omitirlo)
+  workflow_dispatch:
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  # R2 rechaza las sumas de verificación que el AWS CLI v2 envía por defecto.
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+  BUCKET: ${{ vars.R2_BACKUP_BUCKET_NAME }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  OPS_TELEGRAM_CHAT_ID: ${{ secrets.OPS_TELEGRAM_CHAT_ID }}
+  DIAS_DIARIAS: 30      # copias diarias que se conservan
+  MESES_MENSUALES: 72   # 6 años: art. 30 Código de Comercio
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Comprobar configuración
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          faltan=""
+          for v in SUPABASE_DB_URL BACKUP_ENCRYPTION_PASSPHRASE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ENDPOINT BUCKET; do
+            [ -n "${!v}" ] || faltan="$faltan $v"
+          done
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos/variables:$faltan (ver docs/context/copias-de-seguridad.md)"
+            exit 1
+          fi
+
+      - name: Avisar si faltó la copia de ayer
+        run: |
+          ayer=$(date -u -d 'yesterday' +%F)
+          hay_alguna=$(aws s3 ls "s3://$BUCKET/db/daily/" --endpoint-url "$R2_ENDPOINT" | wc -l || true)
+          if [ "$hay_alguna" -gt 0 ] && ! aws s3 ls "s3://$BUCKET/db/daily/$ayer.tar.gz.gpg" --endpoint-url "$R2_ENDPOINT" > /dev/null; then
+            echo "::warning::No existe la copia del $ayer"
+            if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$OPS_TELEGRAM_CHAT_ID" ]; then
+              curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+                --data-urlencode "chat_id=$OPS_TELEGRAM_CHAT_ID" \
+                --data-urlencode "text=⚠️ No existe la copia completa de la BD del $ayer (el workflow no se ejecutó o falló)." > /dev/null
+            fi
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Volcado (roles, esquema y datos)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir dump
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f dump/roles.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy -f dump/data.sql
+          # Un volcado vacío "con éxito" es el peor fallo posible: nadie lo nota hasta restaurar.
+          test -s dump/schema.sql
+          test -s dump/data.sql
+          grep -Eq 'COPY "?public"?\."?pedidos"?' dump/data.sql
+          ls -la dump
+
+      - name: Comprimir y cifrar
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          tar -czf - -C dump . \
+            | gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+                  --passphrase-file <(printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE") \
+                  -o backup.tar.gz.gpg
+          rm -rf dump
+          ls -la backup.tar.gz.gpg
+
+      - name: Subir a R2 (diaria + mensual)
+        run: |
+          set -euo pipefail
+          hoy=$(date -u +%F)
+          mes=$(date -u +%Y-%m)
+          aws s3 cp backup.tar.gz.gpg "s3://$BUCKET/db/daily/$hoy.tar.gz.gpg" --endpoint-url "$R2_ENDPOINT"
+          # La primera copia de cada mes se guarda como mensual (aunque el día 1 no se ejecutara).
+          if ! aws s3 ls "s3://$BUCKET/db/monthly/$mes.tar.gz.gpg" --endpoint-url "$R2_ENDPOINT" > /dev/null; then
+            aws s3 cp backup.tar.gz.gpg "s3://$BUCKET/db/monthly/$mes.tar.gz.gpg" --endpoint-url "$R2_ENDPOINT"
+          fi
+
+      - name: Aplicar retención
+        run: |
+          set -euo pipefail
+          corte_diarias=$(date -u -d "$DIAS_DIARIAS days ago" +%F)
+          corte_mensuales=$(date -u -d "$MESES_MENSUALES months ago" +%Y-%m)
+          # Los nombres son fechas ISO: la comparación de cadenas ordena por fecha.
+          # `if` y no `&&`: con pipefail, un `&&` falso en la última vuelta tumbaría el paso.
+          podar() {
+            local prefijo="$1" corte="$2"
+            aws s3 ls "s3://$BUCKET/$prefijo/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' | while read -r f; do
+              if [ -n "$f" ] && [[ "${f%%.*}" < "$corte" ]]; then
+                aws s3 rm "s3://$BUCKET/$prefijo/$f" --endpoint-url "$R2_ENDPOINT"
+              fi
+            done
+          }
+          podar db/daily "$corte_diarias"
+          podar db/monthly "$corte_mensuales"
+
+      - name: Avisar del fallo por Telegram
+        if: failure()
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$OPS_TELEGRAM_CHAT_ID" ]; then
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              --data-urlencode "chat_id=$OPS_TELEGRAM_CHAT_ID" \
+              --data-urlencode "text=🔴 Falló la copia completa de la BD: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > /dev/null
+          fi
