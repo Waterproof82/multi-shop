@@ -57,7 +57,8 @@ Restaurante: no hay desistimiento porque los productos son perecederos (art. 103
 - **Devoluciones:**
   - `plazo_desistimiento_dias` (≥ 14) y `direccion_devoluciones` (fallback `direccion`).
   - `gastos_devolucion`.
-  - Reembolso en 14 días por el mismo medio de pago (fijo).
+  - Reembolso en 14 días por el mismo medio de pago (fijo); puede retenerse hasta recibir el producto o hasta que el consumidor presente prueba de su devolución, lo que ocurra primero (art. 107.3 TRLGDCU).
+  - Modelo de formulario de desistimiento (Anexo B TRLGDCU) con el texto literal oficial, dirigido al titular (nombre, dirección, email y teléfono).
   - Tabla de garantías, exclusiones marcadas y texto adicional.
 
 ## Modelo de datos
@@ -78,9 +79,9 @@ Tabla nueva `public.empresa_legal`, 1:1 con `empresas` (`empresa_id` PK/FK, `ON 
 | `adicional_aviso_legal` / `adicional_condiciones` / `adicional_envios` / `adicional_devoluciones` | text | opcional, max 2000, texto plano |
 | `updated_at` | timestamptz | |
 
-`garantias`: lista de `{ ambito: string (max 120), estado: 'nuevo' | 'segunda_mano', meses_legales: int, meses_comerciales_extra: int ≥ 0 }`, max 20 filas.
-- `nuevo` → `meses_legales` forzado a 36 (art. 120 TRLGDCU).
-- `segunda_mano` → `meses_legales` ≥ 12.
+`garantias`: lista de `{ ambito: string (max 120), estado: 'nuevo' | 'segunda_mano', mesesLegales: int, mesesComercialesExtra: int ≥ 0 }` — **camelCase dentro del JSONB**, no snake_case: se guarda tal cual lo produce el DTO, sin mapper de columnas para las claves internas. Máx 20 filas.
+- `nuevo` → `mesesLegales` forzado a 36 (art. 120 TRLGDCU).
+- `segunda_mano` → `mesesLegales` ≥ 12.
 - Lista vacía → la página muestra la fila por defecto "Todos los productos · nuevo · 3 años".
 
 `exclusiones_desistimiento`: `{ supuestos: CodigoArt103[], otras: string | null (max 500) }`. `CodigoArt103` es un enum en domain con los supuestos del art. 103 TRLGDCU (personalizados, perecederos, precintados por salud/higiene, mezclados inseparablemente, contenido digital precintado, prensa, etc.).
@@ -140,8 +141,8 @@ Todo el texto de UI del admin y del footer pasa por `t()` (bloque `es`, castella
 - `tests/compliance/legal-garantias.test.ts`: lista vacía → fila por defecto; `nuevo` forzado a 36.
 - `tests/compliance/legal-empresa-legal-dto.test.ts`: rechaza 13 días, 11 meses en segunda mano y strings por encima del max; acepta los límites exactos.
 - `tests/core/legal/get-legal-context.test.ts`: fallbacks (email, dirección, `razonSocial` → `nombre`); sin fila → defaults; JSONB corrupto → defaults.
-- `tests/ui/legal-pages.test.tsx`: un restaurante no muestra envíos ni devoluciones; privacidad sin reparto no lista Glovo; los textos adicionales con `<script>` se muestran escapados.
-- `tests/core/legal/admin-legal-route.test.ts`: 401/403 sin rol; 400 con suelos violados.
+- `tests/ui/legal-aviso-legal.test.tsx`, `legal-condiciones.test.tsx`, `legal-envios.test.tsx`, `legal-privacidad.test.tsx`, `legal-devoluciones.test.tsx`: un restaurante no muestra envíos ni devoluciones; privacidad sin reparto no lista Glovo; los textos adicionales con `<script>` se muestran escapados.
+- Sin test de ruta para `/api/admin/legal`: el repo no testea rutas API directamente; la validación de los suelos la cubre `tests/compliance/legal-empresa-legal-dto.test.ts` y el `handleResult` compartido ya está probado en otras rutas admin.
 
 ## Fuera de alcance
 

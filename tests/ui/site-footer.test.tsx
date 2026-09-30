@@ -22,18 +22,15 @@ function renderFooter(navegacion?: FooterNavegacion) {
 }
 
 describe('SiteFooter — navegación', () => {
-  it('sin navegación explícita, solo enlaza la política de privacidad (obligatoria siempre)', () => {
+  it('sin navegación explícita, la nav general no enlaza nada (la política de privacidad vive en la columna Legal)', () => {
     const nav = renderFooter();
-    const enlaces = within(nav).getAllByRole('link');
-    expect(enlaces).toHaveLength(1);
-    expect(enlaces[0]).toHaveAttribute('href', '/privacidad');
-    expect(enlaces[0]).toHaveTextContent('Política de privacidad');
+    expect(within(nav).queryAllByRole('link')).toHaveLength(0);
   });
 
   it('en la landing enlaza la carta y solo los apartados que existen, en ese orden', () => {
     const nav = renderFooter({ enlaceCarta: true, anclas: ['nosotros', 'donde-estamos'] });
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/carta', '#nosotros', '#donde-estamos', '/privacidad']);
+    expect(hrefs).toEqual(['/carta', '#nosotros', '#donde-estamos']);
     expect(within(nav).queryByRole('link', { name: 'Galería' })).toBeNull();
   });
 
@@ -50,6 +47,6 @@ describe('SiteFooter — navegación', () => {
   it('fuera de la landing, los apartados apuntan a la home (/#ancla), no a la página actual', () => {
     const nav = renderFooter({ enlaceInicio: true, anclas: ['nosotros', 'galeria', 'donde-estamos'] });
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/', '/#nosotros', '/#galeria', '/#donde-estamos', '/privacidad']);
+    expect(hrefs).toEqual(['/', '/#nosotros', '/#galeria', '/#donde-estamos']);
   });
 });

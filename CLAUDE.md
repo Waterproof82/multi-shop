@@ -321,6 +321,17 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Si el email sale pero falla guardar `seguimiento_email_enviado_at`, el POST responde exito** — devolver error provoca reintento y email duplicado al cliente.
 - **Rellenar columnas de `pedidos` con UPDATE masivo es seguro** respecto a `notify_waiter_order_validated`/`push_on_pedido_validated` (saltan en todo UPDATE pero solo actuan si cambia `estado`). Verificar de nuevo si se anade otro trigger `AFTER UPDATE` sin columnas.
 
+## Páginas Legales por Tenant — Trampas Criticas
+
+> Ver doc completo: `docs/context/paginas-legales.md`
+
+- **`paginasLegalesDe()` es la ÚNICA fuente de verdad** de qué páginas legales existen para un tenant (footer, sitemap, llms.txt, 404 de las páginas y pestañas del admin). Añadir una página = añadir su regla ahí; si no, el footer enlaza un 404 o la página queda huérfana.
+- **Suelos legales en TRES sitios a propósito**: Zod (`empresa-legal.dto.ts`), CHECK en BD y `garantiasVisibles()` al pintar. Nunca relajar uno pensando que otro lo cubre: un tenant puede AMPLIAR derechos (desistimiento > 14 días, garantía comercial), nunca bajarlos (nuevo = 36 meses; segunda mano ≥ 12).
+- **Subencargados de `/privacidad` salen de flags** (`subencargadosDe`). Si integras un proveedor nuevo que recibe datos personales, añádelo ahí con su condición; si no, la política miente.
+- **Textos adicionales del tenant = texto plano** (`whitespace-pre-line`). Nunca `dangerouslySetInnerHTML`.
+- **Restaurante nunca tiene `/envios-y-pagos` ni `/devoluciones`** aunque use Glovo: vende perecederos (art. 103.d). El reparto y la ausencia de desistimiento se explican en `/condiciones`.
+- **Sin enlace a la plataforma ODR de la UE**: cerró el 20-07-2025 (Reg. (UE) 2024/3228). No añadirlo aunque lo sugiera una revisión.
+
 ## SEO Multi-Tenant
 
 > Ver doc completo: `docs/context/seo-multitenant.md`
