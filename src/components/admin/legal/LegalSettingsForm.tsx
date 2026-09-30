@@ -118,6 +118,10 @@ function PanelDevoluciones({ id, datos, set, language, toggleSupuesto }: Readonl
   return (
     <>
       <Campo htmlFor={`${id}-plazo`} label={t('legalPlazoDesistimiento', language)} ayuda={t('legalPlazoDesistimientoAyuda', language)}>
+        {/* No usa aNumeroONull: este campo es obligatorio (no puede quedar en null).
+            '' → Number('') = 0, y el Zod de updateEmpresaLegalSchema ya lo rechaza
+            con el mensaje "no puede ser inferior a 14 días", que es el error correcto
+            a mostrar aquí — convertir a null solo cambiaría el mensaje a uno genérico. */}
         <input id={`${id}-plazo`} type="number" min={14} max={365} className={inputClass} value={datos.plazoDesistimientoDias}
           onChange={(e) => set('plazoDesistimientoDias', Number(e.target.value))} />
       </Campo>

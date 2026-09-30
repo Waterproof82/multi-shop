@@ -46,18 +46,28 @@ describe('DevolucionesContenido', () => {
     expect(screen.queryByText('Podemos retener el reembolso hasta recibir el producto.')).not.toBeInTheDocument();
   });
 
-  it('incluye el modelo de formulario de desistimiento con el destinatario del tenant', () => {
+  it('incluye el modelo de formulario de desistimiento con el destinatario del tenant, incluido el teléfono', () => {
     render(<DevolucionesContenido ctx={contextoDePrueba()} />);
     expect(screen.getByText('Modelo de formulario de desistimiento')).toBeInTheDocument();
-    expect(screen.getByText(/A la atención de: Tienda de Prueba S\.L\., Calle Mayor 1, 38300 La Orotava, legal@tienda\.test/)).toBeInTheDocument();
+    expect(screen.getByText(/A la atención de: Tienda de Prueba S\.L\., Calle Mayor 1, 38300 La Orotava, legal@tienda\.test, 922000000/)).toBeInTheDocument();
     expect(screen.getByText(/Por la presente le comunico\/comunicamos/)).toBeInTheDocument();
+    expect(screen.getByText(/Nombre del consumidor y usuario o de los consumidores y usuarios:/)).toBeInTheDocument();
+    expect(screen.getByText(/Domicilio del consumidor y usuario o de los consumidores y usuarios:/)).toBeInTheDocument();
+    expect(screen.getByText(/Firma del consumidor y usuario o de los consumidores y usuarios \(solo si el presente formulario se presenta en papel\):/)).toBeInTheDocument();
     expect(screen.getByText(/\(\*\) Táchese lo que no proceda\./)).toBeInTheDocument();
   });
 
-  it('destinatario del formulario de desistimiento sin dirección ni email', () => {
+  it('destinatario del formulario de desistimiento sin dirección, email ni teléfono', () => {
     render(<DevolucionesContenido ctx={contextoDePrueba({
       titular: { nombre: 'Tienda Sin Datos S.L.', nif: null, direccion: null, email: null, telefono: null, registroMercantil: null },
     })} />);
     expect(screen.getByText(/A la atención de: Tienda Sin Datos S\.L\.\s/)).toBeInTheDocument();
+  });
+
+  it('incluye el teléfono del titular en el destinatario cuando hay email pero no dirección', () => {
+    render(<DevolucionesContenido ctx={contextoDePrueba({
+      titular: { nombre: 'Tienda Con Teléfono S.L.', nif: null, direccion: null, email: 'legal@tienda.test', telefono: '922111222', registroMercantil: null },
+    })} />);
+    expect(screen.getByText(/A la atención de: Tienda Con Teléfono S\.L\., legal@tienda\.test, 922111222/)).toBeInTheDocument();
   });
 });

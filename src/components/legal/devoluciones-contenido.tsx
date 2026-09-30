@@ -8,9 +8,9 @@ const ESTADO: Record<GarantiaFila['estado'], string> = { nuevo: 'Nuevo', segunda
 const ANEXO_B_LINEAS = [
   'Por la presente le comunico/comunicamos (*) que desisto de mi/desistimos de nuestro (*) contrato de venta del siguiente bien/prestación del siguiente servicio (*)',
   'Pedido el/recibido el (*):',
-  'Nombre del consumidor o de los consumidores:',
-  'Domicilio del consumidor o de los consumidores:',
-  'Firma del consumidor o de los consumidores (solo si el presente formulario se presenta en papel):',
+  'Nombre del consumidor y usuario o de los consumidores y usuarios:',
+  'Domicilio del consumidor y usuario o de los consumidores y usuarios:',
+  'Firma del consumidor y usuario o de los consumidores y usuarios (solo si el presente formulario se presenta en papel):',
   'Fecha:',
   '(*) Táchese lo que no proceda.',
 ];
@@ -19,6 +19,7 @@ function construirDestinatario(titular: LegalContext['titular']): string {
   const partes = [titular.nombre];
   if (titular.direccion !== null) partes.push(titular.direccion);
   if (titular.email !== null) partes.push(titular.email);
+  if (titular.telefono !== null) partes.push(titular.telefono);
   return `A la atención de: ${partes.join(', ')}`;
 }
 
