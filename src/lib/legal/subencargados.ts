@@ -29,6 +29,9 @@ export function subencargadosDe(f: FlagsLegales): Subencargado[] {
   const lista: Subencargado[] = [
     { proveedor: 'Supabase (Irlanda)', finalidad: 'Base de datos y almacenamiento', pais: 'UE' },
     { proveedor: 'Vercel Inc.', finalidad: 'Infraestructura de hosting', pais: 'UE/EE.UU. (SCCs)' },
+    // R2: imágenes del catálogo y copias de seguridad (tenant-backup.yml y la
+    // copia completa cifrada de db-backup.yml, que incluye pedidos y clientes).
+    { proveedor: 'Cloudflare Inc.', finalidad: 'Almacenamiento de imágenes y de copias de seguridad cifradas', pais: 'UE/EE.UU. (SCCs)' },
     { proveedor: 'Brevo (Francia)', finalidad: finalidadBrevo(f), pais: 'UE' },
   ];
   if (f.pagoTarjetaActivo) {

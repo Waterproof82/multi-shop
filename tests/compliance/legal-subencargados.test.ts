@@ -13,8 +13,8 @@ const nada: FlagsLegales = {
 const proveedores = (f: FlagsLegales) => subencargadosDe(f).map((s) => s.proveedor);
 
 describe('subencargadosDe', () => {
-  it('sin nada activo: Supabase, Vercel, Brevo y Sentry', () => {
-    expect(proveedores(nada)).toEqual(['Supabase (Irlanda)', 'Vercel Inc.', 'Brevo (Francia)', 'Sentry (EE.UU.)']);
+  it('sin nada activo: Supabase, Vercel, Cloudflare (imágenes y copias), Brevo y Sentry', () => {
+    expect(proveedores(nada)).toEqual(['Supabase (Irlanda)', 'Vercel Inc.', 'Cloudflare Inc.', 'Brevo (Francia)', 'Sentry (EE.UU.)']);
   });
 
   it('Redsys solo con pago con tarjeta', () => {

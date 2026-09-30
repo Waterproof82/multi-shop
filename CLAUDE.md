@@ -332,6 +332,14 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Restaurante nunca tiene `/envios-y-pagos` ni `/devoluciones`** aunque use Glovo: vende perecederos (art. 103.d). El reparto y la ausencia de desistimiento se explican en `/condiciones`.
 - **Sin enlace a la plataforma ODR de la UE**: cerró el 20-07-2025 (Reg. (UE) 2024/3228). No añadirlo aunque lo sugiera una revisión.
 
+## Copias de Seguridad — Trampas Criticas
+
+> Ver doc completo: `docs/context/copias-de-seguridad.md` (incluye puesta en marcha, restauración y checklist para producción)
+
+- **Supabase Free NO guarda copias** (`backups: []`, sin PITR). La única copia completa es `.github/workflows/db-backup.yml` (cifrada, R2). Si sus secretos no están configurados, NO HAY copia de pedidos/clientes/fichajes.
+- **`tenant-backup` es solo catálogo, en JSON sin cifrar**: nunca añadirle tablas con datos de clientes ni columnas secretas (`COLUMNAS_SECRETAS` en la Edge Function; lo vigila `tests/compliance/tenant-backup-sin-secretos.test.ts`).
+- **No afirmar "copias de seguridad" en `/privacidad` ni en DPAs** hasta que `db-backup.yml` esté activo y se haya restaurado al menos una vez.
+
 ## SEO Multi-Tenant
 
 > Ver doc completo: `docs/context/seo-multitenant.md`
