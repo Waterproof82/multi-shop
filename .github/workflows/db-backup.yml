@@ -106,6 +106,7 @@ jobs:
         run: |
           # Distingue "contraseña mal" de "el CLI transforma la conexión":
           # si psql conecta y el volcado no, el problema es del CLI.
+          set -o pipefail
           psql "$SUPABASE_DB_URL" -Atc "select 'conexión OK: ' || current_user || ' / ' || version()" | cut -c1-120
 
       - uses: supabase/setup-cli@v1
