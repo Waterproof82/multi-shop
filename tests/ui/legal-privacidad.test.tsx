@@ -42,6 +42,12 @@ describe('PrivacidadContenido — encargado y derechos', () => {
     expect(screen.queryByText(/copia del DNI/i)).not.toBeInTheDocument();
   });
 
+  it('informa de las copias de seguridad y de que los datos suprimidos quedan bloqueados en ellas', () => {
+    render(<PrivacidadContenido ctx={contextoDePrueba()} />);
+    expect(screen.getByText(/copias de seguridad diarias cifradas/i)).toBeInTheDocument();
+    expect(screen.getByText(/bloqueados/i)).toBeInTheDocument();
+  });
+
   it('informa de seguridad, brechas y cambios de la política', () => {
     render(<PrivacidadContenido ctx={contextoDePrueba()} />);
     expect(screen.getByRole('heading', { name: /seguridad de los datos/i })).toBeInTheDocument();

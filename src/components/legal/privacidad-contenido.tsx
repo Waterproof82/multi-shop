@@ -139,6 +139,13 @@ export function PrivacidadContenido({ ctx }: Readonly<{ ctx: LegalContext }>) {
           establecimiento.
         </p>
         <p>
+          Realizamos copias de seguridad diarias cifradas de la base de datos y comprobamos cada mes que pueden
+          restaurarse. Las copias diarias se conservan 30 días y una copia mensual durante 6 años, por las obligaciones
+          de conservación de la documentación mercantil. Si sus datos se suprimen o anonimizan, pueden permanecer en
+          copias anteriores hasta que estas caduquen: en ellas quedan bloqueados, no se utilizan para ninguna finalidad
+          y, si hubiera que restaurar una copia, se volvería a aplicar la supresión (art. 32 LOPDGDD).
+        </p>
+        <p>
           Si se produjese una violación de seguridad de sus datos, la notificaremos a la AEPD en un máximo de 72 horas
           y, si supone un alto riesgo para sus derechos, se lo comunicaremos a usted sin dilación (arts. 33 y 34 RGPD).
         </p>
