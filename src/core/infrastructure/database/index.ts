@@ -39,6 +39,8 @@ import { MenuVirtualUseCase } from '@/core/application/use-cases/menu-virtual.us
 import { LandingSeccionUseCase } from '@/core/application/use-cases/landing-seccion.use-case';
 import { SupabaseModalidadEntregaRepository } from './SupabaseModalidadEntregaRepository';
 import { ModalidadEntregaUseCase } from '@/core/application/use-cases/modalidad-entrega.use-case';
+import { SupabaseEmpresaLegalRepository } from './SupabaseEmpresaLegalRepository';
+import { EmpresaLegalUseCase } from '@/core/application/use-cases/empresa-legal.use-case';
 import { SupabaseTablaPlantillaRepository } from './SupabaseTablaPlantillaRepository';
 import { TablaPlantillaUseCase } from '@/core/application/use-cases/tabla-plantilla.use-case';
 import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
@@ -155,6 +157,17 @@ let _modalidadEntregaUseCase: ModalidadEntregaUseCase | undefined;
 export function getModalidadEntregaUseCase(): ModalidadEntregaUseCase {
   _modalidadEntregaUseCase ??= new ModalidadEntregaUseCase(new SupabaseModalidadEntregaRepository(getSupabaseClient()));
   return _modalidadEntregaUseCase;
+}
+
+let _empresaLegalUseCase: EmpresaLegalUseCase | undefined;
+export function getEmpresaLegalUseCase(): EmpresaLegalUseCase {
+  // service_role: la lectura pública de páginas legales va por servidor
+  // (anon está denegado por RLS), igual que modalidades_entrega.
+  _empresaLegalUseCase ??= new EmpresaLegalUseCase(
+    new SupabaseEmpresaLegalRepository(getSupabaseClient()),
+    new SupabaseModalidadEntregaRepository(getSupabaseClient())
+  );
+  return _empresaLegalUseCase;
 }
 
 let _tablaPlantillaUseCase: TablaPlantillaUseCase | undefined;
