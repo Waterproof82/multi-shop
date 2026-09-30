@@ -1,0 +1,132 @@
+name: DB Restore Drill (simulacro mensual)
+
+# Una copia que nunca se ha restaurado no es una copia. Cada mes descarga la
+# última copia completa de R2 (db-backup.yml), la descifra y la restaura en un
+# Postgres desechable con la MISMA imagen que usa Supabase en producción, y
+# comprueba que la base reconstruida sirve: esquema, RLS, triggers fiscales,
+# funciones y datos. No toca producción ni gasta proyectos de Supabase.
+#
+# Los datos restaurados viven solo en el runner efímero; nada se imprime salvo
+# recuentos. Ver docs/context/copias-de-seguridad.md.
+
+on:
+  schedule:
+    - cron: '0 5 3 * *'   # día 3 de cada mes, 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+  BUCKET: ${{ vars.R2_BACKUP_BUCKET_NAME }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  OPS_TELEGRAM_CHAT_ID: ${{ secrets.OPS_TELEGRAM_CHAT_ID }}
+  # supabase_admin es el superusuario de la imagen; hace falta para
+  # `session_replication_role = replica` (desactiva triggers durante la carga).
+  PGURL: postgresql://supabase_admin:postgres@localhost:5432/postgres
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      db:
+        # Misma versión que producción (`supabase projects list` → 17.6.1.063).
+        image: supabase/postgres:17.6.1.063
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h localhost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descargar la última copia
+        run: |
+          set -euo pipefail
+          ultima=$(aws s3 ls "s3://$BUCKET/db/daily/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' | sort | tail -1)
+          if [ -z "$ultima" ]; then echo "::error::No hay copias en db/daily/"; exit 1; fi
+          echo "COPIA=$ultima" >> "$GITHUB_ENV"
+          aws s3 cp "s3://$BUCKET/db/daily/$ultima" backup.tar.gz.gpg --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          echo "Copia: $ultima"
+
+      - name: Descifrar
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          mkdir dump
+          gpg --batch --quiet --pinentry-mode loopback \
+              --passphrase-file <(printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE") \
+              -d backup.tar.gz.gpg | tar -xz -C dump
+          rm backup.tar.gz.gpg
+          ls -la dump
+
+      - name: Restaurar (procedimiento documentado)
+        run: |
+          set -euo pipefail
+          # Igual que en docs/context/copias-de-seguridad.md: si esto falla, el
+          # procedimiento de restauración documentado no sirve.
+          psql "$PGURL" --quiet --single-transaction --variable ON_ERROR_STOP=1 \
+            --file dump/roles.sql \
+            --file dump/schema.sql \
+            --command 'SET session_replication_role = replica' \
+            --file dump/data.sql > /dev/null
+          echo "Restauración completada"
+
+      - name: Verificar la base restaurada
+        run: |
+          set -euo pipefail
+          q() { psql "$PGURL" -Atc "$1"; }
+          tablas=$(q "select count(*) from pg_tables where schemaname='public'")
+          funciones=$(q "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'")
+          politicas=$(q "select count(*) from pg_policies where schemaname='public'")
+          sin_rls=$(q "select count(*) from pg_tables t join pg_class c on c.relname=t.tablename and c.relnamespace='public'::regnamespace where t.schemaname='public' and not c.relrowsecurity")
+          trigger_fiscal=$(q "select count(*) from pg_trigger where tgname='pedidos_no_delete' and not tgisinternal")
+          empresas=$(q "select count(*) from public.empresas")
+          pedidos=$(q "select count(*) from public.pedidos")
+          {
+            echo "### Simulacro de restauración — copia \`$COPIA\`"
+            echo "| Comprobación | Resultado |"
+            echo "|---|---|"
+            echo "| Tablas en public | $tablas |"
+            echo "| Funciones en public | $funciones |"
+            echo "| Políticas RLS | $politicas |"
+            echo "| Tablas SIN RLS | $sin_rls |"
+            echo "| Trigger fiscal pedidos_no_delete | $trigger_fiscal |"
+            echo "| Filas en empresas | $empresas |"
+            echo "| Filas en pedidos | $pedidos |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
+          fallos=""
+          [ "$tablas" -ge 50 ] || fallos="$fallos tablas=$tablas"
+          [ "$funciones" -ge 20 ] || fallos="$fallos funciones=$funciones"
+          [ "$politicas" -ge 20 ] || fallos="$fallos politicas=$politicas"
+          [ "$sin_rls" -eq 0 ] || fallos="$fallos tablas_sin_rls=$sin_rls"
+          [ "$trigger_fiscal" -eq 1 ] || fallos="$fallos falta_trigger_pedidos_no_delete"
+          [ "$empresas" -ge 1 ] || fallos="$fallos empresas_vacia"
+          if [ -n "$fallos" ]; then echo "::error::La base restaurada no es válida:$fallos"; exit 1; fi
+
+      - name: Smoke de funciones (el mismo que tras cada migración)
+        run: |
+          psql "$PGURL" --quiet --variable ON_ERROR_STOP=1 --file supabase/tests/smoke-db-functions.sql > /dev/null
+          echo "Smoke OK"
+
+      - name: Avisar del fallo por Telegram
+        if: failure()
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$OPS_TELEGRAM_CHAT_ID" ]; then
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              --data-urlencode "chat_id=$OPS_TELEGRAM_CHAT_ID" \
+              --data-urlencode "text=🔴 El simulacro de restauración de la BD falló: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > /dev/null
+          fi
