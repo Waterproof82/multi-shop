@@ -9,13 +9,14 @@ import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 import type { SeccionAncla } from "@/lib/landing/anclas-pie"
+import { paginasLegalesDe } from "@/lib/legal/paginas-legales"
 
 /**
  * Enlaces de navegacion del pie. Cada pantalla pasa SOLO destinos que existen
  * para ese visitante: un ancla a una seccion no pintada o un "Inicio" que en
  * modo mesa/camarero vuelve a servir la carta serian enlaces rotos.
  * Con `enlaceInicio` estamos FUERA de la landing: las anclas apuntan a `/#id`.
- * Privacidad no se configura: se enlaza siempre (LSSI/RGPD).
+ * Las páginas legales van en su propia columna (FooterLegal), decididas por paginasLegalesDe.
  */
 export interface FooterNavegacion {
   readonly enlaceInicio?: boolean;
@@ -57,7 +58,20 @@ function FooterNav({ navegacion, language }: Readonly<{ navegacion: FooterNavega
               : <a href={`#${ancla}`} className={footerLinkClass}>{t(ETIQUETA_ANCLA[ancla], language)}</a>}
           </li>
         ))}
-        <li><Link href="/privacidad" className={footerLinkClass}>{t("footerPrivacy", language)}</Link></li>
+      </ul>
+    </nav>
+  )
+}
+
+function FooterLegal({ empresa, language }: Readonly<{ empresa: EmpresaPublic; language: Lang }>) {
+  const paginas = paginasLegalesDe(empresa)
+  return (
+    <nav aria-label={t("footerLegalTitle", language)} className="space-y-4">
+      <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("footerLegalTitle", language)}</h3>
+      <ul className="space-y-1">
+        {paginas.map((p) => (
+          <li key={p.slug}><Link href={p.href} className={footerLinkClass}>{t(p.labelKey, language)}</Link></li>
+        ))}
       </ul>
     </nav>
   )
@@ -69,6 +83,7 @@ function FooterNav({ navegacion, language }: Readonly<{ navegacion: FooterNavega
 const GOOGLE_REVIEWS_BADGE_URL = `${process.env.NEXT_PUBLIC_R2_DOMAIN ?? ''}/shared/google-reviews-badge-4c4187e8.png`;
 
 function footerGridColsClass(columnasVisibles: number): string {
+  if (columnasVisibles >= 6) return "lg:grid-cols-6";
   if (columnasVisibles >= 5) return "lg:grid-cols-5";
   if (columnasVisibles === 4) return "lg:grid-cols-4";
   if (columnasVisibles === 3) return "lg:grid-cols-3";
@@ -83,7 +98,7 @@ export function SiteFooter({ empresa, hideMap = false, navegacion = {} }: Readon
 
   const mostrarMapa = Boolean(empresa.urlMapa) && !hideMap
   const mostrarResenas = Boolean(empresa.googleReviewsUrl)
-  const columnasVisibles = 3 + (mostrarMapa ? 1 : 0) + (mostrarResenas ? 1 : 0)
+  const columnasVisibles = 4 + (mostrarMapa ? 1 : 0) + (mostrarResenas ? 1 : 0)
 
   return (
     <footer className="w-full bg-footer-bg text-footer-fg mt-12 border-t border-footer-bg/10">
@@ -91,6 +106,7 @@ export function SiteFooter({ empresa, hideMap = false, navegacion = {} }: Readon
         <div className={`grid grid-cols-1 sm:grid-cols-2 ${footerGridColsClass(columnasVisibles)} gap-10`}>
 
           <FooterNav navegacion={navegacion} language={language} />
+          <FooterLegal empresa={empresa} language={language} />
 
           {/* Columna 1: Redes Sociales */}
           <div className="space-y-4">

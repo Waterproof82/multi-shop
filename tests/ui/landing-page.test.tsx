@@ -216,7 +216,7 @@ describe('LandingPage', () => {
     ]);
     const nav = screen.getByRole('navigation', { name: 'Navegación' });
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/carta', '#nosotros', '/privacidad']);
+    expect(hrefs).toEqual(['/carta', '#nosotros']);
   });
 
   it('usa el mismo pie de página que la carta (SiteFooter)', () => {
