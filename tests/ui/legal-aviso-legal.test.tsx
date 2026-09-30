@@ -22,3 +22,21 @@ describe('AvisoLegalContenido', () => {
     expect(document.querySelector('script')).toBeNull();
   });
 });
+
+describe('AvisoLegalContenido — enlaces y contenidos de usuarios', () => {
+  it('limita la responsabilidad por enlaces a sitios de terceros', () => {
+    render(<AvisoLegalContenido ctx={contextoDePrueba()} />);
+    expect(screen.getByRole('heading', { name: /enlaces a sitios de terceros/i })).toBeInTheDocument();
+  });
+
+  it('permite retirar contenidos de usuarios (valoraciones) ilícitos u ofensivos', () => {
+    render(<AvisoLegalContenido ctx={contextoDePrueba()} />);
+    expect(screen.getByRole('heading', { name: /contenidos de los usuarios/i })).toBeInTheDocument();
+    expect(screen.getByText(/valoraciones/i)).toBeInTheDocument();
+  });
+
+  it('no presume la aceptación de la política de privacidad por navegar', () => {
+    render(<AvisoLegalContenido ctx={contextoDePrueba()} />);
+    expect(screen.queryByText(/implica la aceptación de la política de privacidad/i)).not.toBeInTheDocument();
+  });
+});

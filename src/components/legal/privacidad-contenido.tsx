@@ -11,6 +11,7 @@ const DERECHOS = [
   ['Limitación (Art. 18)', 'Suspender el tratamiento en casos concretos.'],
   ['Portabilidad (Art. 20)', 'Recibir sus datos en formato estructurado.'],
   ['Oposición (Art. 21)', 'Oponerse al tratamiento basado en interés legítimo.'],
+  ['Decisiones automatizadas (Art. 22)', 'No ser objeto de decisiones basadas únicamente en un tratamiento automatizado, incluida la elaboración de perfiles. No tomamos decisiones de ese tipo.'],
 ] as const;
 
 function FinalidadItem({ numero, titulo, base, descripcion }: Readonly<{ numero: string; titulo: string; base: string; descripcion: string }>) {
@@ -118,15 +119,48 @@ export function PrivacidadContenido({ ctx }: Readonly<{ ctx: LegalContext }>) {
         </p>
       </Section>
 
-      <Section titulo="8. Menores de edad">
-        <p>Este servicio no está dirigido a menores de 14 años. Si sabe que un menor nos ha facilitado datos sin consentimiento de sus tutores, comuníquenoslo para suprimirlos.</p>
+      <Section titulo="8. Cómo ejercer sus derechos">
+        <p>
+          Envíe su solicitud{titular.email ? ` a ${titular.email}` : ' al Responsable'} indicando en el asunto
+          «Protección de datos» y en el cuerpo: qué derecho ejerce, los datos con los que realizó su pedido
+          (nombre, teléfono o email) y un medio de contacto para responderle.
+        </p>
+        <p>
+          Solo le pediremos información adicional para verificar su identidad si existen dudas razonables sobre
+          ella, y nunca más de la necesaria. Responderemos en el plazo de un mes, ampliable a dos meses más en
+          casos complejos, avisándole de la ampliación (art. 12.3 RGPD). El ejercicio de sus derechos es gratuito.
+        </p>
       </Section>
 
-      <Section titulo="9. Cookies">
+      <Section titulo="9. Seguridad de los datos">
+        <p>
+          Aplicamos medidas técnicas y organizativas adecuadas al riesgo: cifrado de las comunicaciones (HTTPS/TLS),
+          acceso a los datos restringido al personal autorizado del establecimiento, y separación de los datos de cada
+          establecimiento.
+        </p>
+        <p>
+          Si se produjese una violación de seguridad de sus datos, la notificaremos a la AEPD en un máximo de 72 horas
+          y, si supone un alto riesgo para sus derechos, se lo comunicaremos a usted sin dilación (arts. 33 y 34 RGPD).
+        </p>
+      </Section>
+
+      <Section titulo="10. Menores de edad">
+        <p>Este servicio no está dirigido a menores de 14 años (art. 7 LOPDGDD). Si sabe que un menor nos ha facilitado datos sin consentimiento de sus tutores, comuníquenoslo para suprimirlos.</p>
+      </Section>
+
+      <Section titulo="11. Cookies">
         <p>
           Este sitio usa únicamente <strong>cookies técnicas estrictamente necesarias</strong> (sesión y seguridad CSRF).
           No se usan cookies de seguimiento, analítica de terceros ni publicidad, por lo que no se requiere banner de
           consentimiento (Ley 34/2002, LSSI-CE).
+        </p>
+      </Section>
+
+      <Section titulo="12. Cambios en esta política">
+        <p>
+          Podemos actualizar esta política por cambios normativos o en el servicio. La fecha de la última
+          actualización figura al principio de la página. Si el cambio afecta a finalidades para las que se requiere
+          su consentimiento, se lo volveremos a pedir.
         </p>
       </Section>
 

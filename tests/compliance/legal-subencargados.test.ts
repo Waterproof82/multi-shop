@@ -44,6 +44,13 @@ describe('subencargadosDe', () => {
   });
 });
 
+describe('subencargadosDe — Sentry', () => {
+  it('declara la grabación enmascarada de la sesión cuando hay un error (replaysOnErrorSampleRate)', () => {
+    const sentry = subencargadosDe(nada).find((s) => s.proveedor.startsWith('Sentry'));
+    expect(sentry?.finalidad).toMatch(/grabación enmascarada/);
+  });
+});
+
 describe('categoriasDatosDe', () => {
   const titulos = (f: FlagsLegales) => categoriasDatosDe(f).map((c) => c.titulo);
 
