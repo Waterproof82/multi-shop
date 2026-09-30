@@ -4,6 +4,7 @@ import { useId } from "react";
 import { ImagenSubida as Image } from "@/components/ui/imagen-subida";
 import { useLanguage } from "@/lib/language-context";
 import { readTranslatable } from "@/lib/landing/read-translatable";
+import { imagenesValidas } from "@/lib/landing/anclas-pie";
 import { t } from "@/lib/translations";
 import { Eyebrow, TituloResaltado, landingH2, landingPadX, tituloPlano } from "@/components/landing/landing-ui";
 
@@ -11,11 +12,6 @@ interface GaleriaSectionProps {
   contenido: Record<string, unknown>;
   /** Para el `alt` de cada foto: el admin no escribe uno por imagen. */
   empresaNombre: string;
-}
-
-function imagenesValidas(contenido: Record<string, unknown>): string[] {
-  if (!Array.isArray(contenido.imagenes)) return [];
-  return contenido.imagenes.filter((url): url is string => typeof url === "string" && url.length > 0);
 }
 
 // Rejilla segun cuantas fotos haya, para que la ultima fila quede SIEMPRE

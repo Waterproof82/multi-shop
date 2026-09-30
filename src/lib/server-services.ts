@@ -6,10 +6,10 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
-import { getEmpresaPublicRepository, getComplementoGrupoRepository, getMenuVirtualRepository, getModalidadEntregaUseCase } from "@/core/infrastructure/database";
+import { getEmpresaPublicRepository, getComplementoGrupoRepository, getMenuVirtualRepository, getModalidadEntregaUseCase, getLandingSeccionUseCase } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
-import type { EmpresaPublic } from "@/core/domain/entities/types";
+import type { EmpresaPublic, LandingSeccion } from "@/core/domain/entities/types";
 
 // Lazy Use Case instantiation
 let _menuUseCase: GetMenuUseCase | undefined;
@@ -117,4 +117,26 @@ export async function getModalidadesEntregaPublicas(empresaId: string) {
   const result = await getModalidadEntregaUseCase().getActivasPublicas(empresaId);
   if (!result.success) return [];
   return result.data;
+}
+
+/**
+ * Secciones ACTIVAS de la landing. La usan la home (para pintarlas) y /carta
+ * (para que su pie enlace los mismos apartados). Ante error devuelve [] y lo
+ * registra: sin secciones la landing cae a su fallback y el pie a Inicio.
+ */
+export async function getSeccionesLandingActivas(empresaId: string): Promise<LandingSeccion[]> {
+  try {
+    const result = await getLandingSeccionUseCase().getAll(empresaId);
+    if (result.success) return result.data.filter((seccion) => seccion.activo);
+    logger.logError({
+      codigo: 'LANDING_SECCIONES_FETCH_ERROR',
+      mensaje: result.error.message,
+      modulo: 'use-case',
+      metodo: 'execute',
+      severity: 'error',
+    });
+  } catch (error) {
+    logger.logFromCatch(error, 'use-case', 'execute');
+  }
+  return [];
 }
