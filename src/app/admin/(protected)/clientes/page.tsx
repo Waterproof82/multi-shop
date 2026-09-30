@@ -80,7 +80,7 @@ export default function ClientesPage() {
         setLoading(false);
       }
     }
-    fetchClientes();
+    void fetchClientes();
     return () => controller.abort();
   }, [language, effectiveEmpresaId]);
 

@@ -512,8 +512,8 @@ export default function CategoriasPage() {
   }, []);
 
   useEffect(() => {
-    fetchCategorias();
-    fetchMenusVirtuales();
+    void fetchCategorias();
+    void fetchMenusVirtuales();
   }, [fetchCategorias, fetchMenusVirtuales]);
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
