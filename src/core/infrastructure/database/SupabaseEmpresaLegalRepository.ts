@@ -78,6 +78,10 @@ export class SupabaseEmpresaLegalRepository implements IEmpresaLegalRepository {
     return this.supabase.from('empresa_legal').select('*').eq('empresa_id', empresaId).maybeSingle();
   }
 
+  private async selectDatosEmpresa(empresaId: string) {
+    return this.supabase.from('empresas').select(COLUMNAS_EMPRESA).eq('id', empresaId).maybeSingle();
+  }
+
   async findByEmpresa(empresaId: string): Promise<Result<EmpresaLegal | null>> {
     const method = 'SupabaseEmpresaLegalRepository.findByEmpresa';
     try {
@@ -115,7 +119,9 @@ export class SupabaseEmpresaLegalRepository implements IEmpresaLegalRepository {
   async findDatosEmpresa(empresaId: string): Promise<Result<DatosEmpresaLegal | null>> {
     const method = 'SupabaseEmpresaLegalRepository.findDatosEmpresa';
     try {
-      const { data, error } = await this.supabase.from('empresas').select(COLUMNAS_EMPRESA).eq('id', empresaId).maybeSingle();
+      // SELECT puro: seguro de reintentar una vez ante el ruido de PostgREST.
+      let { data, error } = await this.selectDatosEmpresa(empresaId);
+      if (error && ES_TRANSITORIO.test(error.message)) ({ data, error } = await this.selectDatosEmpresa(empresaId));
       if (error) {
         await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', method, { empresaId, details: { code: error.code } });
         return errorDb(method, 'Error al obtener la empresa');
