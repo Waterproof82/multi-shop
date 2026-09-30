@@ -2,6 +2,7 @@
 
 import { LandingHeader } from "@/components/landing-header";
 import { SiteFooter } from "@/components/site-footer";
+import { anclasDelPie } from "@/lib/landing/anclas-pie";
 import { HeroSection } from "@/components/landing/hero-section";
 import { NosotrosSection } from "@/components/landing/nosotros-section";
 import { CtaCartaSection } from "@/components/landing/cta-carta-section";
@@ -104,7 +105,11 @@ export function LandingPage({ empresa, sections }: Readonly<LandingPageProps>) {
       </main>
 
       {/* Mismo pie que la carta; su mapa se omite si Visítanos ya pinta uno. */}
-      <SiteFooter empresa={empresa} hideMap={showDondeEstamos} />
+      <SiteFooter
+        empresa={empresa}
+        hideMap={showDondeEstamos}
+        navegacion={{ enlaceCarta: true, anclas: anclasDelPie(restoDeSecciones) }}
+      />
       {mostrarCarrito && <CartFab />}
       {whatsappHref && <WhatsappFab href={whatsappHref} conCarrito={mostrarCarrito} />}
     </div>

@@ -145,7 +145,7 @@ export default function ProductosPage() {
   }, [language, effectiveEmpresaId]);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
 
   useEffect(() => {
@@ -786,7 +786,7 @@ export default function ProductosPage() {
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">{formatPrice(prod.precio, 'EUR', language)}</span>
                     <button type="button"
-                      onClick={(e) => { e.stopPropagation(); toggleActivo(prod); }}
+                      onClick={(e) => { e.stopPropagation(); void toggleActivo(prod); }}
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                         prod.activo
                           ? 'bg-primary/10 text-primary hover:bg-primary/20'

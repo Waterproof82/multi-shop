@@ -8,7 +8,7 @@ import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-mo
 import { BannerCarta } from "@/components/banner-carta"
 import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
-import { SiteFooter } from "@/components/site-footer"
+import { SiteFooter, type FooterNavegacion } from "@/components/site-footer"
 import { PromoNotification } from "@/components/promo-notification"
 import { ActiveOrderBanner } from "@/components/active-order-banner"
 import type { EmpresaPublic, ModalidadEntrega } from "@/core/domain/entities/types"
@@ -48,6 +48,8 @@ interface MenuPageProps {
   empresa?: EmpresaPublic | null;
   isWaiterMode?: boolean;
   modalidadesEntrega?: ModalidadEntrega[];
+  /** Enlaces del pie (Inicio + apartados de la landing): solo si `/` sirve la landing a este visitante. */
+  navegacionPie?: FooterNavegacion;
 }
 
 
@@ -57,7 +59,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'empty' {
   return cat.tipoProducto ?? 'comida';
 }
 
-export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false, modalidadesEntrega }: Readonly<MenuPageProps>) {
+export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false, modalidadesEntrega, navegacionPie }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
   const { clearCart, closeCart, openCart, isCartOpen } = useCart();
   const mesaId = useMesaId();
@@ -415,7 +417,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           </div>
         )}
       </main>
-      <SiteFooter empresa={empresa} />
+      <SiteFooter empresa={empresa} navegacion={navegacionPie} />
       {/* Welcome discount popup - shows after 30 seconds for empresas with feature enabled */}
       {showCart && !isWaiterMode && empresa?.descuentoBienvenidaActivo && (
         <WelcomeDiscountPopup

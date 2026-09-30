@@ -62,7 +62,7 @@ El Encargado implementa y mantiene las siguientes medidas técnicas y organizati
 - Control de acceso: RBAC por rol (admin / cajero / encargado / camarero). Autenticación por PIN con hash bcrypt.
 - Aislamiento de tenant: Row Level Security (RLS) en PostgreSQL — cada restaurante solo accede a sus propios datos.
 - Logs de auditoría inmutables: tabla `audit_log` con trigger AFTER INSERT; imposible borrar o modificar entradas.
-- Copias de seguridad: automáticas diarias (retención 30 días) gestionadas por Supabase.
+- Copias de seguridad: copia completa diaria de la base de datos, cifrada con AES-256 y almacenada en Cloudflare R2; se conservan las diarias de los últimos 30 días y una mensual durante 6 años. Procedimiento de restauración documentado y probado periódicamente. (Supabase plan Free NO incluye copias propias; ver `docs/context/copias-de-seguridad.md`. No firmar este DPA con esta cláusula hasta que la copia completa esté activa y restaurada con éxito al menos una vez.)
 
 ### 3.2 Organizativas
 - Acceso a producción restringido a personal técnico autorizado con autenticación MFA.
@@ -80,6 +80,10 @@ El Encargado utiliza los siguientes subencargados para el tratamiento de datos:
 | Supabase Inc. | UE (eu-west-1) | Infraestructura de base de datos | DPA disponible en supabase.com/privacy |
 | Vercel Inc. | UE (Frankfurt) | Hosting de la aplicación web | DPA disponible en vercel.com/legal/dpa |
 | Sentry Inc. | UE | Monitoreo de errores (sin PII en payloads) | DPA disponible en sentry.io/legal/dpa |
+| Cloudflare Inc. | UE/EE.UU. (SCCs) | Almacenamiento de imágenes y de copias de seguridad cifradas (R2) | DPA disponible en cloudflare.com/cloudflare-customer-dpa |
+| Brevo (Sendinblue SAS) | UE (Francia) | Emails de confirmación de pedido, seguimiento de envíos y promociones | DPA disponible en brevo.com/legal |
+| Redsys Servicios de Procesamiento S.L. | España | Pagos con tarjeta (solo si el Responsable lo activa) | Entidad regulada (PSD2) |
+| Glovo App S.L. | España | Reparto a domicilio (solo si el Responsable lo activa) | Condiciones de Glovo On-Demand |
 
 El Encargado notificará al Responsable cualquier cambio en los subencargados con **30 días de antelación**, dando al Responsable la posibilidad de oponerse.
 

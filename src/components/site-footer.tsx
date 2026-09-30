@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { MapPin, Mail, Globe, Phone, Settings } from "lucide-react"
 import { FacebookIcon } from "@/components/ui/facebook-icon"
 import { InstagramIcon } from "@/components/ui/instagram-icon"
@@ -7,10 +8,73 @@ import { ImagenSubida } from "@/components/ui/imagen-subida"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
+import type { SeccionAncla } from "@/lib/landing/anclas-pie"
+import { paginasLegalesDe } from "@/lib/legal/paginas-legales"
+
+/**
+ * Enlaces de navegacion del pie. Cada pantalla pasa SOLO destinos que existen
+ * para ese visitante: un ancla a una seccion no pintada o un "Inicio" que en
+ * modo mesa/camarero vuelve a servir la carta serian enlaces rotos.
+ * Con `enlaceInicio` estamos FUERA de la landing: las anclas apuntan a `/#id`.
+ * Las páginas legales van en su propia columna (FooterLegal), decididas por paginasLegalesDe.
+ */
+export interface FooterNavegacion {
+  readonly enlaceInicio?: boolean;
+  readonly enlaceCarta?: boolean;
+  readonly anclas?: readonly SeccionAncla[];
+}
 
 interface SiteFooterProps {
   readonly empresa?: EmpresaPublic | null;
   readonly hideMap?: boolean;
+  readonly navegacion?: FooterNavegacion;
+}
+
+type Lang = Parameters<typeof t>[1];
+
+const ETIQUETA_ANCLA = {
+  nosotros: "landingNavAboutUs",
+  galeria: "landingNavGallery",
+  "donde-estamos": "landingNavWhereWeAre",
+} as const satisfies Record<SeccionAncla, Parameters<typeof t>[0]>;
+
+const footerLinkClass = "inline-flex min-h-[44px] items-center text-sm text-footer-fg/85 hover:text-footer-fg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg rounded-sm";
+
+function FooterNav({ navegacion, language }: Readonly<{ navegacion: FooterNavegacion; language: Lang }>) {
+  return (
+    <nav aria-label={t("footerNavTitle", language)} className="space-y-4">
+      <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("footerNavTitle", language)}</h3>
+      <ul className="space-y-1">
+        {navegacion.enlaceInicio && (
+          <li><Link href="/" className={footerLinkClass}>{t("landingBackToHome", language)}</Link></li>
+        )}
+        {navegacion.enlaceCarta && (
+          <li><Link href="/carta" className={footerLinkClass}>{t("viewMenu", language)}</Link></li>
+        )}
+        {navegacion.anclas?.map((ancla) => (
+          <li key={ancla}>
+            {navegacion.enlaceInicio
+              ? <Link href={`/#${ancla}`} className={footerLinkClass}>{t(ETIQUETA_ANCLA[ancla], language)}</Link>
+              : <a href={`#${ancla}`} className={footerLinkClass}>{t(ETIQUETA_ANCLA[ancla], language)}</a>}
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+function FooterLegal({ empresa, language }: Readonly<{ empresa: EmpresaPublic; language: Lang }>) {
+  const paginas = paginasLegalesDe(empresa)
+  return (
+    <nav aria-label={t("footerLegalTitle", language)} className="space-y-4">
+      <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("footerLegalTitle", language)}</h3>
+      <ul className="space-y-1">
+        {paginas.map((p) => (
+          <li key={p.slug}><Link href={p.href} className={footerLinkClass}>{t(p.labelKey, language)}</Link></li>
+        ))}
+      </ul>
+    </nav>
+  )
 }
 
 // Badge compartido por todas las empresas — subido una única vez a R2, no pasa por ImageUploader.
@@ -19,12 +83,14 @@ interface SiteFooterProps {
 const GOOGLE_REVIEWS_BADGE_URL = `${process.env.NEXT_PUBLIC_R2_DOMAIN ?? ''}/shared/google-reviews-badge-4c4187e8.png`;
 
 function footerGridColsClass(columnasVisibles: number): string {
-  if (columnasVisibles >= 4) return "lg:grid-cols-4";
+  if (columnasVisibles >= 6) return "lg:grid-cols-6";
+  if (columnasVisibles >= 5) return "lg:grid-cols-5";
+  if (columnasVisibles === 4) return "lg:grid-cols-4";
   if (columnasVisibles === 3) return "lg:grid-cols-3";
   return "lg:grid-cols-2";
 }
 
-export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
+export function SiteFooter({ empresa, hideMap = false, navegacion = {} }: Readonly<SiteFooterProps>) {
   const { language } = useLanguage()
   const currentYear = new Date().getFullYear()
 
@@ -32,12 +98,15 @@ export function SiteFooter({ empresa, hideMap = false }: SiteFooterProps) {
 
   const mostrarMapa = Boolean(empresa.urlMapa) && !hideMap
   const mostrarResenas = Boolean(empresa.googleReviewsUrl)
-  const columnasVisibles = 2 + (mostrarMapa ? 1 : 0) + (mostrarResenas ? 1 : 0)
+  const columnasVisibles = 4 + (mostrarMapa ? 1 : 0) + (mostrarResenas ? 1 : 0)
 
   return (
     <footer className="w-full bg-footer-bg text-footer-fg mt-12 border-t border-footer-bg/10">
       <div className="max-w-[90rem] mx-auto px-6 py-10">
         <div className={`grid grid-cols-1 sm:grid-cols-2 ${footerGridColsClass(columnasVisibles)} gap-10`}>
+
+          <FooterNav navegacion={navegacion} language={language} />
+          <FooterLegal empresa={empresa} language={language} />
 
           {/* Columna 1: Redes Sociales */}
           <div className="space-y-4">

@@ -3,6 +3,7 @@ import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
 import { getAvailableLangs, getPrimaryLang, type LangKey } from "@/lib/seo/tenant-seo";
 import { readTranslatable } from "@/lib/landing/read-translatable";
 import { t } from "@/lib/translations";
+import { paginasLegalesDe } from "@/lib/legal/paginas-legales";
 
 // /llms.txt por tenant (formato https://llmstxt.org): resumen en Markdown que
 // los asistentes de IA (ChatGPT, Perplexity, Claude, Gemini...) leen para
@@ -117,6 +118,10 @@ export function buildLlmsTxt({ empresa, secciones, menu, baseUrl }: LlmsTxtInput
     lineas.push(...bloqueCarta(menu, moneda));
   }
 
-  lineas.push("", "## Optional", "", `- [Política de privacidad](${baseUrl}/privacidad)`, "");
+  lineas.push("", "## Optional", "");
+  for (const p of paginasLegalesDe(empresa)) {
+    lineas.push(`- [${t(p.labelKey, lang)}](${baseUrl}${p.href})`);
+  }
+  lineas.push("");
   return lineas.join("\n");
 }

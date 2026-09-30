@@ -3,6 +3,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
 
+// Esta copia va a R2 como JSON SIN cifrar: nunca debe llevar credenciales.
+// La restauración hace `update({...snapshot.empresa})`, así que una columna
+// ausente se conserva tal cual en la BD — no hace falta copiarlas.
+// (La copia COMPLETA y cifrada de la BD es otra: .github/workflows/db-backup.yml)
+const COLUMNAS_SECRETAS = [
+  'redsys_secret_key',
+  'glovo_private_key',
+  'waiter_pin_hash',
+] as const;
+
+function sinSecretos(empresa: Record<string, unknown>): Record<string, unknown> {
+  const copia = { ...empresa };
+  for (const columna of COLUMNAS_SECRETAS) delete copia[columna];
+  return copia;
+}
+
 async function backupEmpresa(supabase: any, s3: S3Client, empresa: any, today: string): Promise<void> {
   const [prodResult, catResult, mesasResult, ingResult, empTpvResult] = await Promise.all([
     supabase.from('productos').select('*').eq('empresa_id', empresa.id),
@@ -26,7 +42,7 @@ async function backupEmpresa(supabase: any, s3: S3Client, empresa: any, today: s
   if (recetaResult.error) throw new Error(`receta_items: ${recetaResult.error.message}`);
 
   const snapshot = {
-    empresa,
+    empresa: sinSecretos(empresa),
     categorias: catResult.data,
     productos: prodResult.data,
     mesas: mesasResult.data,

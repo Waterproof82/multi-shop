@@ -180,7 +180,10 @@ Ver [`docs/context/security.md`](docs/context/security.md) para detalle completo
 
 ### 💾 Backup Automático
 
-Backup diario de todos los datos operativos de cada empresa a Cloudflare R2. GitHub Actions (cron 03:00 UTC) dispara una Supabase Edge Function (Deno) que serializa un snapshot JSON por tenant y lo sube a `backups/{empresa_id}/{YYYY-MM-DD}.json`. Restauración via `POST /api/admin/backup/restore` con orden FK-safe.
+Dos copias distintas, ambas en Cloudflare R2 (ver [`docs/context/copias-de-seguridad.md`](docs/context/copias-de-seguridad.md)):
+
+- **Copia completa de la BD** (`.github/workflows/db-backup.yml`, diaria): roles + esquema + datos con `supabase db dump`, cifrada AES-256, en `db/daily/` (30 días) y `db/monthly/` (6 años). Es la única que cubre pedidos, cobros, clientes y fichajes — Supabase Free no guarda copias propias.
+- **Copia del catálogo por tenant** (`.github/workflows/tenant-backup.yml` → Edge Function `tenant-backup`, diaria): JSON sin cifrar y sin secretos con empresa, categorías, productos, mesas, ingredientes, empleados TPV y recetas, en `backups/{slug}/{YYYY-MM-DD}.json`. Restauración desde el admin vía `POST /api/admin/backup/restore`. **No sirve para un desastre.**
 
 ---
 

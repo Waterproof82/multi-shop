@@ -209,6 +209,16 @@ describe('LandingPage', () => {
     expect(container.querySelector('.animate-landing-marquee')).toBeNull();
   });
 
+  it('el pie enlaza solo los apartados que se pintan (galería sin fotos no)', () => {
+    renderLanding([
+      seccion({ id: 's-nosotros', tipo: 'nosotros', contenido: { titulo: { es: 'Quiénes somos' } } }),
+      seccion({ id: 's-galeria', tipo: 'galeria', contenido: { imagenes: [] } }),
+    ]);
+    const nav = screen.getByRole('navigation', { name: 'Navegación' });
+    const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(['/carta', '#nosotros']);
+  });
+
   it('usa el mismo pie de página que la carta (SiteFooter)', () => {
     renderLanding([], { direccion: 'Calle Falsa 123' });
     const footer = screen.getByRole('contentinfo');

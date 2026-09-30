@@ -1,4 +1,5 @@
-import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, getModalidadesEntregaPublicas } from "@/lib/server-services"
+import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, getModalidadesEntregaPublicas, getSeccionesLandingActivas } from "@/lib/server-services"
+import { anclasDelPie } from "@/lib/landing/anclas-pie"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
@@ -62,6 +63,14 @@ export async function CartaRoute({
   // - mesa URL with mesas disabled: never (overrides all the above)
   const showCart = !mesaDisabledContext && (isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant));
 
+  // Enlace de vuelta a la landing solo para el visitante normal de /carta:
+  // con QR de mesa, modo camarero o subdominio de pedidos, `/` sirve la
+  // carta directamente (bypass), asi que el enlace no llevaria a la landing.
+  // Si landing_habilitada = false, tampoco mostrar el enlace.
+  const mostrarVolverLanding = desdeRutaCarta && !rawMesaParam && !isWaiterMode && !isPedidos && (empresa?.landingHabilitada ?? false);
+  // Arranca ya, en paralelo con el menu: el pie enlaza los mismos apartados que la landing.
+  const seccionesLandingPromise = mostrarVolverLanding && empresaId ? getSeccionesLandingActivas(empresaId) : Promise.resolve([]);
+
   let menuData: MenuCategoryVM[] = [];
 
   try {
@@ -85,18 +94,16 @@ export async function CartaRoute({
     ? await getModalidadesEntregaPublicas(empresaId!)
     : [];
 
-  // Enlace de vuelta a la landing solo para el visitante normal de /carta:
-  // con QR de mesa, modo camarero o subdominio de pedidos, `/` sirve la
-  // carta directamente (bypass), asi que el enlace no llevaria a la landing.
-  // Si landing_habilitada = false, tampoco mostrar el enlace.
-  const mostrarVolverLanding = desdeRutaCarta && !rawMesaParam && !isWaiterMode && !isPedidos && (empresa?.landingHabilitada ?? false);
+  const navegacionPie = mostrarVolverLanding
+    ? { enlaceInicio: true, anclas: anclasDelPie(await seccionesLandingPromise) }
+    : {};
   const header = await SiteHeaderWrapper({ showCart, empresa, mostrarVolverLanding });
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
 
   return (
     <EmpresaThemeProvider colores={empresa?.colores || null}>
       {empresa && <JsonLd empresa={empresa} menuData={menuData} baseUrl={baseUrl} />}
-      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} modalidadesEntrega={modalidadesEntrega} />
+      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} modalidadesEntrega={modalidadesEntrega} navegacionPie={navegacionPie} />
     </EmpresaThemeProvider>
   );
 }

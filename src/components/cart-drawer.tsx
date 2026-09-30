@@ -1760,7 +1760,7 @@ export function CartDrawer({
               className="flex-1 min-h-[44px] rounded-[3px] bg-foreground text-background hover:bg-foreground/85"
               onClick={() => {
                 setShowActiveOrdersDialog(false);
-                handleConfirmOrder();
+                void handleConfirmOrder();
               }}
             >
               {t('activeOrdersContinue', language)}
