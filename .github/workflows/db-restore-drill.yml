@@ -72,16 +72,37 @@ jobs:
           rm backup.tar.gz.gpg
           ls -la dump
 
-      - name: Restaurar (procedimiento documentado)
+      - name: Separar los datos de la app de los esquemas de Supabase
         run: |
           set -euo pipefail
-          # Igual que en docs/context/copias-de-seguridad.md: si esto falla, el
-          # procedimiento de restauración documentado no sirve.
+          # Los esquemas gestionados por Supabase (auth, storage...) los migran
+          # sus propios servicios (GoTrue, Storage API): en un Postgres "pelado"
+          # su estructura es la base y le faltan columnas (p. ej.
+          # auth.audit_log_entries.ip_address). En una restauración REAL a un
+          # proyecto de Supabase esos servicios ya los han migrado, así que ahí
+          # sí se cargan. El simulacro restaura `public` en estricto y solo
+          # CUENTA las filas del resto dentro de la copia.
+          # Los awk van en ficheros (y no en línea): los escapes de "\." dentro
+          # de YAML + shell + awk son frágiles; con clases [.] no hay escapes.
+          awk -f .github/scripts/backup/solo-public.awk dump/data.sql > dump/data-public.sql
+          {
+            echo "### Filas por esquema de Supabase dentro de la copia (no se cargan en el simulacro)"
+            echo "| Tabla | Filas |"
+            echo "|---|---|"
+            awk -f .github/scripts/backup/filas-otros-esquemas.awk dump/data.sql
+          } >> "$GITHUB_STEP_SUMMARY"
+          usuarios_auth=$(awk -f .github/scripts/backup/contar-usuarios-auth.awk dump/data.sql)
+          echo "USUARIOS_AUTH=$usuarios_auth" >> "$GITHUB_ENV"
+          echo "Usuarios en auth.users dentro de la copia: $usuarios_auth"
+
+      - name: Restaurar (procedimiento documentado, datos de la app)
+        run: |
+          set -euo pipefail
           psql "$PGURL" --quiet --single-transaction --variable ON_ERROR_STOP=1 \
             --file dump/roles.sql \
             --file dump/schema.sql \
             --command 'SET session_replication_role = replica' \
-            --file dump/data.sql > /dev/null
+            --file dump/data-public.sql > /dev/null
           echo "Restauración completada"
 
       - name: Verificar la base restaurada
@@ -106,6 +127,7 @@ jobs:
             echo "| Trigger fiscal pedidos_no_delete | $trigger_fiscal |"
             echo "| Filas en empresas | $empresas |"
             echo "| Filas en pedidos | $pedidos |"
+            echo "| Usuarios en auth.users (en la copia) | $USUARIOS_AUTH |"
           } >> "$GITHUB_STEP_SUMMARY"
           cat "$GITHUB_STEP_SUMMARY"
           fallos=""
@@ -115,6 +137,8 @@ jobs:
           [ "$sin_rls" -eq 0 ] || fallos="$fallos tablas_sin_rls=$sin_rls"
           [ "$trigger_fiscal" -eq 1 ] || fallos="$fallos falta_trigger_pedidos_no_delete"
           [ "$empresas" -ge 1 ] || fallos="$fallos empresas_vacia"
+          # Sin usuarios de Auth, restaurar la BD no devolvería el acceso al admin.
+          [ "$USUARIOS_AUTH" -ge 1 ] || fallos="$fallos copia_sin_usuarios_auth"
           if [ -n "$fallos" ]; then echo "::error::La base restaurada no es válida:$fallos"; exit 1; fi
 
       - name: Smoke de funciones (el mismo que tras cada migración)
