@@ -338,7 +338,8 @@ Tras CADA `supabase db push` o `supabase migration up`:
 
 - **Supabase Free NO guarda copias** (`backups: []`, sin PITR). La única copia completa es `.github/workflows/db-backup.yml` (cifrada, R2). Si sus secretos no están configurados, NO HAY copia de pedidos/clientes/fichajes.
 - **`tenant-backup` es solo catálogo, en JSON sin cifrar**: nunca añadirle tablas con datos de clientes ni columnas secretas (`COLUMNAS_SECRETAS` en la Edge Function; lo vigila `tests/compliance/tenant-backup-sin-secretos.test.ts`).
-- **No afirmar "copias de seguridad" en `/privacidad` ni en DPAs** hasta que `db-backup.yml` esté activo y se haya restaurado al menos una vez.
+- **Simulacro mensual** (`db-restore-drill.yml`): restaura la última copia en `supabase/postgres` de la misma versión que prod. Si Supabase sube la versión de Postgres del proyecto, actualizar el tag de la imagen. No carga `auth`/`storage` (los migran servicios de Supabase); solo los cuenta.
+- **No afirmar "copias de seguridad" en `/privacidad` ni en DPAs** si `db-backup.yml` o el simulacro están en rojo.
 
 ## SEO Multi-Tenant
 
