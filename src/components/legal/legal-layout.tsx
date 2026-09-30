@@ -69,10 +69,10 @@ export function TablaSimple({ cabeceras, filas }: Readonly<{ cabeceras: readonly
           </tr>
         </thead>
         <tbody className="divide-y divide-foreground/10">
-          {filas.map((fila) => (
-            <tr key={fila.join('|')}>
-              {fila.map((celda, i) => (
-                <td key={`${cabeceras[i]}-${celda}`} className="p-2">{celda}</td>
+          {filas.map((fila, i) => (
+            <tr key={`${i}-${fila.join('|')}`}>
+              {fila.map((celda, j) => (
+                <td key={`${cabeceras[j]}-${celda}`} className="p-2">{celda}</td>
               ))}
             </tr>
           ))}

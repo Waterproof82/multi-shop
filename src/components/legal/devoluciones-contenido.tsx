@@ -5,6 +5,36 @@ import { InfoTable, Section, TablaSimple, TextoAdicional } from './legal-layout'
 
 const ESTADO: Record<GarantiaFila['estado'], string> = { nuevo: 'Nuevo', segunda_mano: 'Segunda mano' };
 
+const ANEXO_B_LINEAS = [
+  'Por la presente le comunico/comunicamos (*) que desisto de mi/desistimos de nuestro (*) contrato de venta del siguiente bien/prestación del siguiente servicio (*)',
+  'Pedido el/recibido el (*):',
+  'Nombre del consumidor o de los consumidores:',
+  'Domicilio del consumidor o de los consumidores:',
+  'Firma del consumidor o de los consumidores (solo si el presente formulario se presenta en papel):',
+  'Fecha:',
+  '(*) Táchese lo que no proceda.',
+];
+
+function construirDestinatario(titular: LegalContext['titular']): string {
+  const partes = [titular.nombre];
+  if (titular.direccion !== null) partes.push(titular.direccion);
+  if (titular.email !== null) partes.push(titular.email);
+  return `A la atención de: ${partes.join(', ')}`;
+}
+
+function FormularioDesistimiento({ titular }: Readonly<{ titular: LegalContext['titular'] }>) {
+  return (
+    <Section titulo="Modelo de formulario de desistimiento">
+      <p>Puede utilizar este modelo, aunque no es obligatorio:</p>
+      <div className="rounded-[3px] border border-foreground/10 p-3 whitespace-pre-line text-sm">
+        {construirDestinatario(titular)}
+        {'\n\n'}
+        {ANEXO_B_LINEAS.join('\n')}
+      </div>
+    </Section>
+  );
+}
+
 function Gastos({ quien }: Readonly<{ quien: LegalContext['legal']['gastosDevolucion'] }>) {
   if (quien === 'empresa') return <p>Los gastos de devolución corren a nuestro cargo.</p>;
   return <p>Los gastos directos de devolución corren a cargo del cliente, salvo que el producto sea defectuoso o no corresponda con lo pedido.</p>;
@@ -39,8 +69,10 @@ export function DevolucionesContenido({ ctx }: Readonly<{ ctx: LegalContext }>) 
       </Section>
 
       <Section titulo="2. Reembolso">
-        <p>Le reembolsaremos el importe pagado, incluidos los gastos de envío iniciales (salvo el sobrecoste de una modalidad de envío más cara que la estándar), en un plazo máximo de {PLAZO_REEMBOLSO_DIAS} días desde que nos comunique el desistimiento, por el mismo medio de pago. Podemos retener el reembolso hasta recibir el producto.</p>
+        <p>Le reembolsaremos el importe pagado, incluidos los gastos de envío iniciales (salvo el sobrecoste de una modalidad de envío más cara que la estándar), en un plazo máximo de {PLAZO_REEMBOLSO_DIAS} días desde que nos comunique el desistimiento, por el mismo medio de pago. Podemos retener el reembolso hasta haber recibido el producto o hasta que usted nos presente una prueba de su devolución, lo que ocurra primero.</p>
       </Section>
+
+      <FormularioDesistimiento titular={titular} />
 
       <Exclusiones ctx={ctx} />
 
