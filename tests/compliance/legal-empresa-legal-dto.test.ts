@@ -64,6 +64,29 @@ describe('updateEmpresaLegalSchema — suelos legales', () => {
     expect(updateEmpresaLegalSchema.safeParse({ ...valido, emailLegal: 'no-es-email' }).success).toBe(false);
   });
 
+  it('acepta un email legal de 201 caracteres (por encima del límite viejo de 200, dentro del RFC 5321 de 254)', () => {
+    const email201 = `${'a'.repeat(189)}@example.com`;
+    expect(email201.length).toBe(201);
+    expect(updateEmpresaLegalSchema.safeParse({ ...valido, emailLegal: email201 }).success).toBe(true);
+  });
+
+  it('rechaza un email legal de más de 254 caracteres (límite RFC 5321)', () => {
+    const email255 = `${'a'.repeat(243)}@example.com`;
+    expect(email255.length).toBe(255);
+    expect(updateEmpresaLegalSchema.safeParse({ ...valido, emailLegal: email255 }).success).toBe(false);
+  });
+
+  it('rechaza garantía de producto nuevo con 6 meses con el mensaje EXACTO de nuevo (no el de segunda mano)', () => {
+    const r = updateEmpresaLegalSchema.safeParse({
+      ...valido,
+      garantias: [{ ambito: 'Ejemplo', estado: 'nuevo', mesesLegales: 6, mesesComercialesExtra: 0 }],
+    });
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    const issue = r.error.issues.find((i) => i.path.join('.') === 'garantias.0.mesesLegales');
+    expect(issue?.message).toBe('La garantía legal de un producto nuevo es de 3 años');
+  });
+
   it('descarta claves desconocidas (no se puede colar empresaId)', () => {
     const r = updateEmpresaLegalSchema.safeParse({ ...valido, empresaId: 'otra' });
     expect(r.success).toBe(true);

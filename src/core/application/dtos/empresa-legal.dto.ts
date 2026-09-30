@@ -14,7 +14,7 @@ function textoOpcional(max: number) {
 }
 
 const emailOpcional = z
-  .union([z.literal(''), z.email().max(200)])
+  .union([z.literal(''), z.email().max(254)])
   .nullable()
   .transform((v) => (v ? v : null));
 
@@ -22,12 +22,25 @@ export const garantiaFilaSchema = z
   .object({
     ambito: z.string().trim().min(1, 'Indica a qué productos aplica').max(120),
     estado: z.enum(['nuevo', 'segunda_mano']),
-    mesesLegales: z.number().int().min(MIN_SEGUNDA_MANO_MESES, 'La garantía mínima de segunda mano es de 1 año').max(120),
+    mesesLegales: z.number().int().min(0).max(120),
     mesesComercialesExtra: z.number().int().min(0).max(240),
   })
-  .refine((f) => f.estado === 'segunda_mano' || f.mesesLegales === GARANTIA_NUEVO_MESES, {
-    message: 'La garantía legal de un producto nuevo es de 3 años',
-    path: ['mesesLegales'],
+  .superRefine((f, ctx) => {
+    if (f.estado === 'nuevo' && f.mesesLegales !== GARANTIA_NUEVO_MESES) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'La garantía legal de un producto nuevo es de 3 años',
+        path: ['mesesLegales'],
+      });
+      return;
+    }
+    if (f.estado === 'segunda_mano' && f.mesesLegales < MIN_SEGUNDA_MANO_MESES) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'La garantía mínima de segunda mano es de 1 año',
+        path: ['mesesLegales'],
+      });
+    }
   });
 
 export const garantiasSchema = z.array(garantiaFilaSchema).max(20);
