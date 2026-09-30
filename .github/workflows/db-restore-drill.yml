@@ -130,6 +130,10 @@ jobs:
             echo "| Usuarios en auth.users (en la copia) | $USUARIOS_AUTH |"
           } >> "$GITHUB_STEP_SUMMARY"
           cat "$GITHUB_STEP_SUMMARY"
+          {
+            echo "R_TABLAS=$tablas"; echo "R_FUNCIONES=$funciones"; echo "R_POLITICAS=$politicas"
+            echo "R_SIN_RLS=$sin_rls"; echo "R_EMPRESAS=$empresas"; echo "R_PEDIDOS=$pedidos"
+          } >> "$GITHUB_ENV"
           fallos=""
           [ "$tablas" -ge 50 ] || fallos="$fallos tablas=$tablas"
           [ "$funciones" -ge 20 ] || fallos="$fallos funciones=$funciones"
@@ -145,6 +149,35 @@ jobs:
         run: |
           psql "$PGURL" --quiet --variable ON_ERROR_STOP=1 --file supabase/tests/smoke-db-functions.sql > /dev/null
           echo "Smoke OK"
+
+      - name: Enviar el desglose por Telegram
+        if: success()
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$OPS_TELEGRAM_CHAT_ID" ]; then
+            msg="✅ Simulacro de restauración correcto
+          Copia: ${COPIA%%.*}
+
+          Estructura
+          • Tablas: $R_TABLAS
+          • Funciones: $R_FUNCIONES
+          • Políticas RLS: $R_POLITICAS
+          • Tablas sin RLS: $R_SIN_RLS
+          • Trigger fiscal pedidos_no_delete: presente
+
+          Datos
+          • Empresas: $R_EMPRESAS
+          • Pedidos: $R_PEDIDOS
+          • Usuarios admin (auth): $USUARIOS_AUTH
+
+          • Smoke de funciones: OK
+
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            # La indentación del bloque YAML se cuela en cada línea: quitarla.
+            msg=$(printf '%s\n' "$msg" | sed 's/^ *//')
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              --data-urlencode "chat_id=$OPS_TELEGRAM_CHAT_ID" \
+              --data-urlencode "text=$msg" > /dev/null
+          fi
 
       - name: Avisar del fallo por Telegram
         if: failure()
