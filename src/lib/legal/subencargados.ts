@@ -37,6 +37,6 @@ export function subencargadosDe(f: FlagsLegales): Subencargado[] {
   if (f.deliveryHabilitado) {
     lista.push({ proveedor: 'Glovo App S.L. (España)', finalidad: 'Reparto a domicilio de pedidos', pais: 'UE' });
   }
-  lista.push({ proveedor: 'Sentry (EE.UU.)', finalidad: 'Monitorización de errores técnicos', pais: 'EE.UU. (SCCs)' });
+  lista.push({ proveedor: 'Sentry (EE.UU.)', finalidad: 'Monitorización de errores técnicos, incluida una grabación enmascarada (sin textos ni imágenes) de la interacción cuando se produce un error', pais: 'EE.UU. (SCCs)' });
   return lista;
 }
