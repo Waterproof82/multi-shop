@@ -84,7 +84,7 @@ psql --single-transaction --variable ON_ERROR_STOP=1 \
 - [ ] Restauración completa probada en un proyecto de pruebas; repetir cada trimestre.
 - [x] Borradas de R2 las copias de catálogo anteriores al 2026-09-30 (143 objetos con credenciales en claro).
 - [ ] Telegram de avisos: falta el secreto `OPS_TELEGRAM_CHAT_ID` (el bot ya está configurado).
-- [ ] Passphrase guardada en un gestor de contraseñas.
+- [x] Passphrase guardada en un gestor de contraseñas (2026-09-30).
 - [ ] Valorar Supabase Pro (copias diarias propias 7 días) o PITR si el volumen de pedidos lo justifica. NO sustituye a `db-backup.yml`: 7 días no cubren la conservación legal.
 - [ ] Ciclo de vida del bucket R2 revisado (que ninguna regla borre `db/monthly/` antes de 6 años).
 - [ ] Solo entonces: mencionar "copias de seguridad" en `/privacidad` (sección Seguridad) y firmar DPAs con la cláusula 3.1 de `docs/legal/dpa-template.md`.
