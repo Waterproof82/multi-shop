@@ -92,7 +92,7 @@ psql --single-transaction --variable ON_ERROR_STOP=1 \
 - [x] Restauración probada (2026-09-30, simulacro) y repetida automáticamente cada mes.
 - [ ] Restauración de `auth` a un proyecto de Supabase real: solo se puede probar con un segundo proyecto. Hacerlo una vez antes de tener tenants que dependan del acceso admin.
 - [x] Borradas de R2 las copias de catálogo anteriores al 2026-09-30 (143 objetos con credenciales en claro).
-- [ ] Telegram de avisos: falta el secreto `OPS_TELEGRAM_CHAT_ID` (el bot ya está configurado).
+- [x] Telegram de avisos: `OPS_TELEGRAM_CHAT_ID` configurado (chat privado del titular con el bot del proyecto; prueba enviada 2026-09-30).
 - [x] Passphrase guardada en un gestor de contraseñas (2026-09-30).
 - [ ] Valorar Supabase Pro (copias diarias propias 7 días) o PITR si el volumen de pedidos lo justifica. NO sustituye a `db-backup.yml`: 7 días no cubren la conservación legal.
 - [ ] Ciclo de vida del bucket R2 revisado (que ninguna regla borre `db/monthly/` antes de 6 años).
