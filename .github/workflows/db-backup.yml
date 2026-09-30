@@ -53,6 +53,39 @@ jobs:
             echo "::error::Faltan secretos/variables:$faltan (ver docs/context/copias-de-seguridad.md)"
             exit 1
           fi
+          # Valida la FORMA de la cadena sin imprimir nunca la contraseña: un
+          # "password authentication failed" no dice si el fallo es la
+          # contraseña, unos corchetes olvidados o un carácter sin codificar.
+          python3 - <<'PY'
+          import os, sys, re
+          from urllib.parse import urlsplit, unquote
+          url = os.environ["SUPABASE_DB_URL"].strip()
+          errores = []
+          if url != os.environ["SUPABASE_DB_URL"]:
+              errores.append("la cadena tiene espacios o saltos de línea al principio o al final")
+          if not re.match(r"^postgres(ql)?://", url):
+              errores.append("no empieza por postgresql://")
+          if url.count("@") != 1:
+              errores.append(f"contiene {url.count('@')} '@': la contraseña lleva '@' sin codificar (usar %40)")
+          p = urlsplit(url)
+          pwd = unquote(p.password or "")
+          print(f"usuario={p.username} host={p.hostname} puerto={p.port} bd={p.path.lstrip('/')} longitud_contraseña={len(pwd)}")
+          if not p.password:
+              errores.append("no hay contraseña en la cadena")
+          if "[" in (p.password or "") or "]" in (p.password or "") or "YOUR-PASSWORD" in url:
+              errores.append("la contraseña conserva los corchetes o el texto [YOUR-PASSWORD]")
+          if re.search(r"[#/?:&]", p.password or ""):
+              errores.append("la contraseña tiene caracteres que hay que codificar en una URL (#/?:&)")
+          if p.username and "." not in p.username:
+              errores.append("el usuario debe ser postgres.<id-del-proyecto> para el pooler")
+          if p.port == 6543:
+              errores.append("puerto 6543 = Transaction pooler; pg_dump necesita el Session pooler (5432)")
+          if p.hostname and p.hostname.startswith("db."):
+              errores.append("conexión directa (db.*): solo IPv6, inaccesible desde GitHub; usar el Session pooler")
+          for e in errores:
+              print(f"::error::SUPABASE_DB_URL: {e}")
+          sys.exit(1 if errores else 0)
+          PY
 
       - name: Avisar si faltó la copia de ayer
         run: |
