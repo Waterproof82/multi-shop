@@ -332,6 +332,14 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Restaurante nunca tiene `/envios-y-pagos` ni `/devoluciones`** aunque use Glovo: vende perecederos (art. 103.d). El reparto y la ausencia de desistimiento se explican en `/condiciones`.
 - **Sin enlace a la plataforma ODR de la UE**: cerró el 20-07-2025 (Reg. (UE) 2024/3228). No añadirlo aunque lo sugiera una revisión.
 
+## TPV por Tenant (`empresas.tpv_habilitado`) — Trampas Criticas
+
+- **Un solo interruptor, solo superadmin** (sección "Cumplimiento legal" de `/superadmin`). El TPV es lo ÚNICO que emite facturas; sin TPV la web solo confirma pedidos, factura un programa externo, NO hay registro de jornada (los fichajes viven en el TPV) y VeriFactu no aplica a este sistema. Todo lo demás se DERIVA del flag (`src/lib/empresa/tpv-legal.ts`): no crear flags separados para jornada/facturación.
+- **NUNCA añadir `tpv_habilitado` a `updateEmpresaSchema`**: lo usa también `/api/admin/empresa` (admin de tenant). Va en `superadminUpdateEmpresaSchema` (test `tpv-habilitado-solo-superadmin.test.ts`). OJO: `tipo`, `delivery_habilitado`, `mesas_habilitadas`, `pagos_*` y `validacion_pedidos_habilitada` SÍ están hoy en el esquema compartido — un admin de tenant puede cambiarlos con una petición a mano (pendiente de mover).
+- **Bloqueo en `proxy.ts`** (`/api/tpv`, `/api/laborcontrol` → 403) con caché de 60 s (`tpvHabilitadoParaEmpresa`); ante error de BD deja pasar (interruptor de producto, no la barrera de auth). `/tpv/legal` y el export con token de inspector quedan SIEMPRE abiertos: Hacienda accede a los cobros ya registrados aunque se apague el TPV.
+- **Retención de clientes**: 5 años con TPV, 3 sin TPV (garantía legal). La purga (`planDePurga`) y `/privacidad` leen el mismo `retencionClientesAnios()`. Anonimizar borra también `clientes.direccion` y la copia del domicilio/coordenadas en `pedidos` (`CAMPOS_PEDIDO_ANONIMIZADOS`) — hasta el 2026-10-01 no se hacía.
+- **Apagar el TPV nunca borra** cobros ni fichajes (retención fiscal 5 años y laboral 4 años).
+
 ## Copias de Seguridad — Trampas Criticas
 
 > Ver doc completo: `docs/context/copias-de-seguridad.md` (incluye puesta en marcha, restauración y checklist para producción)
