@@ -19,6 +19,8 @@ Obligaciones que dependen de poder restaurar:
 
 VeriFactu no aplica solo al TPV: aplica a cualquier sistema que EMITA facturas o tickets. Una tienda que factura con su propio programa y solo usa nuestra web para vender no está en su ámbito; pero sus pedidos siguen sujetos a la conservación mercantil. Por eso la copia completa es para TODOS los tenants.
 
+**Las copias no dependen del TPV del tenant** (`tpv_habilitado`): son de toda la BD. Lo que cambia sin TPV es cuándo se anonimizan los datos personales (3 años en vez de 5), no qué se copia. Los datos ya anonimizados permanecen en copias anteriores hasta su caducidad, bloqueados (art. 32 LOPDGDD); tras restaurar una copia, volver a ejecutar la purga (`GET /api/cron/rgpd-purge` con `CRON_SECRET`) para reaplicar la anonimización.
+
 ## Las dos copias
 
 ### 1. Copia completa de la BD — `.github/workflows/db-backup.yml`

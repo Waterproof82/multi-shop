@@ -113,10 +113,12 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
   - Backups cifrados con HMAC-SHA256 para snapshots fiscales Electron
   - `clientes.anonimizado_en` — campo TIMESTAMPTZ que indica si un cliente fue anonimizado vía derecho de supresión
   - `clientes.ultima_actividad` — se actualiza por trigger `trg_pedidos_ultima_actividad` en cada INSERT a `pedidos`. Base para el auto-purge. DEFAULT NOW() al crear el cliente.
-  - `POST /api/admin/rgpd/anonimizar-cliente` — sustituye `nombre/email/telefono` con placeholders; preserva `id` y FKs con `pedidos`. Idempotente. Solo `admin`/`superadmin`.
-  - **Vercel Cron mensual** (`GET /api/cron/rgpd-purge`): purga `clientes` con `ultima_actividad < now() - 5 años` AND `anonimizado_en IS NULL`. Protegido por `CRON_SECRET` (env var). Plazo de 5 años alineado con Art.66 LGT (obligación fiscal). El margen de ~30 días entre ejecuciones es jurídicamente irrelevante para un período de retención de 5 años.
+  - `POST /api/admin/rgpd/anonimizar-cliente` — borra `nombre/email/telefono/direccion` del cliente y la copia del domicilio y coordenadas en sus `pedidos` (`CAMPOS_ANONIMIZADOS` / `CAMPOS_PEDIDO_ANONIMIZADOS` en `src/lib/rgpd/plan-purga.ts`); preserva `id` y FKs con `pedidos`. Idempotente. Solo `admin`/`superadmin`.
+  - **Vercel Cron mensual** (`GET /api/cron/rgpd-purge`): anonimiza clientes con `anonimizado_en IS NULL` y `ultima_actividad` anterior al plazo de SU tenant: **5 años con TPV** (los pedidos son registros fiscales del sistema, Art.66 LGT), **3 años sin TPV** (factura un programa externo; 3 años = garantía legal). Ver `tpv-por-tenant.md` y `rgpd-clientes.md`. Protegido por `CRON_SECRET`.
+  - Hasta el 2026-10-01 la anonimización NO borraba la dirección (ni en `clientes` ni la copia en `pedidos`): corregido, y limpiados los ya anonimizados en la migración `20261001000001`.
 - **Trampas**:
-  - `ultima_actividad` solo avanza vía trigger en `pedidos`. Si se crea un cliente sin pedidos, su `ultima_actividad = created_at`. La purga automática eventualmente anonimiza clientes sin pedidos en `>5 años`.
+  - `ultima_actividad` solo avanza vía trigger en `pedidos`. Si se crea un cliente sin pedidos, su `ultima_actividad = created_at`. La purga lo anonimiza tras el plazo de su tenant contado desde el alta.
+  - Apagar el TPV a un tenant baja su plazo de 5 a 3 años: en la siguiente purga se anonimizan (irreversible) los clientes de entre 3 y 5 años sin actividad.
   - pg_cron **no está habilitado** en este proyecto (plan Free Supabase). El mecanismo de purga automática es el Vercel Cron.
   - `CRON_SECRET` debe estar configurado en Vercel → Settings → Environment Variables. Sin él, el endpoint devuelve 401.
 - **Ficheros clave:**

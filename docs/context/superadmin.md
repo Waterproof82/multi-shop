@@ -34,6 +34,12 @@
   - `/api/admin/productos` - GET/POST/PUT/DELETE requieren `empresaId` query param
   - `/api/admin/categorias`, `/api/admin/clientes`, etc. - similarly
 
+### Interruptores de producto — solo superadmin
+`PUT /api/superadmin/empresas/[id]` valida con `superadminUpdateEmpresaSchema`; `/api/admin/empresa` (admin de tenant) con `updateEmpresaSchema`, que NO contiene: `tpv_habilitado`, `tipo`, `delivery_habilitado`, `mesas_habilitadas`, `pagos_mesa_habilitados`, `pagos_pickup_habilitados`, `validacion_pedidos_habilitada`. Hasta el 2026-10-01 los seis últimos estaban en el esquema compartido y un tenant podía cambiarlos con una petición a mano. Un interruptor de producto nuevo va SIEMPRE en el esquema del superadmin (test `tpv-habilitado-solo-superadmin.test.ts`).
+
+### Sección "Cumplimiento legal"
+Debajo de la tabla de empresas (`src/app/superadmin/seccion-legal.tsx`). Por empresa: interruptor de TPV y el resumen derivado (`resumenLegalEmpresa`): quién factura (y modo VeriFactu), registro de jornada y plazo de anonimización de clientes. Desactivar el TPV pide confirmación y avisa de que es irreversible para los clientes de más de 3 años sin actividad; activarlo se guarda directo; si el guardado falla, el interruptor vuelve a su estado y se avisa. Detalle completo en `tpv-por-tenant.md`.
+
 ### Banner flotante en modo superadmin
 - Componente `src/components/superadmin-banner.tsx`, montado desde `src/app/admin/(protected)/layout.tsx`
 - Banner fixed con z-index alto

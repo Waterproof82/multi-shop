@@ -52,13 +52,29 @@ Nunca relajar uno pensando que otro lo cubre. Un tenant puede AMPLIAR derechos d
 
 Constantes en `src/core/domain/legal/constantes.ts`.
 
-## Migración `empresa_legal` — pendiente de aplicar
+## Migración `empresa_legal`
 
-`supabase/migrations/20260930000001_empresa_legal.sql` está **escrita pero NO aplicada**. Hasta que se aplique:
+`supabase/migrations/20260930000001_empresa_legal.sql` — **aplicada el 2026-09-30** con `supabase db push --linked` + `pnpm db:smoke`. Verificado en vivo: RLS activa, policy RESTRICTIVE para anon, policies de admin `TO authenticated`, sin GRANTs a anon.
 
-- `/admin/legal` y las páginas públicas (`/aviso-legal`, `/condiciones`, `/envios-y-pagos`, `/devoluciones`, `/privacidad`) fallarán en producción — la tabla no existe.
-- Aplicar SIEMPRE con `supabase db push --linked` (nunca `apply_migration`/`execute_sql` sueltos — ver checklist de migraciones en `CLAUDE.md`), seguido de `pnpm db:smoke`.
-- El proyecto Supabase linkeado es PRODUCCIÓN (tenants reales): pedir confirmación explícita antes de este paso.
+## `/privacidad` según el TPV del tenant
+
+Desde el 2026-10-01 la política depende de `flags.tpvHabilitado` (ver `tpv-por-tenant.md`):
+
+| | Con TPV | Sin TPV |
+|---|---|---|
+| Plazo (sección 5) | 5 años sin actividad | 3 años sin actividad |
+| Finalidad que justifica guardar el pedido | "Obligaciones fiscales y contables" (art. 6.1.c, art. 66 LGT) | "Atención de garantías y reclamaciones" (art. 6.1.c y 6.1.f, garantía 3 años) |
+| Qué se conserva tras anonimizar | Registros de pedidos y cobros exigidos por la normativa fiscal | Productos e importes, sin datos que identifiquen |
+
+Las finalidades se construyen con `finalidadesAdicionales(flags)` (lista, numeradas por índice): no volver a un ternario para la numeración, se vuelve anidado en cuanto hay un caso más (S3358).
+
+## Otras secciones de `/privacidad` (2026-09-30)
+
+- **Encargado del tratamiento**: `FABRICANTE` (`src/lib/fabricante.ts`) — José Miguel Aristía Gordillo (Digitalizatenerife), persona física; NIF visible por decisión del titular. Cambiar de productor exige cambiar también `DECLARATION_DATE` (la declaración responsable del RD 1007/2023 la suscribe el productor) y firmar DPA nuevos con cada tenant.
+- Derechos: incluye el art. 22 (decisiones automatizadas). Sección "Cómo ejercer sus derechos": sin exigir copia del DNI (desproporcionado según la AEPD), plazo de un mes (art. 12.3).
+- Seguridad: medidas, notificación de brechas (arts. 33-34) y **copias de seguridad** cifradas con el bloqueo de datos suprimidos (art. 32 LOPDGDD). Solo se afirma porque `db-backup.yml` y el simulacro mensual están en verde (ver `copias-de-seguridad.md`).
+- Sentry declarado con la grabación enmascarada de la sesión ante errores (`replaysOnErrorSampleRate: 1.0`).
+- Cloudflare Inc. como subencargado (imágenes y copias de seguridad en R2).
 
 ## Formulario de desistimiento (Anexo B) y retención del reembolso (art. 107.3)
 
@@ -79,7 +95,7 @@ Constantes en `src/core/domain/legal/constantes.ts`.
 
 | Proveedor | Condición |
 |---|---|
-| Supabase, Vercel, Sentry | Siempre |
+| Supabase, Vercel, Cloudflare (R2), Sentry | Siempre |
 | Brevo | Siempre. Finalidad construida por flags: "confirmación de pedidos" (siempre) + "seguimiento de envíos" (`envioDomicilioHabilitado`) + "promociones" (`descuentoBienvenidaActivo`) |
 | Redsys | `pagoTarjetaActivo` (derivado de `redsys_merchant_code IS NOT NULL`; el código nunca sale del repositorio) |
 | Glovo | `deliveryHabilitado` (reparto de restaurante) |
