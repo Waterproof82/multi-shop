@@ -42,3 +42,14 @@ export const updateEmpresaSchema = z.object({
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;
+
+/**
+ * Campos que SOLO puede tocar el superadmin. Nunca añadirlos a
+ * `updateEmpresaSchema`: ese esquema lo usa también `/api/admin/empresa`, y
+ * cualquier admin de tenant podría activarse el TPV con una petición a mano.
+ */
+export const superadminUpdateEmpresaSchema = updateEmpresaSchema.extend({
+  tpv_habilitado: z.boolean().optional(),
+});
+
+export type SuperadminUpdateEmpresaDTO = z.infer<typeof superadminUpdateEmpresaSchema>;
