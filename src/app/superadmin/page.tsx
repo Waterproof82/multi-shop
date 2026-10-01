@@ -3,6 +3,7 @@ import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calen
 import { getSuperAdminUseCase } from '@/core/infrastructure/database';
 import { logger } from '@/core/infrastructure/logging/logger';
 import { EmpresasTable } from './empresas-table';
+import { SeccionLegal } from './seccion-legal';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -31,6 +32,8 @@ interface Empresa {
   validacionPedidosHabilitada: boolean;
   deliveryHabilitado: boolean;
   landingHabilitada: boolean;
+  tpvHabilitado: boolean;
+  verifactuMode: string | null;
   googleReviewsUrl: string | null;
   createdAt: string;
   stats: EmpresaStats;
@@ -267,6 +270,19 @@ export default async function SuperAdminPage() {
           />
         )}
       </div>
+
+      {!fetchError && (
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 shadow-2xl">
+          <SeccionLegal
+            empresas={empresas.map((e) => ({
+              id: e.id,
+              nombre: e.nombre,
+              tpvHabilitado: e.tpvHabilitado,
+              verifactuMode: e.verifactuMode,
+            }))}
+          />
+        </div>
+      )}
     </div>
   );
 }

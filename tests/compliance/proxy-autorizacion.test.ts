@@ -50,6 +50,10 @@ vi.mock('@/lib/tpv-employee-auth', () => ({
 vi.mock('@/core/infrastructure/database/supabase-client', () => ({
   getSupabaseClient: () => ({}),
 }));
+const tpvHabilitadoMock = vi.fn(async () => true);
+vi.mock('@/lib/tpv/tpv-habilitado', () => ({
+  tpvHabilitadoParaEmpresa: (...a: unknown[]) => tpvHabilitadoMock(...(a as [])),
+}));
 
 const { proxy } = await import('@/proxy');
 
@@ -90,7 +94,50 @@ beforeEach(() => {
   verifyCsrfTokenMock.mockReturnValue(true);
   verifyWaiterTokenMock.mockResolvedValue(null);
   verifyTpvEmployeeTokenMock.mockResolvedValue(null);
+  tpvHabilitadoMock.mockResolvedValue(true);
   process.env.ACCESS_TOKEN_SECRET = 'secreto-de-test';
+});
+
+// ── Interruptor de TPV por tenant (empresas.tpv_habilitado) ──────────────────
+
+describe('tenant SIN TPV: /api/tpv y /api/laborcontrol quedan cerrados', () => {
+  const RUTAS_TPV = ['/api/tpv/stock/mermas', '/api/tpv/cobro', '/api/laborcontrol/fichaje'];
+
+  it.each(RUTAS_TPV)('%s → 403 aunque la sesión de admin sea válida', async (ruta) => {
+    adminValido('admin', 'e1');
+    tpvHabilitadoMock.mockResolvedValue(false);
+    const res = await proxy(peticion(ruta, { cookies: { admin_token: 't' } }));
+    expect(res.status).toBe(403);
+    expect(tpvHabilitadoMock).toHaveBeenCalledWith('e1');
+  });
+
+  it.each(RUTAS_TPV)('%s → pasa si el tenant tiene TPV', async (ruta) => {
+    adminValido('admin', 'e1');
+    const res = await proxy(peticion(ruta, { cookies: { admin_token: 't' } }));
+    expect(dejaPasar(res)).toBe(true);
+  });
+
+  it('las rutas públicas del TPV (login, inspector) no consultan el interruptor', async () => {
+    tpvHabilitadoMock.mockResolvedValue(false);
+    const res = await proxy(peticion('/api/tpv/empleados/login', { metodo: 'POST' }));
+    expect(dejaPasar(res)).toBe(true);
+    expect(tpvHabilitadoMock).not.toHaveBeenCalled();
+  });
+
+  it('el cron de laborcontrol no consulta el interruptor (no tiene empresa)', async () => {
+    tpvHabilitadoMock.mockResolvedValue(false);
+    const res = await proxy(peticion('/api/laborcontrol/cron/seal'));
+    expect(dejaPasar(res)).toBe(true);
+    expect(tpvHabilitadoMock).not.toHaveBeenCalled();
+  });
+
+  it('el resto del admin no se ve afectado por el interruptor', async () => {
+    adminValido('admin', 'e1');
+    tpvHabilitadoMock.mockResolvedValue(false);
+    const res = await proxy(peticion('/api/admin/productos', { cookies: { admin_token: 't' } }));
+    expect(dejaPasar(res)).toBe(true);
+    expect(tpvHabilitadoMock).not.toHaveBeenCalled();
+  });
 });
 
 // ── Suite 1: la tabla de enrutado ─────────────────────────────────────────────

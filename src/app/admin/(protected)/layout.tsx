@@ -9,6 +9,7 @@ import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { SuperadminBanner } from '@/components/superadmin-banner';
 import { TextoTraducido } from '@/components/texto-traducido';
+import { tpvHabilitadoParaEmpresa } from '@/lib/tpv/tpv-habilitado';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +76,10 @@ export default async function AdminProtectedLayout({
     empresaId = admin.empresaId!;
   }
 
+  // Mismo flag y misma caché que el proxy: si el superadmin apaga el TPV, aquí
+  // desaparecen "Ir al TPV", empleados y auditoría (como mucho 60 s después).
+  const tpvHabilitado = await tpvHabilitadoParaEmpresa(empresaId);
+
   return (
     <LanguageProvider>
     <AdminThemeProvider>
@@ -88,6 +93,7 @@ export default async function AdminProtectedLayout({
         mesasHabilitadas={mesasHabilitadas}
         deliveryHabilitado={deliveryHabilitado}
         landingHabilitada={landingHabilitada}
+        tpvHabilitado={tpvHabilitado}
         overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
         isSuperAdmin={isSuperAdminView}
       >

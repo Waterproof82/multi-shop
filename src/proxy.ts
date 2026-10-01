@@ -10,6 +10,7 @@ import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { verifyWaiterToken } from '@/lib/waiter-auth';
 import { verifyTpvEmployeeToken, signTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { tpvHabilitadoParaEmpresa } from '@/lib/tpv/tpv-habilitado';
 
 function getAdminTokenSecret(): string | undefined {
   return process.env.ACCESS_TOKEN_SECRET;
@@ -366,8 +367,21 @@ function isPublicTpvRoute(path: string, request: NextRequest): boolean {
  */
 async function handleAdminOrEmployeeAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
   const adminResult = await handleAdminAuth(request, origin);
-  if (adminResult.status === 200) return adminResult;
-  return handleTpvEmployeeAuth(request, origin);
+  const result = adminResult.status === 200 ? adminResult : await handleTpvEmployeeAuth(request, origin);
+  return exigirTpvHabilitado(result, origin);
+}
+
+/**
+ * Tras autenticar: si el tenant no tiene el TPV contratado (`tpv_habilitado`),
+ * /api/tpv y /api/laborcontrol quedan cerrados (los fichajes viven en el TPV).
+ * Sin `x-empresa-id` (superadmin sin empresa) no hay tenant que comprobar.
+ */
+async function exigirTpvHabilitado(result: NextResponse, origin: string | null): Promise<NextResponse> {
+  if (result.status !== 200) return result;
+  const empresaId = result.headers.get('x-empresa-id');
+  if (!empresaId) return result;
+  if (await tpvHabilitadoParaEmpresa(empresaId)) return result;
+  return addCorsHeaders(errorResponse('El TPV no está habilitado para esta empresa', 403), origin);
 }
 
 /** Una sesión de admin válida NO basta: hace falta además el rol. */

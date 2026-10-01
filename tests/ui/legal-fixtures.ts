@@ -19,7 +19,7 @@ export function contextoDePrueba(o: Overrides = {}): LegalContext {
     direccionDevoluciones: 'Calle Mayor 1, 38300 La Orotava',
     modalidadesDomicilio: [],
     ...resto,
-    flags: { deliveryHabilitado: false, envioDomicilioHabilitado: false, descuentoBienvenidaActivo: false, pagoTarjetaActivo: false, ...flags },
+    flags: { deliveryHabilitado: false, envioDomicilioHabilitado: false, descuentoBienvenidaActivo: false, pagoTarjetaActivo: false, tpvHabilitado: true, ...flags },
     legal: { ...EMPRESA_LEGAL_POR_DEFECTO, ...legal },
   };
 }

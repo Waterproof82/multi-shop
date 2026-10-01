@@ -42,6 +42,18 @@ describe('PrivacidadContenido — encargado y derechos', () => {
     expect(screen.queryByText(/copia del DNI/i)).not.toBeInTheDocument();
   });
 
+  it('con TPV: 5 años y conservación de las ventas como obligación fiscal', () => {
+    render(<PrivacidadContenido ctx={contextoDePrueba({ flags: { tpvHabilitado: true } })} />);
+    expect(screen.getByText('5 años sin actividad')).toBeInTheDocument();
+    expect(screen.getByText('Obligaciones fiscales y contables')).toBeInTheDocument();
+  });
+
+  it('sin TPV: 3 años y sin finalidad fiscal (factura un programa externo)', () => {
+    render(<PrivacidadContenido ctx={contextoDePrueba({ flags: { tpvHabilitado: false } })} />);
+    expect(screen.getByText('3 años sin actividad')).toBeInTheDocument();
+    expect(screen.queryByText('Obligaciones fiscales y contables')).not.toBeInTheDocument();
+  });
+
   it('informa de las copias de seguridad y de que los datos suprimidos quedan bloqueados en ellas', () => {
     render(<PrivacidadContenido ctx={contextoDePrueba()} />);
     expect(screen.getByText(/copias de seguridad diarias cifradas/i)).toBeInTheDocument();

@@ -33,6 +33,7 @@ interface NavItemDef {
   requiresRestaurant?: boolean;
   requiresDelivery?: boolean;
   requiresLanding?: boolean;
+  requiresTpv?: boolean;
 }
 
 interface NavGroupDef {
@@ -52,6 +53,7 @@ interface FilterCtx {
   deliveryHabilitado: boolean;
   isTienda: boolean;
   landingHabilitada: boolean;
+  tpvHabilitado: boolean;
 }
 
 // ── Color config (must use complete Tailwind class strings) ───────────────────
@@ -166,8 +168,8 @@ const NAV_ENTRIES: NavEntry[] = [
       ],
     },
   },
-  { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresRestaurant: true } },
-  { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresRestaurant: true } },
+  { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresTpv: true } },
+  { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresTpv: true } },
   { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate, requiresLanding: true } },
   { type: 'item', def: { href: '/admin/legal', labelKey: 'sidebarLegal', icon: Scale } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
@@ -190,6 +192,8 @@ export function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
   // Con la landing desactivada desde superadmin, "/" redirige a la carta:
   // editarla no tendría efecto visible.
   if (item.requiresLanding && !ctx.landingHabilitada) return false;
+  // Empleados TPV y auditoría: solo con el TPV contratado (lo activa el superadmin).
+  if (item.requiresTpv && !ctx.tpvHabilitado) return false;
   return true;
 }
 
@@ -373,6 +377,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     mesasHabilitadas,
     deliveryHabilitado,
     landingHabilitada,
+    tpvHabilitado,
   } = useAdmin();
   const { language } = useLanguage();
 
@@ -396,6 +401,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     deliveryHabilitado,
     isTienda: empresaTipo === 'tienda',
     landingHabilitada,
+    tpvHabilitado,
   };
 
   const visibleEntries = NAV_ENTRIES
@@ -515,7 +521,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
 
           {/* Footer */}
           <div className="p-4 border-t border-white/10 space-y-1">
-            {filterCtx.isRestaurant && (
+            {filterCtx.tpvHabilitado && (
               <a
                 href="/tpv/mostrador"
                 className="flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"

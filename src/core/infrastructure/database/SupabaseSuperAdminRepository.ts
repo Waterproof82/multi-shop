@@ -59,6 +59,8 @@ interface EmpresaRow {
   validacion_pedidos_habilitada: boolean;
   delivery_habilitado: boolean;
   landing_habilitada: boolean;
+  tpv_habilitado: boolean | null;
+  verifactu_mode: string | null;
   google_reviews_url: string | null;
   created_at: string;
 }
@@ -389,6 +391,8 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       validacionPedidosHabilitada: row.validacion_pedidos_habilitada ?? false,
       deliveryHabilitado: row.delivery_habilitado ?? false,
       landingHabilitada: row.landing_habilitada ?? true,
+      tpvHabilitado: row.tpv_habilitado ?? false,
+      verifactuMode: row.verifactu_mode ?? null,
       googleReviewsUrl: row.google_reviews_url ?? null,
       moneda: row.moneda,
       emailNotification: row.email_notification,

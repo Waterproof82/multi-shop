@@ -17,19 +17,19 @@ const ITEM_DELIVERY = {
 describe('isItemVisible — link de delivery en el sidebar', () => {
   it('se muestra para restaurante con deliveryHabilitado=true', () => {
     expect(isItemVisible(ITEM_DELIVERY, {
-      mostrarPromociones: false, mostrarTgtg: false, isRestaurant: true, deliveryHabilitado: true, isTienda: false, landingHabilitada: true,
+      mostrarPromociones: false, mostrarTgtg: false, isRestaurant: true, deliveryHabilitado: true, isTienda: false, landingHabilitada: true, tpvHabilitado: false,
     })).toBe(true);
   });
 
   it('NO se muestra para restaurante con deliveryHabilitado=false', () => {
     expect(isItemVisible(ITEM_DELIVERY, {
-      mostrarPromociones: false, mostrarTgtg: false, isRestaurant: true, deliveryHabilitado: false, isTienda: false, landingHabilitada: true,
+      mostrarPromociones: false, mostrarTgtg: false, isRestaurant: true, deliveryHabilitado: false, isTienda: false, landingHabilitada: true, tpvHabilitado: false,
     })).toBe(false);
   });
 
   it('se muestra para tienda aunque deliveryHabilitado sea false — es la única puerta a los toggles de recogida/domicilio', () => {
     expect(isItemVisible(ITEM_DELIVERY, {
-      mostrarPromociones: false, mostrarTgtg: false, isRestaurant: false, deliveryHabilitado: false, isTienda: true, landingHabilitada: true,
+      mostrarPromociones: false, mostrarTgtg: false, isRestaurant: false, deliveryHabilitado: false, isTienda: true, landingHabilitada: true, tpvHabilitado: false,
     })).toBe(true);
   });
 });
