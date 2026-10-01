@@ -1,7 +1,6 @@
 import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
 import { getSuperAdminUseCase } from '@/core/infrastructure/database';
-import { logger } from '@/core/infrastructure/logging/logger';
 import { EmpresasTable } from './empresas-table';
 import { SeccionLegal } from './seccion-legal';
 
