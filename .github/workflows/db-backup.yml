@@ -109,7 +109,7 @@ jobs:
           set -o pipefail
           psql "$SUPABASE_DB_URL" -Atc "select 'conexión OK: ' || current_user || ' / ' || version()" | cut -c1-120
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 
