@@ -25,18 +25,12 @@ export const updateEmpresaSchema = z.object({
   descripcion_de: z.string().max(1000).optional().nullable(),
   mostrar_promociones: z.boolean().optional(),
   mostrar_tgtg: z.boolean().optional(),
-  tipo: z.enum(['tienda', 'restaurante']).optional(),
   descuento_bienvenida_activo: z.boolean().optional(),
   descuento_bienvenida_porcentaje: z.number().min(1).max(50).optional(),
   descuento_bienvenida_duracion: z.number().min(1).max(365).optional(),
   banner_fit: z.enum(['contain', 'cover', 'fill']).optional().or(z.literal('')).or(z.null()),
   tipo_banner: z.enum(['imagen', 'slider']).optional(),
   banner_slides: z.array(httpsUrl).max(5).optional(),
-  pagos_mesa_habilitados: z.boolean().optional(),
-  pagos_pickup_habilitados: z.boolean().optional(),
-  mesas_habilitadas: z.boolean().optional(),
-  validacion_pedidos_habilitada: z.boolean().optional(),
-  delivery_habilitado: z.boolean().optional(),
   envio_domicilio_habilitado: z.boolean().optional(),
   google_reviews_url: z.url().nullable().optional(),
 });
@@ -46,10 +40,17 @@ export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;
 /**
  * Campos que SOLO puede tocar el superadmin. Nunca añadirlos a
  * `updateEmpresaSchema`: ese esquema lo usa también `/api/admin/empresa`, y
- * cualquier admin de tenant podría activarse el TPV con una petición a mano.
+ * cualquier admin de tenant podría activarse el TPV, Glovo, mesas o cambiar su
+ * `tipo` con una petición a mano (el panel del tenant nunca envía estos campos).
  */
 export const superadminUpdateEmpresaSchema = updateEmpresaSchema.extend({
   tpv_habilitado: z.boolean().optional(),
+  tipo: z.enum(['tienda', 'restaurante']).optional(),
+  delivery_habilitado: z.boolean().optional(),
+  mesas_habilitadas: z.boolean().optional(),
+  pagos_mesa_habilitados: z.boolean().optional(),
+  pagos_pickup_habilitados: z.boolean().optional(),
+  validacion_pedidos_habilitada: z.boolean().optional(),
 });
 
 export type SuperadminUpdateEmpresaDTO = z.infer<typeof superadminUpdateEmpresaSchema>;
