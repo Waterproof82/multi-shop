@@ -31,6 +31,8 @@ describe('SeccionLegal (superadmin)', () => {
     render(<SeccionLegal empresas={[conTpv]} />);
     fireEvent.click(bloque('Mermelada de Tomate').getByRole('switch', { name: /TPV/ }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent(/no podrán fichar ni cobrar/);
+    // Consecuencia irreversible: el plazo de clientes baja de 5 a 3 años.
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/más de 3 años sin actividad se anonimizarán/);
     expect(fetchWithCsrf).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar TPV' }));

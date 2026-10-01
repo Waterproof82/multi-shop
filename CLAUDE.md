@@ -334,6 +334,10 @@ Tras CADA `supabase db push` o `supabase migration up`:
 
 ## TPV por Tenant (`empresas.tpv_habilitado`) — Trampas Criticas
 
+> Ver doc completo: `docs/context/tpv-por-tenant.md` (tabla de consecuencias, procedimiento para apagarlo, FAQ). Ciclo de vida de clientes: `docs/context/rgpd-clientes.md`.
+
+- **Apagar el TPV es irreversible para los clientes**: la siguiente purga anonimiza a los de 3–5 años sin actividad. El diálogo de confirmación del superadmin lo avisa; no quitar ese aviso.
+- **Sin TPV NO se borran pedidos ni cambian las copias**: los pedidos son documentación mercantil del tenant (6 años) y somos encargados del tratamiento (art. 28 RGPD). Solo cambia el plazo de anonimización.
 - **Un solo interruptor, solo superadmin** (sección "Cumplimiento legal" de `/superadmin`). El TPV es lo ÚNICO que emite facturas; sin TPV la web solo confirma pedidos, factura un programa externo, NO hay registro de jornada (los fichajes viven en el TPV) y VeriFactu no aplica a este sistema. Todo lo demás se DERIVA del flag (`src/lib/empresa/tpv-legal.ts`): no crear flags separados para jornada/facturación.
 - **NUNCA añadir `tpv_habilitado` a `updateEmpresaSchema`**: lo usa también `/api/admin/empresa` (admin de tenant). Va en `superadminUpdateEmpresaSchema`, junto con `tipo`, `delivery_habilitado`, `mesas_habilitadas`, `pagos_*` y `validacion_pedidos_habilitada` (movidos ahí el 2026-10-01: antes un admin de tenant podía cambiarlos con una petición a mano). Test `tpv-habilitado-solo-superadmin.test.ts`. Un interruptor de producto nuevo va SIEMPRE en el esquema del superadmin.
 - **Bloqueo en `proxy.ts`** (`/api/tpv`, `/api/laborcontrol` → 403) con caché de 60 s (`tpvHabilitadoParaEmpresa`); ante error de BD deja pasar (interruptor de producto, no la barrera de auth). `/tpv/legal` y el export con token de inspector quedan SIEMPRE abiertos: Hacienda accede a los cobros ya registrados aunque se apague el TPV.
