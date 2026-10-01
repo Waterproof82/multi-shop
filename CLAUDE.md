@@ -345,6 +345,16 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Retención de clientes**: 5 años con TPV, 3 sin TPV (garantía legal). La purga (`planDePurga`) y `/privacidad` leen el mismo `retencionClientesAnios()`. Anonimizar borra también `clientes.direccion` y la copia del domicilio/coordenadas en `pedidos` (`CAMPOS_PEDIDO_ANONIMIZADOS`) — hasta el 2026-10-01 no se hacía.
 - **Apagar el TPV nunca borra** cobros ni fichajes (retención fiscal 5 años y laboral 4 años).
 
+## Conservación de Datos (cuenta atrás por ejercicio) — Trampas Criticas
+
+> Ver doc completo: `docs/context/conservacion-datos.md`
+
+- **Plazos en UN sitio:** `APARTADOS_RETENCION` (`src/lib/empresa/retencion.ts`): pedidos 6, cobros 5, turnos 5, fichajes 4 años, contados por EJERCICIO. Superadmin (`/superadmin`) y panel del cliente (`/admin/conservacion`) leen de ahí.
+- **Cumplir el plazo NO borra nada.** Solo informa y permite descargar; borrar es decisión de la empresa (encargados, art. 28 RGPD) y aún no existe.
+- **Hora de Madrid en los dos extremos:** ejercicio con `AT TIME ZONE 'Europe/Madrid'` y `conservarHasta` = 22:59:59.999 UTC del 31/12. Con 23:59 UTC la pantalla muestra el año siguiente.
+- **`retencion_resumen(NULL)` devuelve TODAS las empresas**: solo `service_role`, nunca exponerla a `authenticated`.
+- **Exportar desde PostgREST = paginar** (`.range()`): corta en 1000 filas sin avisar. **CSV = neutralizar fórmulas** (`celdaCsv`).
+
 ## Copias de Seguridad — Trampas Criticas
 
 > Ver doc completo: `docs/context/copias-de-seguridad.md` (incluye puesta en marcha, restauración y checklist para producción)

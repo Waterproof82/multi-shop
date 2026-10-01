@@ -172,6 +172,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresTpv: true } },
   { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate, requiresLanding: true } },
   { type: 'item', def: { href: '/admin/legal', labelKey: 'sidebarLegal', icon: Scale } },
+  { type: 'item', def: { href: '/admin/conservacion', labelKey: 'sidebarConservacion', icon: Archive } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
 ];
 

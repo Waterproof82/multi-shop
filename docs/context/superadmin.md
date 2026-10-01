@@ -52,6 +52,9 @@ Columna "TPV" de la tabla de empresas (`src/app/superadmin/interruptor-tpv.tsx`)
 - Cada reset queda en `empresas_prueba_reset_log` (solo inserción; `reseteado_por` = `superadmin:<x-admin-id>`).
 - **Trampa:** `handleResult` responde con los datos SIN envolver (`{ pedidos, ... }`, no `{ data }`). La primera versión del botón leía `body.data` y mostraba "No se pudo resetear" tras un reset que SÍ se había hecho.
 
+### Conservación de datos
+Debajo de la nota legal, un desplegable por empresa con la cuenta atrás de cada apartado y ejercicio (`conservacion-superadmin.tsx`). Sin descargas: el superadmin entra con "Editar" y descarga desde `/admin/conservacion`. Detalle en `conservacion-datos.md`.
+
 ### Banner flotante en modo superadmin
 - Componente `src/components/superadmin-banner.tsx`, montado desde `src/app/admin/(protected)/layout.tsx`
 - Banner fixed con z-index alto
