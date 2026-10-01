@@ -34,7 +34,7 @@ Decisiones del usuario (2026-10-01):
 | Admin | `admin-sidebar.tsx` (`requiresTpv`), `admin/(protected)/layout.tsx`, `lib/admin-context.tsx` | Oculta los accesos al TPV |
 | Purga RGPD | `src/lib/rgpd/plan-purga.ts` + `supabase-cliente.repository.ts` | Plazo por tenant; ver `rgpd-clientes.md` |
 | Política de privacidad | `components/legal/privacidad-contenido.tsx` | Plazo y finalidades según `flags.tpvHabilitado` |
-| Panel superadmin | `src/app/superadmin/seccion-legal.tsx` | Sección "Cumplimiento legal": interruptor + resumen por empresa |
+| Panel superadmin | `src/app/superadmin/interruptor-tpv.tsx` + `nota-legal.tsx` | Columna "TPV" de la tabla de empresas (diálogo con el resumen al cambiarlo) + nota genérica debajo |
 | Validación | `core/application/dtos/empresa.dto.ts` | `superadminUpdateEmpresaSchema` |
 
 ## Seguridad: interruptores solo del superadmin
@@ -84,4 +84,4 @@ No. Las copias son de toda la BD para todos los tenants, y los pedidos no se bor
 | `tests/compliance/rgpd-plan-purga.test.ts` | Agrupación por plazo y campos anonimizados (incluida la copia en pedidos) |
 | `tests/ui/admin-sidebar-tpv.test.tsx` | Items del TPV en el menú |
 | `tests/ui/legal-privacidad.test.tsx` | 5 vs 3 años y finalidad fiscal vs garantías |
-| `tests/ui/superadmin-seccion-legal.test.tsx` | Resumen, confirmación al apagar (con el aviso irreversible), guardado y reversión si falla |
+| `tests/ui/superadmin-interruptor-tpv.test.tsx` | Confirmación al activar y al apagar (con el resumen y el aviso irreversible), guardado y reversión si falla |

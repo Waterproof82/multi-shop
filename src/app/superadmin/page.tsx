@@ -2,7 +2,7 @@ import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
 import { getSuperAdminUseCase } from '@/core/infrastructure/database';
 import { EmpresasTable } from './empresas-table';
-import { SeccionLegal } from './seccion-legal';
+import { NotaLegal } from './nota-legal';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -33,6 +33,7 @@ interface Empresa {
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
   verifactuMode: string | null;
+  esPrueba: boolean;
   googleReviewsUrl: string | null;
   createdAt: string;
   stats: EmpresaStats;
@@ -265,23 +266,15 @@ export default async function SuperAdminPage() {
               totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,
               landingHabilitada: e.landingHabilitada,
+              tpvHabilitado: e.tpvHabilitado,
+              verifactuMode: e.verifactuMode,
+              esPrueba: e.esPrueba,
             }))}
           />
         )}
       </div>
 
-      {!fetchError && (
-        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 shadow-2xl">
-          <SeccionLegal
-            empresas={empresas.map((e) => ({
-              id: e.id,
-              nombre: e.nombre,
-              tpvHabilitado: e.tpvHabilitado,
-              verifactuMode: e.verifactuMode,
-            }))}
-          />
-        </div>
-      )}
+      {!fetchError && <NotaLegal />}
     </div>
   );
 }

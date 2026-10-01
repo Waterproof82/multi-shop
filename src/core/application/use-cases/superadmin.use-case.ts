@@ -1,4 +1,4 @@
-import { ISuperAdminRepository, EmpresaWithStats, SuperAdminGlobalStats } from "@/core/domain/repositories/ISuperAdminRepository";
+import { ISuperAdminRepository, EmpresaWithStats, SuperAdminGlobalStats, ResetEmpresaPruebaResult } from "@/core/domain/repositories/ISuperAdminRepository";
 import { Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 
@@ -53,6 +53,19 @@ export class SuperAdminUseCase {
       return { success: true, data: result.data };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'SuperAdminUseCase.getGlobalStats');
+      return { success: false, error: appError };
+    }
+  }
+
+  async resetEmpresaPrueba(empresaId: string, actor: string): Promise<Result<ResetEmpresaPruebaResult>> {
+    try {
+      const result = await this.superAdminRepo.resetEmpresaPrueba(empresaId, actor);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'SuperAdminUseCase.resetEmpresaPrueba' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'SuperAdminUseCase.resetEmpresaPrueba', { empresaId });
       return { success: false, error: appError };
     }
   }

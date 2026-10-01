@@ -6,6 +6,8 @@ import { Building2, Globe, MapPin, Image as ImageIcon, FileText, Share2, Externa
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';
 import { LandingSwitches } from './landing-switches';
+import { InterruptorTpv } from './interruptor-tpv';
+import { ResetPrueba } from './reset-prueba';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -45,6 +47,9 @@ interface EmpresaRow {
     hasMetaDescription: boolean;
   };
   landingHabilitada: boolean;
+  tpvHabilitado: boolean;
+  verifactuMode: string | null;
+  esPrueba: boolean;
 }
 
 interface ModuloSwitchProps {
@@ -304,8 +309,20 @@ function SeoCell({ seoStatus, dominio, expanded }: {
   );
 }
 
-function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExpanded: boolean }) {
-  const [tipo, setTipo] = useState(empresa.tipo);
+/** Celda de una columna que solo aplica a restaurantes, vista en una tienda. */
+function NoAplica() {
+  return <span className="text-slate-500" title="Solo para restaurantes">—</span>;
+}
+
+interface EmpresaTableRowProps {
+  readonly empresa: EmpresaRow;
+  readonly tipo: 'tienda' | 'restaurante';
+  readonly onTipoChange: (next: 'tienda' | 'restaurante') => void;
+  readonly mostrarColumnasRestaurante: boolean;
+  readonly seoExpanded: boolean;
+}
+
+function EmpresaTableRow({ empresa, tipo, onTipoChange, mostrarColumnasRestaurante, seoExpanded }: EmpresaTableRowProps) {
   const esRestaurante = tipo === 'restaurante';
 
   return (
@@ -343,39 +360,43 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
           empresaId={empresa.id}
           tipo={tipo}
           totalMesas={empresa.totalMesas}
-          onTipoChange={setTipo}
+          onTipoChange={onTipoChange}
         />
       </td>
-      <td className="px-4 py-4 text-center">
-        {esRestaurante ? (
-          <ModuloSwitch
-            empresaId={empresa.id}
-            field="mesas_habilitadas"
-            checked={empresa.mesasHabilitadas}
-            label={`Activar mesas para ${empresa.nombre}`}
-          />
-        ) : null}
-      </td>
-      <td className="px-4 py-4 text-center">
-        {esRestaurante ? (
-          <ModuloSwitch
-            empresaId={empresa.id}
-            field="pagos_mesa_habilitados"
-            checked={empresa.pagosMesaHabilitados}
-            label={`Activar pagos en mesa para ${empresa.nombre}`}
-          />
-        ) : null}
-      </td>
-      <td className="px-4 py-4 text-center">
-        {esRestaurante ? (
-          <ModuloSwitch
-            empresaId={empresa.id}
-            field="validacion_pedidos_habilitada"
-            checked={empresa.validacionPedidosHabilitada}
-            label={`Activar validación de pedidos para ${empresa.nombre}`}
-          />
-        ) : null}
-      </td>
+      {mostrarColumnasRestaurante && (
+        <>
+          <td className="px-4 py-4 text-center">
+            {esRestaurante ? (
+              <ModuloSwitch
+                empresaId={empresa.id}
+                field="mesas_habilitadas"
+                checked={empresa.mesasHabilitadas}
+                label={`Activar mesas para ${empresa.nombre}`}
+              />
+            ) : <NoAplica />}
+          </td>
+          <td className="px-4 py-4 text-center">
+            {esRestaurante ? (
+              <ModuloSwitch
+                empresaId={empresa.id}
+                field="pagos_mesa_habilitados"
+                checked={empresa.pagosMesaHabilitados}
+                label={`Activar pagos en mesa para ${empresa.nombre}`}
+              />
+            ) : <NoAplica />}
+          </td>
+          <td className="px-4 py-4 text-center">
+            {esRestaurante ? (
+              <ModuloSwitch
+                empresaId={empresa.id}
+                field="validacion_pedidos_habilitada"
+                checked={empresa.validacionPedidosHabilitada}
+                label={`Activar validación de pedidos para ${empresa.nombre}`}
+              />
+            ) : <NoAplica />}
+          </td>
+        </>
+      )}
       <td className="px-4 py-4 text-center">
         <ModuloSwitch
           empresaId={empresa.id}
@@ -389,11 +410,16 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
           empresaId={empresa.id}
           field="pagos_pickup_habilitados"
           checked={empresa.pagosPickupHabilitados}
-          label={`Activar pagos pick-up para ${empresa.nombre}`}
+          label={`Activar pagos online (Redsys) para ${empresa.nombre}`}
         />
       </td>
-      <td className="px-4 py-4 text-center text-white">
-        {empresa.stats.totalClientes}
+      <td className="px-4 py-4 text-center">
+        <InterruptorTpv
+          empresaId={empresa.id}
+          nombre={empresa.nombre}
+          tpvHabilitado={empresa.tpvHabilitado}
+          verifactuMode={empresa.verifactuMode}
+        />
       </td>
       <td className="px-4 py-4">
         <div className="flex flex-col items-center gap-1">
@@ -408,21 +434,25 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
           />
         </div>
       </td>
-      <td className="px-4 py-4">
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-sm font-medium text-amber-300">
-            {empresa.stats.cuponesTgtgTotales > 0
-              ? `${empresa.stats.cuponesTgtgValidados}/${empresa.stats.cuponesTgtgTotales}`
-              : '—'}
-          </span>
-          <ModuloSwitch
-            empresaId={empresa.id}
-            field="mostrar_tgtg"
-            checked={empresa.mostrarTgtg}
-            label={`Activar TooGoodToGo para ${empresa.nombre}`}
-          />
-        </div>
-      </td>
+      {mostrarColumnasRestaurante && (
+        <td className="px-4 py-4 text-center">
+          {esRestaurante ? (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-sm font-medium text-amber-300">
+                {empresa.stats.cuponesTgtgTotales > 0
+                  ? `${empresa.stats.cuponesTgtgValidados}/${empresa.stats.cuponesTgtgTotales}`
+                  : '—'}
+              </span>
+              <ModuloSwitch
+                empresaId={empresa.id}
+                field="mostrar_tgtg"
+                checked={empresa.mostrarTgtg}
+                label={`Activar TooGoodToGo para ${empresa.nombre}`}
+              />
+            </div>
+          ) : <NoAplica />}
+        </td>
+      )}
       <td className="px-4 py-4">
         <GoogleReviewsField empresaId={empresa.id} initialValue={empresa.googleReviewsUrl} />
       </td>
@@ -433,12 +463,15 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
         <SeoCell seoStatus={empresa.seoStatus} dominio={empresa.dominio} expanded={seoExpanded} />
       </td>
       <td className="px-4 py-4 text-right">
-        <a
-          href={`/api/superadmin/switch-empresa?empresaId=${empresa.id}`}
-          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-        >
-          Editar
-        </a>
+        <div className="flex flex-col items-end gap-2">
+          <a
+            href={`/api/superadmin/switch-empresa?empresaId=${empresa.id}`}
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+          >
+            Editar
+          </a>
+          {empresa.esPrueba && <ResetPrueba empresaId={empresa.id} nombre={empresa.nombre} />}
+        </div>
       </td>
     </tr>
   );
@@ -450,6 +483,12 @@ interface EmpresasTableProps {
 
 export function EmpresasTable({ empresas }: EmpresasTableProps) {
   const [seoExpanded, setSeoExpanded] = useState(false);
+  // El tipo vive aquí (no en cada fila) para que las columnas de restaurante
+  // aparezcan en cuanto una empresa pasa a restaurante, y se oculten si no queda ninguna.
+  const [tipos, setTipos] = useState<Record<string, 'tienda' | 'restaurante'>>(
+    () => Object.fromEntries(empresas.map((e) => [e.id, e.tipo])),
+  );
+  const mostrarColumnasRestaurante = Object.values(tipos).includes('restaurante');
 
   if (empresas.length === 0) {
     return (
@@ -469,24 +508,35 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Empresa</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Dominio</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Tipo</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mesas</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Mesa</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Validación</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Globo envíos</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Pick-up</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Clientes</th>
+              {mostrarColumnasRestaurante && (
+                <>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mesas</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Mesa</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Validación</th>
+                </>
+              )}
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Glovo envíos</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
+                <span className="flex flex-col items-center gap-0.5">
+                  <span>Activar pagos</span>
+                  <span className="text-xs font-normal">online · Redsys</span>
+                </span>
+              </th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">TPV</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
                   <span>Promos</span>
                   <span className="text-xs font-normal">envíos</span>
                 </span>
               </th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
-                <span className="flex flex-col items-center gap-0.5">
-                  <span>TGTG</span>
-                  <span className="text-xs font-normal">validados</span>
-                </span>
-              </th>
+              {mostrarColumnasRestaurante && (
+                <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
+                  <span className="flex flex-col items-center gap-0.5">
+                    <span>TGTG</span>
+                    <span className="text-xs font-normal">validados</span>
+                  </span>
+                </th>
+              )}
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Google Reviews</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Landing</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
@@ -509,7 +559,14 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
           </thead>
           <tbody className="divide-y divide-white/10">
             {empresas.map((empresa) => (
-              <EmpresaTableRow key={empresa.id} empresa={empresa} seoExpanded={seoExpanded} />
+              <EmpresaTableRow
+                key={empresa.id}
+                empresa={empresa}
+                tipo={tipos[empresa.id] ?? empresa.tipo}
+                onTipoChange={(next) => setTipos((prev) => ({ ...prev, [empresa.id]: next }))}
+                mostrarColumnasRestaurante={mostrarColumnasRestaurante}
+                seoExpanded={seoExpanded}
+              />
             ))}
           </tbody>
         </table>
