@@ -6,7 +6,7 @@ import { parseExclusionesGuardadas, parseGarantiasGuardadas } from '@/core/appli
 import { logger } from '../logging/logger';
 
 const COLUMNAS_EMPRESA =
-  'nombre, razon_social, nif, direccion, telefono_whatsapp, email_notification, tipo, moneda, tipo_impuesto, delivery_habilitado, envio_domicilio_habilitado, descuento_bienvenida_activo, redsys_merchant_code';
+  'nombre, razon_social, nif, direccion, telefono_whatsapp, email_notification, tipo, moneda, tipo_impuesto, delivery_habilitado, envio_domicilio_habilitado, descuento_bienvenida_activo, redsys_merchant_code, tpv_habilitado';
 
 const ES_TRANSITORIO = /timeout|gateway/i;
 
@@ -64,6 +64,7 @@ function mapDatosEmpresa(row: Record<string, unknown>): DatosEmpresaLegal {
     envioDomicilioHabilitado: Boolean(row.envio_domicilio_habilitado),
     descuentoBienvenidaActivo: Boolean(row.descuento_bienvenida_activo),
     pagoTarjetaActivo: Boolean(row.redsys_merchant_code),
+    tpvHabilitado: Boolean(row.tpv_habilitado),
   };
 }
 

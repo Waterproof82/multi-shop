@@ -85,6 +85,9 @@ export interface EmpresaWithStats {
   validacionPedidosHabilitada: boolean;
   deliveryHabilitado: boolean;
   landingHabilitada: boolean;
+  /** TPV + registro de jornada + facturación en este sistema. Solo superadmin. */
+  tpvHabilitado: boolean;
+  verifactuMode: string | null;
   googleReviewsUrl: string | null;
   stats: EmpresaStats;
   totalMesas: number;

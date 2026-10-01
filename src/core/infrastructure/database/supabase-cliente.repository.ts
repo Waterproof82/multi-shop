@@ -2,6 +2,7 @@ import { Cliente, Result } from "@/core/domain/entities/types";
 import { IClienteRepository, CreateClienteData, UpdateClienteData } from "@/core/domain/repositories/IClienteRepository";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "../logging/logger";
+import { CAMPOS_ANONIMIZADOS, CAMPOS_PEDIDO_ANONIMIZADOS, planDePurga, type GrupoPurga } from "@/lib/rgpd/plan-purga";
 
 interface ClienteWithPedidos extends Cliente {
   numero_pedidos: number;
@@ -16,26 +17,37 @@ interface ClienteWithPedidos extends Cliente {
 // unico retry inmediato es seguro.
 const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
 
-function purgeExpiredClientesQuery(client: SupabaseClient, cutoff: string) {
+function purgeExpiredClientesQuery(client: SupabaseClient, grupo: GrupoPurga) {
   return client
     .from('clientes')
-    .update({
-      nombre: 'ANONIMIZADO',
-      email: null,
-      telefono: null,
-      anonimizado_en: new Date().toISOString(),
-    })
+    .update({ ...CAMPOS_ANONIMIZADOS, anonimizado_en: new Date().toISOString() })
     .is('anonimizado_en', null)
-    .lt('ultima_actividad', cutoff)
+    .in('empresa_id', grupo.empresaIds)
+    .lt('ultima_actividad', grupo.corte)
     .select('id');
 }
 
-async function purgeExpiredClientesConRetry(client: SupabaseClient, cutoff: string) {
-  const first = await purgeExpiredClientesQuery(client, cutoff);
+async function purgeExpiredClientesConRetry(client: SupabaseClient, grupo: GrupoPurga) {
+  const first = await purgeExpiredClientesQuery(client, grupo);
   if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
-    return purgeExpiredClientesQuery(client, cutoff);
+    return purgeExpiredClientesQuery(client, grupo);
   }
   return first;
+}
+
+// Lotes para no construir un `IN (...)` gigante en la URL de PostgREST.
+const LOTE_PEDIDOS = 200;
+
+/** Borra la copia del domicilio en los pedidos de los clientes anonimizados. */
+async function anonimizarPedidosDeClientes(client: SupabaseClient, clienteIds: string[]) {
+  for (let i = 0; i < clienteIds.length; i += LOTE_PEDIDOS) {
+    const { error } = await client
+      .from('pedidos')
+      .update(CAMPOS_PEDIDO_ANONIMIZADOS)
+      .in('cliente_id', clienteIds.slice(i, i + LOTE_PEDIDOS));
+    if (error) return error;
+  }
+  return null;
 }
 
 export class SupabaseClienteRepository implements IClienteRepository {
@@ -236,23 +248,35 @@ export class SupabaseClienteRepository implements IClienteRepository {
     }
   }
 
+  /**
+   * El plazo depende del tenant (5 años con TPV, 3 sin TPV — ver
+   * `retencionClientesAnios`). Un grupo por plazo; por cada cliente
+   * anonimizado se borra también la copia de su domicilio en `pedidos`.
+   */
   async purgeExpiredClientes(): Promise<Result<number>> {
+    const method = 'SupabaseClienteRepository.purgeExpiredClientes';
+    const fallo = (message: string, code?: string): Result<number> => {
+      void logger.logAndReturnError('DB_UPDATE_ERROR', message, 'repository', method, { details: { code } });
+      return { success: false, error: { code: 'DB_ERROR', message: 'Error al purgar clientes expirados', module: 'repository', method: 'purgeExpiredClientes' } };
+    };
     try {
-      const cutoff = new Date(Date.now() - 5 * 365.25 * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await purgeExpiredClientesConRetry(this.supabase, cutoff);
+      const { data: empresas, error: empError } = await this.supabase.from('empresas').select('id, tpv_habilitado');
+      if (empError) return fallo(empError.message, empError.code);
 
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_UPDATE_ERROR',
-          error.message,
-          'repository',
-          'SupabaseClienteRepository.purgeExpiredClientes',
-          { details: { code: error.code } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al purgar clientes expirados', module: 'repository', method: 'purgeExpiredClientes' } };
+      const plan = planDePurga(
+        (empresas ?? []).map((e) => ({ id: e.id as string, tpvHabilitado: Boolean(e.tpv_habilitado) })),
+        new Date(),
+      );
+      let total = 0;
+      for (const grupo of plan) {
+        const { data, error } = await purgeExpiredClientesConRetry(this.supabase, grupo);
+        if (error) return fallo(error.message, error.code);
+        const ids = (data ?? []).map((c) => c.id as string);
+        const errorPedidos = await anonimizarPedidosDeClientes(this.supabase, ids);
+        if (errorPedidos) return fallo(errorPedidos.message, errorPedidos.code);
+        total += ids.length;
       }
-
-      return { success: true, data: data?.length ?? 0 };
+      return { success: true, data: total };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.purgeExpiredClientes', {});
       return { success: false, error: appError };
@@ -263,15 +287,23 @@ export class SupabaseClienteRepository implements IClienteRepository {
     try {
       const { error } = await this.supabase
         .from('clientes')
-        .update({
-          nombre: 'ANONIMIZADO',
-          email: null,
-          telefono: null,
-          anonimizado_en: new Date().toISOString(),
-        })
+        .update({ ...CAMPOS_ANONIMIZADOS, anonimizado_en: new Date().toISOString() })
         .eq('id', clienteId)
         .eq('empresa_id', empresaId)
         .is('anonimizado_en', null);
+
+      if (!error) {
+        // Derecho de supresión: también la copia del domicilio en sus pedidos.
+        const { error: errorPedidos } = await this.supabase
+          .from('pedidos')
+          .update(CAMPOS_PEDIDO_ANONIMIZADOS)
+          .eq('cliente_id', clienteId)
+          .eq('empresa_id', empresaId);
+        if (errorPedidos) {
+          await logger.logAndReturnError('DB_UPDATE_ERROR', errorPedidos.message, 'repository', 'SupabaseClienteRepository.anonimizarCliente', { empresaId, details: { code: errorPedidos.code } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al anonimizar los pedidos del cliente', module: 'repository', method: 'anonimizarCliente' } };
+        }
+      }
 
       if (error) {
         await logger.logAndReturnError(

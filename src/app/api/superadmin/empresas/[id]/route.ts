@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getSuperAdminUseCase } from '@/core/infrastructure/database';
 import { requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
-import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
+import { superadminUpdateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return validationErrorResponse('Invalid request body');
   }
 
-  const parsed = updateEmpresaSchema.safeParse(body);
+  const parsed = superadminUpdateEmpresaSchema.safeParse(body);
   if (!parsed.success) {
     return validationErrorResponse(parsed.error.issues[0].message);
   }

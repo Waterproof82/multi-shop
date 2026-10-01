@@ -13,6 +13,7 @@ const ITEM_LANDING = {
 
 const BASE_CTX = {
   mostrarPromociones: false, mostrarTgtg: false, isRestaurant: false, deliveryHabilitado: false, isTienda: true,
+  tpvHabilitado: false,
 };
 
 describe('isItemVisible — link de landing en el sidebar', () => {

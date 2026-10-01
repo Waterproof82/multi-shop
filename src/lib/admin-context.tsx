@@ -12,6 +12,7 @@ interface AdminContextType {
   mesasHabilitadas: boolean;
   deliveryHabilitado: boolean;
   landingHabilitada: boolean;
+  tpvHabilitado: boolean;
   overrideEmpresaId?: string;
   isSuperAdmin: boolean;
 }
@@ -26,6 +27,7 @@ const AdminContext = createContext<AdminContextType>({
   mesasHabilitadas: true,
   deliveryHabilitado: false,
   landingHabilitada: true,
+  tpvHabilitado: false,
   isSuperAdmin: false,
 });
 
@@ -44,11 +46,12 @@ interface AdminProviderProps {
   readonly mesasHabilitadas: boolean;
   readonly deliveryHabilitado: boolean;
   readonly landingHabilitada: boolean;
+  readonly tpvHabilitado: boolean;
   readonly overrideEmpresaId?: string;
   readonly isSuperAdmin: boolean;
 }
 
-export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, overrideEmpresaId, isSuperAdmin }: Readonly<AdminProviderProps>) {
+export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, tpvHabilitado, overrideEmpresaId, isSuperAdmin }: Readonly<AdminProviderProps>) {
   const empresaSlug = empresaNombre
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
@@ -66,9 +69,10 @@ export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo,
     mesasHabilitadas,
     deliveryHabilitado,
     landingHabilitada,
+    tpvHabilitado,
     overrideEmpresaId,
     isSuperAdmin
-  }), [effectiveEmpresaId, empresaSlug, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, overrideEmpresaId, isSuperAdmin]);
+  }), [effectiveEmpresaId, empresaSlug, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, tpvHabilitado, overrideEmpresaId, isSuperAdmin]);
 
   return (
     <AdminContext.Provider value={value}>

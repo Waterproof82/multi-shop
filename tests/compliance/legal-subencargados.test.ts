@@ -8,6 +8,7 @@ const nada: FlagsLegales = {
   envioDomicilioHabilitado: false,
   descuentoBienvenidaActivo: false,
   pagoTarjetaActivo: false,
+  tpvHabilitado: true,
 };
 
 const proveedores = (f: FlagsLegales) => subencargadosDe(f).map((s) => s.proveedor);

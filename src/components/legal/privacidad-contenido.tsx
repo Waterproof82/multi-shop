@@ -2,6 +2,7 @@ import type { LegalContext } from '@/core/domain/entities/empresa-legal';
 import { FABRICANTE } from '@/lib/fabricante';
 import { subencargadosDe } from '@/lib/legal/subencargados';
 import { categoriasDatosDe } from '@/lib/legal/categorias-datos';
+import { retencionClientesAnios, RETENCION_CLIENTES_SIN_TPV_ANIOS } from '@/lib/empresa/tpv-legal';
 import { InfoTable, Section, TablaSimple } from './legal-layout';
 
 const DERECHOS = [
@@ -13,6 +14,45 @@ const DERECHOS = [
   ['Oposición (Art. 21)', 'Oponerse al tratamiento basado en interés legítimo.'],
   ['Decisiones automatizadas (Art. 22)', 'No ser objeto de decisiones basadas únicamente en un tratamiento automatizado, incluida la elaboración de perfiles. No tomamos decisiones de ese tipo.'],
 ] as const;
+
+interface Finalidad {
+  readonly titulo: string;
+  readonly base: string;
+  readonly descripcion: string;
+}
+
+/** Finalidades a partir de la 3.3, según lo que tenga activo el tenant. */
+function finalidadesAdicionales(flags: LegalContext['flags']): Finalidad[] {
+  const lista: Finalidad[] = [];
+  if (flags.descuentoBienvenidaActivo) {
+    lista.push({
+      titulo: 'Envío de promociones y descuentos',
+      base: 'Consentimiento (Art. 6.1.a RGPD)',
+      descripcion: 'Solo si lo ha aceptado expresamente. Puede retirar su consentimiento en cualquier momento con el enlace de baja de cada comunicación.',
+    });
+  }
+  if (flags.tpvHabilitado) {
+    lista.push({
+      titulo: 'Obligaciones fiscales y contables',
+      base: 'Obligación legal (Art. 6.1.c RGPD)',
+      descripcion: 'Los registros de ventas se conservan durante 5 años conforme al Art. 66 de la Ley 58/2003 General Tributaria.',
+    });
+  } else {
+    // Sin TPV la factura la emite un programa externo: aquí no hay registro
+    // fiscal. Lo que justifica guardar el pedido es la garantía legal (3 años).
+    lista.push({
+      titulo: 'Atención de garantías y reclamaciones',
+      base: 'Obligación legal e interés legítimo (Art. 6.1.c y 6.1.f RGPD)',
+      descripcion: `Conservamos los datos de su pedido durante el plazo de la garantía legal (${RETENCION_CLIENTES_SIN_TPV_ANIOS} años) para poder atender una reclamación.`,
+    });
+  }
+  return lista;
+}
+
+function conservaTrasAnonimizar(tpvHabilitado: boolean): string {
+  if (tpvHabilitado) return 'conservando solo los registros de pedidos y cobros exigidos por la normativa fiscal.';
+  return 'conservando solo los productos e importes de los pedidos, sin datos que le identifiquen.';
+}
 
 function FinalidadItem({ numero, titulo, base, descripcion }: Readonly<{ numero: string; titulo: string; base: string; descripcion: string }>) {
   return (
@@ -66,12 +106,9 @@ export function PrivacidadContenido({ ctx }: Readonly<{ ctx: LegalContext }>) {
             descripcion="Sus datos son necesarios para procesar y entregar su pedido. Sin ellos no es posible prestar el servicio." />
           <FinalidadItem numero="3.2" titulo="Comunicaciones sobre el pedido" base="Ejecución del contrato e interés legítimo (Art. 6.1.b y 6.1.f RGPD)"
             descripcion="Le enviamos la confirmación del pedido y, en su caso, información sobre su estado o envío." />
-          {flags.descuentoBienvenidaActivo && (
-            <FinalidadItem numero="3.3" titulo="Envío de promociones y descuentos" base="Consentimiento (Art. 6.1.a RGPD)"
-              descripcion="Solo si lo ha aceptado expresamente. Puede retirar su consentimiento en cualquier momento con el enlace de baja de cada comunicación." />
-          )}
-          <FinalidadItem numero={flags.descuentoBienvenidaActivo ? '3.4' : '3.3'} titulo="Obligaciones fiscales y contables" base="Obligación legal (Art. 6.1.c RGPD)"
-            descripcion="Los registros de ventas se conservan durante 5 años conforme al Art. 66 de la Ley 58/2003 General Tributaria." />
+          {finalidadesAdicionales(flags).map((f, i) => (
+            <FinalidadItem key={f.titulo} numero={`3.${i + 3}`} titulo={f.titulo} base={f.base} descripcion={f.descripcion} />
+          ))}
         </div>
       </Section>
 
@@ -87,8 +124,8 @@ export function PrivacidadContenido({ ctx }: Readonly<{ ctx: LegalContext }>) {
       <Section titulo="5. Plazos de conservación">
         <p>
           Sus datos se conservan mientras exista una relación activa con el establecimiento. Tras{' '}
-          <strong>5 años sin actividad</strong>, sus datos identificativos se anonimizan de forma automática,
-          conservando solo los registros de pedidos y cobros exigidos por la normativa fiscal.
+          <strong>{retencionClientesAnios(flags.tpvHabilitado)} años sin actividad</strong>, sus datos de contacto
+          (nombre, teléfono, email y dirección) se anonimizan de forma automática, {conservaTrasAnonimizar(flags.tpvHabilitado)}
         </p>
       </Section>
 
