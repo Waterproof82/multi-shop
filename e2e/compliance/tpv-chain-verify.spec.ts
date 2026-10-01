@@ -3,7 +3,8 @@
  *
  * Verifica:
  *   1. GET /api/tpv/audit/chain sin auth → 401/403 (endpoint protegido)
- *   2. GET /api/tpv/audit/chain con admin_token → 200 con estructura válida
+ *   2. GET /api/tpv/audit/chain con admin_token → 200 con estructura válida,
+ *      o 403 "TPV no habilitado" si el tenant no tiene el TPV contratado
  *   3. GET /api/tpv/audit/export sin auth → 401/403
  *
  * Requiere: PLAYWRIGHT_ADMIN_EMAIL + PLAYWRIGHT_ADMIN_PASSWORD para el test 2
@@ -49,7 +50,7 @@ test.describe('TPV Audit Chain — verificación cadena (RD 1007/2023)', () => {
       await authedRequest?.dispose();
     });
 
-    test('GET /api/tpv/audit/chain con admin_token → 200 con array', async () => {
+    test('GET /api/tpv/audit/chain con admin_token → 200 con array (o 403 si el tenant no tiene TPV)',async () => {
       if (!adminEmail() || !adminPassword()) {
         test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
         return;
@@ -60,6 +61,16 @@ test.describe('TPV Audit Chain — verificación cadena (RD 1007/2023)', () => {
       }
 
       const res = await authedRequest.get('/api/tpv/audit/chain');
+
+      // 403 = el tenant del admin no tiene el TPV contratado (`tpv_habilitado`):
+      // el proxy cierra /api/tpv tras autenticar. Se exige ESE mensaje, no
+      // cualquier 403, para que un fallo de auth no pase por "TPV apagado".
+      if (res.status() === 403) {
+        const body = await res.json() as { error?: string };
+        expect(body.error).toBe('El TPV no está habilitado para esta empresa');
+        return;
+      }
+
       // 200 = chain endpoint responde correctamente
       // 404 = no existe turno — también válido (no hay datos aún)
       expect([200, 404]).toContain(res.status());
