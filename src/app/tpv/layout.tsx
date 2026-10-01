@@ -8,6 +8,7 @@ import {
   getComplementoGrupoRepository,
 } from '@/core/infrastructure/database';
 import { resolverSesionTpv } from '@/lib/tpv/sesion-servidor';
+import { tpvHabilitadoParaEmpresa } from '@/lib/tpv/tpv-habilitado';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { TpvHeader } from '@/components/tpv/TpvHeader';
@@ -58,6 +59,11 @@ export default async function TpvLayout({ children }: { readonly children: React
   if (!sesion) redirect('/tpv/login');
 
   const { rol, empresaId, esEmpleado: isEmployeeSession } = sesion;
+
+  // Tenant sin TPV contratado: ni catálogo, ni turnos, ni fichajes. Antes de
+  // las consultas pesadas de abajo. (/tpv/legal queda fuera, en FRAMELESS_PATHS:
+  // el acceso de Hacienda a los cobros ya registrados no depende del interruptor.)
+  if (!(await tpvHabilitadoParaEmpresa(empresaId))) redirect('/admin');
   // El nombre solo llega gratis con el token de admin; en sesión de empleado hay
   // que buscarlo, y esta pantalla sí lo pinta en la cabecera.
   const empresaNombre = sesion.empresaNombre ?? await nombreDeEmpresa(empresaId);
