@@ -47,6 +47,18 @@ Cobros y fichajes viven bajo `/api/tpv` y `/api/laborcontrol`: con el TPV apagad
 - **Inyección CSV.** Un texto que empieza por `= + - @` se prefija con `'`: los nombres de producto los escribe el tenant y Excel los ejecutaría como fórmula.
 - **El CSV de pedidos no lleva datos personales** (dirección, coordenadas): es registro mercantil. Los datos del cliente tienen su vía (`/api/admin/rgpd/exportar-cliente`).
 
-## Siguiente
+## PENDIENTE — Eliminar ejercicios con el plazo cumplido (decidido el 2026-10-01, sin fecha)
 
-Borrar un ejercicio cumplido desde el panel del cliente (no antes del 1/1/2033 para los primeros pedidos): exige descargarlo antes, confirmar que no hay procedimientos abiertos, un log de solo inserción y un **sello de cierre** de la cadena de hash de cobros (último hash y totales del ejercicio) para que la verificación de integridad siga funcionando sin los registros borrados.
+Hoy un ejercicio con el plazo cumplido solo muestra "Plazo cumplido" y la descarga: el cliente NO puede eliminar nada. Diseño acordado para cuando se construya (no corre prisa, porque los primeros pedidos vencen el 31/12/2032):
+
+1. Botón "Eliminar ejercicio N" en `/admin/conservacion`, que se activa solo si:
+   - el plazo de ese apartado ya se cumplió,
+   - el ejercicio se descargó antes (queda registrado),
+   - y el cliente confirma que no hay inspección, recurso ni reclamación abierta sobre ese año (interrumpen la prescripción).
+2. Confirmación escribiendo el año, igual que el reset de pruebas.
+3. Se borra el ejercicio COMPLETO, nunca registros sueltos. Antes se guarda un **sello de cierre** de la cadena de cobros (último hash y totales del año) para que la verificación de los años siguientes siga funcionando.
+4. Un log de solo inserción con quién, qué ejercicio, cuándo y cuántos registros.
+5. En BD, excepción estrecha en los triggers de bloqueo, que dejan pasar solo filas de ejercicios ya cumplidos de esa empresa (mismo patrón que `empresas.es_prueba`).
+6. Fichajes: antes, comprobar si la cadena de `lc_fichajes` es por empresa o global (ver `superadmin.md`, sección del reset).
+
+Se puede probar antes de 2033 con datos con fecha atrasada en la empresa de pruebas.
