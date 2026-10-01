@@ -1,5 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ISuperAdminRepository, EmpresaWithStats, EmpresaStats, SuperAdminGlobalStats } from "@/core/domain/repositories/ISuperAdminRepository";
+import { ISuperAdminRepository, EmpresaWithStats, EmpresaStats, SuperAdminGlobalStats, ResetEmpresaPruebaResult } from "@/core/domain/repositories/ISuperAdminRepository";
 import { Result } from "@/core/domain/entities/types";
 import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
 import { logger } from "@/core/infrastructure/logging/logger";
@@ -61,6 +61,7 @@ interface EmpresaRow {
   landing_habilitada: boolean;
   tpv_habilitado: boolean | null;
   verifactu_mode: string | null;
+  es_prueba: boolean | null;
   google_reviews_url: string | null;
   created_at: string;
 }
@@ -179,6 +180,41 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseSuperAdminRepository.findEmpresaById', { empresaId: id });
+      return { success: false, error: appError };
+    }
+  }
+
+  async resetEmpresaPrueba(empresaId: string, actor: string): Promise<Result<ResetEmpresaPruebaResult>> {
+    try {
+      // La función rechaza cualquier empresa que no sea de prueba (o que use
+      // VeriFactu) y lo hace todo en una transacción: si falla, no borra nada.
+      const { data, error } = await this.supabase.rpc('reset_empresa_prueba', {
+        p_empresa_id: empresaId,
+        p_actor: actor,
+      });
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_DELETE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseSuperAdminRepository.resetEmpresaPrueba',
+          { details: { empresaId, code: error.code } }
+        );
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al resetear la empresa de prueba',
+            module: 'repository',
+            method: 'resetEmpresaPrueba'
+          }
+        };
+      }
+
+      return { success: true, data: data as ResetEmpresaPruebaResult };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseSuperAdminRepository.resetEmpresaPrueba', { empresaId });
       return { success: false, error: appError };
     }
   }
@@ -393,6 +429,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       landingHabilitada: row.landing_habilitada ?? true,
       tpvHabilitado: row.tpv_habilitado ?? false,
       verifactuMode: row.verifactu_mode ?? null,
+      esPrueba: row.es_prueba ?? false,
       googleReviewsUrl: row.google_reviews_url ?? null,
       moneda: row.moneda,
       emailNotification: row.email_notification,

@@ -20,6 +20,8 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
   - `tpv_cobros` — trigger `tpv_cobro_no_delete` bloquea DELETE (RD 1619/2012)
   - `tpv_turnos` — trigger `tpv_turno_no_delete` bloquea DELETE (Ley 11/2021)
   - `pedidos` — trigger `pedidos_no_delete` bloquea DELETE (Art.66 LGT). Los pedidos son la fuente de datos de `tpv_cobros`; borrarlos rompería el audit trail fiscal aunque el cobro permanezca intacto.
+- **Única excepción: empresas de prueba** (`empresas.es_prueba`, inmutable, nunca en un DTO). Los triggers de bloqueo de `pedidos`, `tpv_cobros`, `tpv_turnos` y `tpv_turno_eventos` dejan borrar SOLO filas de esas empresas, vía `reset_empresa_prueba()` (se niega si la empresa envía a VeriFactu; queda en `empresas_prueba_reset_log`). No son registros fiscales: no hay negocio real detrás. Migración `20261001000002`; detalle en `superadmin.md`.
+- **Cuenta atrás por ejercicio:** superadmin y `/admin/conservacion` muestran cuándo cumple su plazo cada ejercicio y permiten descargarlo; no borra nada. Ver `conservacion-datos.md`.
 - **Estrategia de retención:** datos conservados indefinidamente (supera el mínimo legal). No se implementa archivado externo — el volumen de datos de un restaurante en 5 años (~400 MB) es trivial para Supabase Pro.
 - **Fichero clave:** `supabase/migrations/20260722000002_pedidos_block_delete.sql`
 

@@ -1,8 +1,10 @@
 import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
-import { getSuperAdminUseCase } from '@/core/infrastructure/database';
+import { getSuperAdminUseCase, getHistorialUseCase } from '@/core/infrastructure/database';
+import type { FilaRetencionEmpresa } from '@/core/domain/repositories/IHistorialRepository';
 import { EmpresasTable } from './empresas-table';
-import { SeccionLegal } from './seccion-legal';
+import { NotaLegal } from './nota-legal';
+import { ConservacionSuperadmin } from './conservacion-superadmin';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -33,6 +35,7 @@ interface Empresa {
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
   verifactuMode: string | null;
+  esPrueba: boolean;
   googleReviewsUrl: string | null;
   createdAt: string;
   stats: EmpresaStats;
@@ -74,34 +77,39 @@ function getPositionClasses(posicion: number): string {
   }
 }
 
-async function getData(): Promise<{ empresas: Empresa[]; globalStats: GlobalStats | null; error: string | null }> {
+async function getData(): Promise<{ empresas: Empresa[]; globalStats: GlobalStats | null; retencion: FilaRetencionEmpresa[]; error: string | null }> {
   try {
     const empresasResult = await getSuperAdminUseCase().getAllEmpresas();
     if (!empresasResult.success) {
-      return { empresas: [], globalStats: null, error: empresasResult.error.message };
+      return { empresas: [], globalStats: null, retencion: [], error: empresasResult.error.message };
     }
 
     const globalStatsResult = await getSuperAdminUseCase().getGlobalStats();
     if (!globalStatsResult.success) {
-      return { empresas: empresasResult.data, globalStats: null, error: globalStatsResult.error.message };
+      return { empresas: empresasResult.data, globalStats: null, retencion: [], error: globalStatsResult.error.message };
     }
 
-    return { 
-      empresas: empresasResult.data, 
+    // Si falla, la sección de conservación sale vacía: no tumba el resto del panel.
+    const retencionResult = await getHistorialUseCase().resumenRetencion(null);
+
+    return {
+      empresas: empresasResult.data,
       globalStats: globalStatsResult.data,
-      error: null 
+      retencion: retencionResult.success ? retencionResult.data : [],
+      error: null
     };
   } catch (e) {
-    return { 
-      empresas: [], 
-      globalStats: null, 
-      error: e instanceof Error ? e.message : 'Error desconocido' 
+    return {
+      empresas: [],
+      globalStats: null,
+      retencion: [],
+      error: e instanceof Error ? e.message : 'Error desconocido'
     };
   }
 }
 
 export default async function SuperAdminPage() {
-  const { empresas, globalStats, error: fetchError } = await getData();
+  const { empresas, globalStats, retencion, error: fetchError } = await getData();
 
   const totalStats = empresas.reduce((acc, emp) => ({
     totalPedidos: acc.totalPedidos + emp.stats.totalPedidos,
@@ -265,21 +273,19 @@ export default async function SuperAdminPage() {
               totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,
               landingHabilitada: e.landingHabilitada,
+              tpvHabilitado: e.tpvHabilitado,
+              verifactuMode: e.verifactuMode,
+              esPrueba: e.esPrueba,
             }))}
           />
         )}
       </div>
 
+      {!fetchError && <NotaLegal />}
+
       {!fetchError && (
         <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 shadow-2xl">
-          <SeccionLegal
-            empresas={empresas.map((e) => ({
-              id: e.id,
-              nombre: e.nombre,
-              tpvHabilitado: e.tpvHabilitado,
-              verifactuMode: e.verifactuMode,
-            }))}
-          />
+          <ConservacionSuperadmin empresas={empresas.map((e) => ({ id: e.id, nombre: e.nombre }))} filas={retencion} />
         </div>
       )}
     </div>

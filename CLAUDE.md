@@ -56,6 +56,7 @@ Todo el codebase usa `Result<T, AppError>`.
   - **NUNCA exponer `es_prueba` en un DTO de Zod ni en un mapper de repositorio.** Si el cliente pudiera activarlo, seria un vector para sacar ingresos de los totales fiscales. Solo se fija en el INSERT con service_role (tests E2E).
   - Los pedidos con el flag quedan excluidos de `get_pedido_stats_ano`. Purga en lote: `SELECT purge_pedidos_prueba(empresa_id)`.
   - El test `e2e/compliance/pedidos-borrado-pruebas.spec.ts` verifica las barreras en CI.
+- **`empresas.es_prueba` (CRITICO):** empresa de pruebas cuyos pedidos, cobros, turnos y clientes se pueden borrar con `reset_empresa_prueba(empresa_id, actor)` (botón "Resetear datos de prueba" en `/superadmin`). Los triggers `pedidos_block_delete`, `tpv_cobro_block_delete`, `tpv_turno_block_delete` y `tpv_turno_evento_block_delete` dejan pasar SOLO filas de empresas con el flag. Mismo blindaje que `pedidos.es_prueba`: **inmutable** (trigger `empresas_es_prueba_inmutable`), se fija al crear la empresa o en una migración con el id fijo, y **NUNCA en un DTO** (ni el del superadmin; test `empresa-es-prueba-no-expuesto.test.ts`). El reset se niega si `verifactu_mode = 'verifactu'` y queda en `empresas_prueba_reset_log` (solo inserción). Migración `20261001000002`.
 - **Tests E2E que insertan pedidos:** deben poner `es_prueba: true` en el INSERT y borrarlos en el teardown. Sin el flag las filas son imborrables y se acumulan en la tabla con retencion fiscal, inflando los conteos del dashboard (paso de verdad: 200 filas acumuladas duplicaban el numero de pedidos de julio 2026).
 - **E2E tests de seguridad:** `e2e/waiter-csrf.spec.ts` cubre CSRF + RLS. Ejecutar con `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/`.
 
@@ -343,6 +344,16 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Bloqueo en `proxy.ts`** (`/api/tpv`, `/api/laborcontrol` → 403) con caché de 60 s (`tpvHabilitadoParaEmpresa`); ante error de BD deja pasar (interruptor de producto, no la barrera de auth). `/tpv/legal` y el export con token de inspector quedan SIEMPRE abiertos: Hacienda accede a los cobros ya registrados aunque se apague el TPV.
 - **Retención de clientes**: 5 años con TPV, 3 sin TPV (garantía legal). La purga (`planDePurga`) y `/privacidad` leen el mismo `retencionClientesAnios()`. Anonimizar borra también `clientes.direccion` y la copia del domicilio/coordenadas en `pedidos` (`CAMPOS_PEDIDO_ANONIMIZADOS`) — hasta el 2026-10-01 no se hacía.
 - **Apagar el TPV nunca borra** cobros ni fichajes (retención fiscal 5 años y laboral 4 años).
+
+## Conservación de Datos (cuenta atrás por ejercicio) — Trampas Criticas
+
+> Ver doc completo: `docs/context/conservacion-datos.md`
+
+- **Plazos en UN sitio:** `APARTADOS_RETENCION` (`src/lib/empresa/retencion.ts`): pedidos 6, cobros 5, turnos 5, fichajes 4 años, contados por EJERCICIO. Superadmin (`/superadmin`) y panel del cliente (`/admin/conservacion`) leen de ahí.
+- **Cumplir el plazo NO borra nada.** Solo informa y permite descargar; borrar es decisión de la empresa (encargados, art. 28 RGPD) y aún no existe.
+- **Hora de Madrid en los dos extremos:** ejercicio con `AT TIME ZONE 'Europe/Madrid'` y `conservarHasta` = 22:59:59.999 UTC del 31/12. Con 23:59 UTC la pantalla muestra el año siguiente.
+- **`retencion_resumen(NULL)` devuelve TODAS las empresas**: solo `service_role`, nunca exponerla a `authenticated`.
+- **Exportar desde PostgREST = paginar** (`.range()`): corta en 1000 filas sin avisar. **CSV = neutralizar fórmulas** (`celdaCsv`).
 
 ## Copias de Seguridad — Trampas Criticas
 

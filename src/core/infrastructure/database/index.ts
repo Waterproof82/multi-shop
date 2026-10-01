@@ -9,6 +9,7 @@ import { SupabasePedidoRepository } from './supabase-pedido.repository';
 import { SupabaseMesaRepository } from './supabase-mesa.repository';
 import { SupabaseMesaSesionRepository } from './supabase-mesa-sesion.repository';
 import { SupabaseSuperAdminRepository } from './SupabaseSuperAdminRepository';
+import { SupabaseHistorialRepository } from './supabase-historial.repository';
 import { SupabaseTgtgRepository } from './supabase-tgtg.repository';
 import { SupabaseDescuentoRepository } from './supabase-descuento.repository';
 import { SupabaseMesaClientTokenRepository } from './supabase-mesa-client-token.repository';
@@ -25,6 +26,7 @@ import { PromocionUseCase } from '@/core/application/use-cases/promocion.use-cas
 import { TgtgUseCase } from '@/core/application/use-cases/tgtg.use-case';
 import { AuthAdminUseCase } from '@/core/application/use-cases/auth-admin.use-case';
 import { SuperAdminUseCase } from '@/core/application/use-cases/superadmin.use-case';
+import { HistorialUseCase } from '@/core/application/use-cases/historial.use-case';
 import { DescuentoUseCase } from '@/core/application/use-cases/descuento.use-case';
 import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client-token.use-case';
 import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-case';
@@ -243,6 +245,12 @@ let _superAdminUseCase: SuperAdminUseCase | undefined;
 export function getSuperAdminUseCase(): SuperAdminUseCase {
   _superAdminUseCase ??= new SuperAdminUseCase(new SupabaseSuperAdminRepository(getSupabaseClient()));
   return _superAdminUseCase;
+}
+
+let _historialUseCase: HistorialUseCase | undefined;
+export function getHistorialUseCase(): HistorialUseCase {
+  _historialUseCase ??= new HistorialUseCase(new SupabaseHistorialRepository(getSupabaseClient()));
+  return _historialUseCase;
 }
 
 let _descuentoUseCase: DescuentoUseCase | undefined;

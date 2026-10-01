@@ -88,6 +88,8 @@ export interface EmpresaWithStats {
   /** TPV + registro de jornada + facturación en este sistema. Solo superadmin. */
   tpvHabilitado: boolean;
   verifactuMode: string | null;
+  /** Solo lectura: se fija al crear la empresa y es inmutable en BD. Nunca en un DTO. */
+  esPrueba: boolean;
   googleReviewsUrl: string | null;
   stats: EmpresaStats;
   totalMesas: number;
@@ -103,10 +105,18 @@ export interface EmpresaWithStats {
   };
 }
 
+export interface ResetEmpresaPruebaResult {
+  pedidos: number;
+  cobros: number;
+  turnos: number;
+  clientes: number;
+}
+
 export interface ISuperAdminRepository {
   findAllEmpresas(): Promise<Result<EmpresaWithStats[]>>;
   findEmpresaById(id: string): Promise<Result<EmpresaWithStats | null>>;
   updateEmpresa(id: string, data: Record<string, unknown>): Promise<Result<void>>;
   getEmpresaStats(empresaId: string): Promise<Result<EmpresaStats>>;
   getGlobalStats(): Promise<Result<SuperAdminGlobalStats>>;
+  resetEmpresaPrueba(empresaId: string, actor: string): Promise<Result<ResetEmpresaPruebaResult>>;
 }
