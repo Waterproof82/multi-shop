@@ -3,7 +3,13 @@
 import { useId, useState } from 'react';
 import { PillSwitch } from '@/components/ui/pill-switch';
 import { fetchWithCsrf } from '@/lib/csrf-client';
-import { resumenLegalEmpresa, type EstadoLegal, type LineaLegal } from '@/lib/empresa/tpv-legal';
+import {
+  resumenLegalEmpresa,
+  RETENCION_CLIENTES_CON_TPV_ANIOS,
+  RETENCION_CLIENTES_SIN_TPV_ANIOS,
+  type EstadoLegal,
+  type LineaLegal,
+} from '@/lib/empresa/tpv-legal';
 
 export interface EmpresaLegalSuperadmin {
   readonly id: string;
@@ -38,7 +44,12 @@ function ConfirmarDesactivar({ nombre, onConfirmar, onCancelar }: Readonly<{ nom
       <p id={tituloId} className="font-semibold text-amber-200">¿Desactivar el TPV de {nombre}?</p>
       <p id={textoId} className="text-sm text-amber-100/90">
         Sus empleados no podrán fichar ni cobrar, y la facturación pasará a su programa externo. Los fichajes y cobros
-        ya registrados se conservan: no se borra nada.
+        ya registrados se conservan.
+      </p>
+      <p className="text-sm text-amber-100/90">
+        <strong>Irreversible:</strong> en la próxima purga mensual, los datos personales de sus clientes con más de{' '}
+        {RETENCION_CLIENTES_SIN_TPV_ANIOS} años sin actividad se anonimizarán (hoy se guardan {RETENCION_CLIENTES_CON_TPV_ANIOS}).
+        Volver a activar el TPV no los recupera.
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onConfirmar} className="min-h-[44px] rounded-lg bg-amber-500 px-4 text-sm font-semibold text-slate-900">
