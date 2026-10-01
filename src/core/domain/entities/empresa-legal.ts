@@ -55,6 +55,8 @@ export interface FlagsLegales {
   envioDomicilioHabilitado: boolean;
   descuentoBienvenidaActivo: boolean;
   pagoTarjetaActivo: boolean;
+  /** Con TPV las ventas son registros fiscales de este sistema (5 años); sin TPV, 3. */
+  tpvHabilitado: boolean;
 }
 
 export interface ModalidadDomicilioLegal {

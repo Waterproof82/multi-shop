@@ -38,6 +38,7 @@ function construirContexto(
       envioDomicilioHabilitado: d.envioDomicilioHabilitado,
       descuentoBienvenidaActivo: d.descuentoBienvenidaActivo,
       pagoTarjetaActivo: d.pagoTarjetaActivo,
+      tpvHabilitado: d.tpvHabilitado,
     },
     direccionDevoluciones: legal.direccionDevoluciones ?? d.direccion,
     legal,

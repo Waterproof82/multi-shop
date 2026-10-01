@@ -9,7 +9,7 @@ const datos: DatosEmpresaLegal = {
   nombre: 'La Tienda', razonSocial: null, nif: 'B00000000', direccion: 'Calle Mayor 1',
   telefono: '600000000', emailNotification: 'hola@latienda.test', tipo: 'tienda', moneda: 'EUR',
   tipoImpuesto: 'igic', deliveryHabilitado: false, envioDomicilioHabilitado: true,
-  descuentoBienvenidaActivo: false, pagoTarjetaActivo: true,
+  descuentoBienvenidaActivo: false, pagoTarjetaActivo: true, tpvHabilitado: false,
 };
 
 const modalidad = (over: Partial<ModalidadEntrega>): ModalidadEntrega => ({
@@ -41,6 +41,7 @@ describe('EmpresaLegalUseCase.getContext', () => {
     expect(r.data.direccionDevoluciones).toBe('Calle Mayor 1'); // null → direccion
     expect(r.data.tipoImpuesto).toBe('igic');
     expect(r.data.flags.pagoTarjetaActivo).toBe(true);
+    expect(r.data.flags.tpvHabilitado).toBe(false);
   });
 
   it('los datos legales propios prevalecen sobre los de empresa', async () => {
