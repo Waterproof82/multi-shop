@@ -78,7 +78,7 @@
     "@eslint/eslintrc": "^3.3.6",
     "@next/bundle-analyzer": "^16.3.1",
     "@playwright/test": "^1.61.1",
-    "@tailwindcss/postcss": "^4.1.9",
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^3.0.0",
