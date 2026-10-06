@@ -44,9 +44,12 @@ const LEGEND_ITEMS: { quadrant: BcgQuadrant; labelKey: TranslationKey; descKey: 
   { quadrant: 'dog', labelKey: 'bcgDog', descKey: 'bcgDogDesc' },
 ];
 
+// Recharts pone en `name` el nombre del EJE ("Unidades"/"Margen"), no el del
+// plato: ese va en `payload`, que es la fila original de `chartData`.
 interface TooltipPayload {
   name: string;
   value: number;
+  payload: { name: string };
 }
 
 interface TooltipProps {
@@ -54,12 +57,12 @@ interface TooltipProps {
   payload?: TooltipPayload[];
 }
 
-function BcgTooltip({ active, payload }: Readonly<TooltipProps>) {
+export function BcgTooltip({ active, payload }: Readonly<TooltipProps>) {
   const { language } = useLanguage();
   if (!active || !payload || payload.length < 2) return null;
   return (
     <div className="bg-slate-900 border border-white/20 rounded-lg px-3 py-2 text-sm">
-      <p className="font-semibold text-white">{payload[0]?.name}</p>
+      <p className="font-semibold text-white">{payload[0]?.payload.name}</p>
       <p className="text-slate-300">{t("bcgUnits", language)} {payload[0]?.value}</p>
       <p className="text-slate-300">{t("bcgMargin", language)} {payload[1]?.value?.toFixed(1)} %</p>
     </div>
