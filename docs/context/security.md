@@ -676,9 +676,16 @@ REVOKE EXECUTE ON FUNCTION public.mi_trigger_fn() FROM authenticated;
 
 Las funciones RPC llamadas desde API routes con `getSupabaseClient()` (service_role): REVOKE FROM PUBLIC y FROM authenticated; el servicio_role mantiene su GRANT y PostgREST lo usa correctamente.
 
-### `get_mi_empresa_id()` — excepción intencional
+### `private.get_mi_empresa_id()` — en schema no expuesto (antes: excepción intencional)
 
-Esta función SECURITY DEFINER es accesible por `authenticated` por diseño — es llamada directamente desde cláusulas `USING` de RLS policies. Moverla o revocarle acceso a authenticated rompería el aislamiento de tenant en todas las tablas que la usan.
+Esta función SECURITY DEFINER necesita EXECUTE para `authenticated` porque la llaman las cláusulas `USING` de las RLS policies, y quitárselo rompería el aislamiento de tenant en todas las tablas. Hasta el 2026-10-06 vivía en `public`, así que además quedaba llamable en `/rest/v1/rpc/get_mi_empresa_id` (advisor 0029; solo devolvía el `empresa_id` de quien llamaba, pero era una exposición innecesaria).
+
+La migración `20261006000001` la movió al schema `private`, que PostgREST no expone. Conserva el EXECUTE y deja de ser llamable por RPC:
+- Las policies y vistas existentes siguen funcionando: Postgres las guarda por OID, no por nombre.
+- El generador `lc_create_next_partition()` sí escribía el nombre como texto en `EXECUTE format(...)`, así que se redefinió con `private.get_mi_empresa_id()`.
+- La migración aborta si alguna otra función llama al nombre sin el prefijo `private.`.
+- Las policies nuevas deben escribir `private.get_mi_empresa_id()` con el prefijo, porque `private` no está en el `search_path`.
+- **Nunca añadir `private` a los "Exposed schemas" de la Data API**: volvería a publicar la función.
 
 ### `SET search_path` y pgcrypto en Supabase
 
@@ -1153,4 +1160,4 @@ Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Ap
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |
 | Leaked password protection (Supabase Auth) | Info | Requiere plan Pro de Supabase. Aceptado como riesgo conocido — el login de admin usa `auth.users` gestionado internamente, no contraseñas de usuarios finales. Activar en Dashboard → Auth → Policies cuando se actualice al plan Pro. |
-| `get_mi_empresa_id()` callable por authenticated | Info | Intencional — necesario para cláusulas USING de RLS policies. No es un vector de ataque: la función solo devuelve el empresaId del admin autenticado. |
+| `get_mi_empresa_id()` callable por authenticated | Info | **Resuelto 2026-10-06** — movida a `private` (no expuesto). Mantiene el EXECUTE de `authenticated` que necesitan las RLS policies, pero ya no es llamable por `/rest/v1/rpc`. |

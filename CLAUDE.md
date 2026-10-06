@@ -47,7 +47,7 @@ Todo el codebase usa `Result<T, AppError>`.
   GRANT  EXECUTE ON FUNCTION public.mi_funcion() TO service_role;
   ```
   Sin esto, la funcion queda expuesta en `/rest/v1/rpc/mi_funcion` para cualquier usuario anonimo.
-  Excepcion unica: `get_mi_empresa_id()` necesita EXECUTE en `authenticated` para las RLS policies.
+  Sin excepciones en `public`. Si `authenticated` NECESITA ejecutarla (p. ej. la llaman las RLS policies), va en el schema `private` (no expuesto por PostgREST), como `private.get_mi_empresa_id()` desde la migracion `20261006000001`.
   El test `e2e/compliance/supabase-security-definer.spec.ts` verifica esto automaticamente en CI.
 - **Particiones RLS:** Las tablas de particion NO heredan RLS del padre. Cada particion nueva necesita `ENABLE ROW LEVEL SECURITY` + policies propias. `lc_create_next_partition()` lo hace automaticamente.
 - **delete-all en produccion:** `DELETE /api/admin/pedidos/delete-all` tiene guard `NODE_ENV === 'production'` → 403. Nunca eliminar ese guard.
@@ -89,7 +89,7 @@ CREATE POLICY "No direct anon access to mi_tabla"
 -- limpiamente. Mismo incidente del 2026-07-31.
 CREATE POLICY "Admin ve mi_tabla"
   ON public.mi_tabla FOR SELECT TO authenticated
-  USING (empresa_id = get_mi_empresa_id());
+  USING (empresa_id = (SELECT private.get_mi_empresa_id()));
 -- ... INSERT / UPDATE / DELETE con mismo patron (TO authenticated, WITH CHECK explicito en INSERT)
 ```
 
@@ -120,9 +120,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO authenticated;
 ```
 
 ### 3. Funcion auxiliar de aislamiento de tenant
-`get_mi_empresa_id()` — definida en `20260527000002_create_get_mi_empresa_id.sql`.
-Retorna el `empresa_id` del admin autenticado via `auth.uid()` → `perfiles_admin`.
-Usar siempre en RLS policies para aislar datos por empresa.
+`private.get_mi_empresa_id()` — creada en `20260527000002_create_get_mi_empresa_id.sql`,
+movida al schema `private` en `20261006000001` (advisor 0029: en `public` quedaba
+llamable por `/rest/v1/rpc`). Retorna el `empresa_id` del admin autenticado via
+`auth.uid()` → `perfiles_admin`. Usar siempre en RLS policies para aislar datos por empresa.
+**Escribirla SIEMPRE calificada**: `private` no esta en el `search_path`, asi que
+`get_mi_empresa_id()` a secas falla con "function does not exist". Las policies viejas
+siguen funcionando porque Postgres las guarda por OID, no por nombre.
 
 ### 4. Como aplicar la migracion (OBLIGATORIO — nunca MCP suelto)
 

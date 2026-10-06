@@ -32,8 +32,11 @@
  *     rechaza invocarlas fuera de un trigger sin importar el GRANT, así que
  *     no son explotables vía RPC y solo añadirían ruido.
  *
- * Whitelist intencionalmente expuestas a authenticated (no a anon):
- *   - get_mi_empresa_id: usada en RLS USING clauses — authenticated necesita EXECUTE
+ * Whitelist intencionalmente expuestas a authenticated: vacía. La única
+ * excepción histórica, get_mi_empresa_id (las policies RLS necesitan que
+ * authenticated la ejecute), vive desde 2026-10-06 en el schema `private`,
+ * no expuesto por PostgREST — conserva el EXECUTE pero ya no es llamable
+ * por RPC (migración 20261006000001).
  *
  * Requiere:
  *   NEXT_PUBLIC_SUPABASE_URL         — URL del proyecto Supabase
@@ -78,6 +81,8 @@ const RPC_FUNCTIONS_MUST_BE_BLOCKED = [
   'switch_to_equal_split_remaining',
   'update_custom_selection',
   'get_next_pedido_number',
+  // Movida a `private` (no expuesto): si vuelve a `public`, responde 200.
+  'get_mi_empresa_id',
 ] as const;
 
 // Funciones que exponen acceso a anon de forma INTENCIONAL.
@@ -87,11 +92,9 @@ const INTENTIONAL_ANON_WHITELIST = new Set<string>([
 ]);
 
 // Funciones callable por authenticated de forma INTENCIONAL.
-// get_mi_empresa_id: RLS policies de tablas usan esta función — authenticated
-// necesita EXECUTE para que las policies funcionen.
-const INTENTIONAL_AUTHENTICATED_WHITELIST = new Set<string>([
-  'get_mi_empresa_id',
-]);
+// (vacío — una función que authenticated necesite ejecutar, como las que usan
+// las policies RLS, va en el schema `private`, no en `public`)
+const INTENTIONAL_AUTHENTICATED_WHITELIST = new Set<string>([]);
 
 // ── Capa 1: intento directo como anon ─────────────────────────────────────────
 
