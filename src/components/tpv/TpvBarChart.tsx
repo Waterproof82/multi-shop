@@ -34,7 +34,7 @@ export function TpvBarChart({ data }: Props) {
           contentStyle={{ background: '#1a1d27', border: '1px solid #2e3347', borderRadius: 8 }}
           labelStyle={{ color: '#e8eaf0', fontSize: 11 }}
           itemStyle={{ color: '#4f72ff', fontSize: 11 }}
-          formatter={(v: number) => [`${v.toFixed(2)} €`, 'Ventas']}
+          formatter={(v) => [`${Number(v).toFixed(2)} €`, 'Ventas']}
         />
         <Bar dataKey="total" fill="#4f72ff" radius={[3, 3, 0, 0]} />
       </BarChart>
