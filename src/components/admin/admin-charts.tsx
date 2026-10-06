@@ -5,7 +5,6 @@
 import {
   BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, PieChart, LineChart, Line, Bar, Pie, Legend,
-  type TooltipProps,
 } from 'recharts';
 import { formatPrice } from '@/lib/format-price';
 import { translations } from '@/lib/translations';
@@ -133,10 +132,10 @@ function DailyOrdersChart({
                 }}
                 labelStyle={{ color: chartTheme.tooltipColor, fontWeight: 600 }}
                 itemStyle={{ color: chartTheme.tooltipColor }}
-                formatter={((value: number, name: string) => [
+                formatter={(value, name) => [
                   `${value}`,
-                  labelForOrigin(name, language, t),
-                ]) as TooltipProps<number, string>['formatter']}
+                  labelForOrigin(String(name), language, t),
+                ]}
               />
               <Legend
                 formatter={(value) => labelForOrigin(value, language, t)}
@@ -317,7 +316,7 @@ function RevenuePieChart({
               ))}
             </Pie>
             <Tooltip
-              formatter={((value: number) => formatPrice(value, 'EUR', language)) as TooltipProps<number, string>['formatter']}
+              formatter={(value) => formatPrice(Number(value), 'EUR', language)}
               contentStyle={{
                 backgroundColor: chartTheme.tooltipBg,
                 border: `1px solid ${chartTheme.tooltipBorder}`,
@@ -446,7 +445,7 @@ if (!promos.length) {
                 contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
                 labelStyle={{ color: chartTheme.tooltipColor }}
                 itemStyle={{ color: chartTheme.tooltipColor }}
-                formatter={(value: number) => [`${value.toLocaleString()} emails`, t("statsSendCountLabel", language)]}
+                formatter={(value) => [`${Number(value).toLocaleString()} emails`, t("statsSendCountLabel", language)]}
               />
               <Bar dataKey="envios" fill={chartTheme.colors[1]} radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -593,12 +592,12 @@ function TgtgStatsChart({
                   contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
                   labelStyle={{ color: chartTheme.tooltipColor, fontWeight: 600 }}
                   itemStyle={{ color: chartTheme.tooltipColor }}
-                  labelFormatter={(label: string) => {
+                  labelFormatter={(label) => {
                     const entry = chartData.find(d => d.label === label);
                     return entry ? `${label} · ${entry.fecha}` : label;
                   }}
-                  formatter={(value: number, name: string) => [
-                    name === 'reservas' ? `${value} ${t("tgtgReservas", language)}` : formatPrice(value, 'EUR', language),
+                  formatter={(value, name) => [
+                    name === 'reservas' ? `${value} ${t("tgtgReservas", language)}` : formatPrice(Number(value), 'EUR', language),
                     name === 'reservas' ? t("tgtgReservas", language) : t("revenueLabel", language),
                   ]}
                 />
