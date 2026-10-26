@@ -47,7 +47,7 @@
     "@radix-ui/react-toast": "1.2.24",
     "@react-pdf/renderer": "^4.5.1",
     "@sentry/nextjs": "^11.8.0",
-    "@supabase/supabase-js": "^2.117.3",
+    "@supabase/supabase-js": "^2.118.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.4",
     "@vercel/analytics": "^2.0.1",
