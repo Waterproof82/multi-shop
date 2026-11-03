@@ -21,8 +21,15 @@ export function findMenuItemBySlug(menu: MenuCategoryVM[], slug: string): MenuIt
 /**
  * Productos que deben aparecer en el sitemap y recibir su propia página
  * indexable: necesitan slug y NO tener `canonicalExterno` (ese caso emite
- * `noindex` + canonical externo en su propia página — PR3).
+ * `noindex` + canonical externo en su propia página — PR3). Un mismo
+ * producto puede estar en varias categorías de la carta, así que se
+ * deduplica por slug: una URL, una entrada.
  */
 export function productosIndexables(menu: MenuCategoryVM[]): MenuItemVM[] {
-  return todosLosItems(menu).filter((item) => Boolean(item.slug) && !item.canonicalExterno);
+  const vistos = new Set<string>();
+  return todosLosItems(menu).filter((item) => {
+    if (!item.slug || item.canonicalExterno || vistos.has(item.slug)) return false;
+    vistos.add(item.slug);
+    return true;
+  });
 }

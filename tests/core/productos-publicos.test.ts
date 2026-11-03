@@ -83,4 +83,21 @@ describe('productosIndexables', () => {
     const menu: MenuCategoryVM[] = [categoria({ items: [item({ id: 'p1' })] })];
     expect(productosIndexables(menu)).toEqual([]);
   });
+
+  // Un mismo producto puede listarse en varias categorías de la carta (p. ej.
+  // la suya y una de destacados). En producción eso duplicó 19 de las 23
+  // entradas /producto/ del sitemap de Alma de Arena.
+  it('un producto listado en varias categorías aparece una sola vez', () => {
+    const collar = item({ id: 'p1', slug: 'collar-sol' });
+    const menu: MenuCategoryVM[] = [
+      categoria({ id: 'c1', items: [collar] }),
+      categoria({ id: 'c2', label: 'Destacados', items: [collar] }),
+      categoria({
+        id: 'c3',
+        items: [],
+        subcategories: [{ id: 'sub1', nombre: 'Collares', products: [collar] }],
+      }),
+    ];
+    expect(productosIndexables(menu).map((p) => p.slug)).toEqual(['collar-sol']);
+  });
 });
