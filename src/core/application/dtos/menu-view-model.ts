@@ -64,6 +64,11 @@ export interface MenuItemVM {
   complementGroups?: ComplementGroupVM[];
   alergenos?: string[];
   table?: ProductoTablaVM;
+  /** Solo productos de tienda (product-detail-pages). Ausente en restaurantes. */
+  slug?: string;
+  /** URL externa (p. ej. kitemergenciacanarias.es): cuando está presente, la
+   * página /producto/{slug} no emite JSON-LD de Product y queda fuera del sitemap. */
+  canonicalExterno?: string;
 }
 
 export interface MenuSubcategoryVM {

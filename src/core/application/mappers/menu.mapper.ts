@@ -84,6 +84,8 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
     translations: mapProductTranslations(product),
     alergenos: product.alergenos ?? [],
     table: product.tabla && product.tabla.columnas.length > 0 ? mapTabla(product.tabla) : undefined,
+    slug: product.slug || undefined,
+    canonicalExterno: product.canonicalExterno || undefined,
   };
 }
 
