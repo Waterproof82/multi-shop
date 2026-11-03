@@ -28,6 +28,7 @@ import { t } from '@/lib/translations';
 import { AllergenIcon, ALLERGEN_KEYS, ALLERGEN_TRANSLATION_KEY } from '@/components/allergen-icons';
 import type { AllergenKey } from '@/components/allergen-icons';
 import { ProductTablaEditor, type ProductoTablaForm } from '@/components/admin/ProductTablaEditor';
+import { SLUG_REGEX } from '@/core/domain/productos/slug';
 
 interface Categoria {
   id: string;
@@ -59,6 +60,8 @@ interface ProductoFormData {
   porcentajeImpuestoOverride: number | null;
   alergenos: string[];
   tabla_info: ProductoTablaForm;
+  slug: string;
+  canonical_externo: string;
 }
 
 interface ProductComplementosSectionProps {
@@ -435,6 +438,43 @@ export function ProductFormDialog({
                   helpText={t("productImage2Help", language)}
                 />
               </div>
+            )}
+
+            {empresaTipo === 'tienda' && (
+              <>
+                <div className="col-span-2">
+                  <label htmlFor="slug" className="block text-sm font-medium text-foreground mb-1">
+                    {t("productSlugLabel", language)}
+                  </label>
+                  <Input
+                    id="slug"
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => onFormChange({ ...formData, slug: e.target.value })}
+                    aria-invalid={formData.slug.length > 0 && !SLUG_REGEX.test(formData.slug)}
+                    aria-describedby="slug_help"
+                  />
+                  <span id="slug_help" className="text-xs text-muted-foreground mt-1 block">
+                    {t("productSlugHelp", language)}
+                  </span>
+                </div>
+
+                <div className="col-span-2">
+                  <label htmlFor="canonical_externo" className="block text-sm font-medium text-foreground mb-1">
+                    {t("productCanonicalExternoLabel", language)}
+                  </label>
+                  <Input
+                    id="canonical_externo"
+                    type="url"
+                    value={formData.canonical_externo}
+                    onChange={(e) => onFormChange({ ...formData, canonical_externo: e.target.value })}
+                    aria-describedby="canonical_externo_help"
+                  />
+                  <span id="canonical_externo_help" className="text-xs text-muted-foreground mt-1 block">
+                    {t("productCanonicalExternoHelp", language)}
+                  </span>
+                </div>
+              </>
             )}
 
             <div className="col-span-2">
