@@ -14,17 +14,13 @@ vi.mock('next/headers', () => ({
   cookies: async () => ({ get: () => undefined }),
 }));
 
-const getEmpresaByDomain = vi.fn();
-const isPedidosSubdomain = vi.fn();
-const extractMainDomain = vi.fn();
+const resolverEmpresaPublica = vi.fn();
 const getCachedMenu = vi.fn();
 const getModalidadesEntregaPublicas = vi.fn();
 const getSeccionesLandingActivas = vi.fn();
 
 vi.mock('@/lib/server-services', () => ({
-  getEmpresaByDomain: (...args: unknown[]) => getEmpresaByDomain(...args),
-  isPedidosSubdomain: (...args: unknown[]) => isPedidosSubdomain(...args),
-  extractMainDomain: (...args: unknown[]) => extractMainDomain(...args),
+  resolverEmpresaPublica: (...args: unknown[]) => resolverEmpresaPublica(...args),
   getCachedMenu: (...args: unknown[]) => getCachedMenu(...args),
   getModalidadesEntregaPublicas: (...args: unknown[]) => getModalidadesEntregaPublicas(...args),
   getSeccionesLandingActivas: (...args: unknown[]) => getSeccionesLandingActivas(...args),
@@ -38,8 +34,7 @@ import { CartaRoute } from '@/components/carta-route';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getEmpresaByDomain.mockResolvedValue(null);
-  isPedidosSubdomain.mockReturnValue(false);
+  resolverEmpresaPublica.mockResolvedValue({ empresa: null, isPedidos: false });
 });
 
 describe('CartaRoute — host sin empresa asociada', () => {

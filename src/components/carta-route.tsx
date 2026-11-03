@@ -1,4 +1,4 @@
-import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, getModalidadesEntregaPublicas, getSeccionesLandingActivas } from "@/lib/server-services"
+import { getCachedMenu, resolverEmpresaPublica, getModalidadesEntregaPublicas, getSeccionesLandingActivas } from "@/lib/server-services"
 import { anclasDelPie } from "@/lib/landing/anclas-pie"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
@@ -25,19 +25,10 @@ export async function CartaRoute({
   const isWaiterMode = !!cookieStore.get('waiter_token')?.value;
   const fullDomain = await getDomainFromHeaders();
 
-  let empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
-
-  const subdomainConfig = empresa?.subdomainPedidos ?? 'pedidos';
-  const isPedidos = isPedidosSubdomain(fullDomain, subdomainConfig);
-
-  if (!empresa && isPedidos) {
-    const mainDomain = extractMainDomain(fullDomain, subdomainConfig);
-    empresa = await getEmpresaByDomain(mainDomain);
-  }
-
+  const { empresa, isPedidos } = await resolverEmpresaPublica(fullDomain);
   const empresaId = empresa?.id;
 
-  if (!empresa && empresaId === undefined) {
+  if (!empresa) {
     return (
       <main id="main-content" className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center p-8">
