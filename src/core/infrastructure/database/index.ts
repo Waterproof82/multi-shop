@@ -53,6 +53,8 @@ import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.
 import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
 import { SupabaseAuditLogRepository } from '../repositories/supabase-audit-log.repository';
 import type { IAuditLogRepository } from '@/core/domain/repositories/IAuditLogRepository';
+import { SupabaseSlugHistoricoRepository } from './SupabaseSlugHistoricoRepository';
+import { SlugHistoricoUseCase } from '@/core/application/use-cases/slug-historico.use-case';
 
 // ---------------------------------------------------------------------------
 // Private lazy repository getters (shared between use cases, not exported)
@@ -147,6 +149,15 @@ let _productUseCase: ProductUseCase | undefined;
 export function getProductUseCase(): ProductUseCase {
   _productUseCase ??= new ProductUseCase(getProductRepository());
   return _productUseCase;
+}
+
+let _slugHistoricoUseCase: SlugHistoricoUseCase | undefined;
+export function getSlugHistoricoUseCase(): SlugHistoricoUseCase {
+  // service_role: la lectura del histórico de slugs para resolver un
+  // redirect va por servidor (anon está denegado por RLS, igual que
+  // empresa_legal / modalidades_entrega).
+  _slugHistoricoUseCase ??= new SlugHistoricoUseCase(new SupabaseSlugHistoricoRepository(getSupabaseClient()));
+  return _slugHistoricoUseCase;
 }
 
 let _categoryUseCase: CategoryUseCase | undefined;
