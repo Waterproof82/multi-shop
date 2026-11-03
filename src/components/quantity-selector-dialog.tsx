@@ -150,6 +150,8 @@ interface QuantitySelectorDialogProps {
   item: MenuItemVM | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Tenant tipo "tienda" (product-detail-pages): oculta los alergenos. */
+  isTienda?: boolean
 }
 
 function getEffectiveGroups(item: MenuItemVM): ComplementGroupVM[] {
@@ -215,7 +217,7 @@ function etiquetaGrupoClass(obligatorio: boolean, completo: boolean): string {
 }
 
 export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogProps>) {
-  const { item, open, onOpenChange } = props;
+  const { item, open, onOpenChange, isTienda = false } = props;
   const [quantity, setQuantity] = useState(1)
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({})
   const [addedAnimation, setAddedAnimation] = useState(false)
@@ -406,7 +408,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
             </div>
           )}
 
-          <AllergenList alergenos={item.alergenos} language={language} />
+          {!isTienda && <AllergenList alergenos={item.alergenos} language={language} />}
 
           {item.table && <ProductTable table={item.table} language={language} />}
 
