@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
+import type { MenuItemVM } from "@/core/application/dtos/menu-view-model";
 
 // Metadatos SEO por tenant. Funciones puras: sin Next ni BBDD, testeables.
 //
@@ -179,6 +180,76 @@ export function buildTenantPageMetadata({
       card: ogImage ? "summary_large_image" : "summary",
       title,
       description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+  };
+}
+
+/** Nombre/descripción del producto en `lang`, con el mismo fallback a
+ * español que el resto de componentes de la carta (no hay clave "es" en
+ * `translations`: el español vive en `name`/`description`). */
+function nombreProductoEn(item: MenuItemVM, lang: LangKey): string {
+  if (lang === "es") return item.name;
+  return item.translations?.[lang]?.name || item.name;
+}
+
+function descripcionProductoEn(item: MenuItemVM, lang: LangKey): string | undefined {
+  const texto = lang === "es" ? item.description : (item.translations?.[lang]?.description ?? item.description);
+  return texto ? recortarDescripcion(texto) : undefined;
+}
+
+export interface ProductPageMetadataInput {
+  empresa: EmpresaPublic;
+  item: MenuItemVM;
+  langParam: string | string[] | undefined;
+}
+
+/**
+ * Metadatos de `/producto/{slug}`: envuelve `buildTenantPageMetadata` (hreflang,
+ * `?lang=`, robots) SIN modificarla, sustituyendo título/descripción/imagen
+ * por los del producto.
+ *
+ * Con `canonicalExterno` la página no es dueña de su contenido (vive en otro
+ * dominio, p. ej. kitemergenciacanarias.es): canonical apunta ahí, se marca
+ * `noindex` y no hay variantes de idioma propias (spec PR3, "Canonical and
+ * sitemap exclusion for canonical_externo").
+ */
+export function buildProductPageMetadata({ empresa, item, langParam }: ProductPageMetadataInput): Metadata {
+  if (item.canonicalExterno) {
+    return {
+      alternates: { canonical: item.canonicalExterno },
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const primaryLang = getPrimaryLang(empresa);
+  const availableLangs = getAvailableLangs(empresa);
+  const lang = resolverIdiomaPagina(parseLangParam(langParam), availableLangs, primaryLang);
+  const nombre = nombreProductoEn(item, lang);
+  const descripcionPropia = descripcionProductoEn(item, lang);
+
+  const base = buildTenantPageMetadata({
+    empresa,
+    path: `/producto/${item.slug}`,
+    langParam,
+    titulo: () => nombre,
+  });
+
+  const description = descripcionPropia ?? base.description ?? undefined;
+  const ogImage = item.image;
+
+  return {
+    ...base,
+    description,
+    openGraph: {
+      ...base.openGraph,
+      description,
+      ...(ogImage ? { images: [{ url: ogImage, alt: nombre }] } : {}),
+    },
+    twitter: {
+      ...base.twitter,
+      description,
+      card: ogImage ? "summary_large_image" : "summary",
       ...(ogImage ? { images: [ogImage] } : {}),
     },
   };
