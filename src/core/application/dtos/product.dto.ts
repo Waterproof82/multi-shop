@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { tablaInfoShapeSchema } from "./tabla-info.dto";
+import { SLUG_REGEX, SLUG_MAX } from "@/core/domain/productos/slug";
 
 const imageFitValues = ['contain', 'cover', 'fill', 'none', 'scale-down'] as const;
 
@@ -46,6 +47,12 @@ export const createProductSchema = z.object({
     ])
   ).optional().default([]),
   tabla_info: tablaInfoSchema,
+  // Solo tiendas lo usan; restaurantes lo dejan null (ver product.use-case.ts).
+  slug: z.string().max(SLUG_MAX).regex(SLUG_REGEX, 'Slug inválido: solo minúsculas, números y guiones').nullable().optional(),
+  canonical_externo: z.string().max(500).refine(
+    (url) => url.startsWith('https://'),
+    { message: 'canonical_externo debe ser una URL https' }
+  ).nullable().optional(),
 });
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;

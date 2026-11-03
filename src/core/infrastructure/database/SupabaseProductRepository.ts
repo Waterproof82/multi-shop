@@ -11,6 +11,10 @@ import { logger } from "../logging/logger";
 // inmediato es seguro sin necesidad de analizar idempotencia.
 const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
 
+// Violación del índice único parcial productos_empresa_slug_key
+// (migración 20261103000001_productos_slug.sql).
+const PG_UNIQUE_VIOLATION = "23505";
+
 export function emptyStringToNull(value: string | null | undefined): string | null | undefined {
   if (value === undefined || value === null) return value;
   return value === "" ? null : value;
@@ -61,6 +65,8 @@ export class SupabaseProductRepository implements IProductRepository {
       alergenos: (row.alergenos as string[]) ?? [],
       tabla: (row.tabla_info as ProductoTabla | null) ?? null,
       createdAt: new Date(row.created_at as string),
+      slug: (row.slug as string | null) ?? null,
+      canonicalExterno: (row.canonical_externo as string | null) ?? null,
     };
   }
 
@@ -101,11 +107,19 @@ export class SupabaseProductRepository implements IProductRepository {
           tipo_producto: tipoProducto,
           alergenos: data.alergenos ?? [],
           tabla_info: data.tabla_info ?? null,
+          slug: data.slug ?? null,
+          canonical_externo: data.canonical_externo ?? null,
         })
         .select()
         .single();
 
       if (error) {
+        if (error.code === PG_UNIQUE_VIOLATION) {
+          return {
+            success: false,
+            error: { code: 'UNIQUE_VIOLATION', message: 'El slug ya está en uso', module: 'repository', method: 'create' },
+          };
+        }
         await logger.logAndReturnError(
           'DB_INSERT_ERROR',
           error.message,
@@ -113,14 +127,14 @@ export class SupabaseProductRepository implements IProductRepository {
           'SupabaseProductRepository.create',
           { empresaId: data.empresaId, details: { code: error.code, hint: error.hint } }
         );
-        return { 
-          success: false, 
-          error: { 
-            code: 'DB_ERROR', 
-            message: 'Error al crear producto', 
-            module: 'repository', 
-            method: 'create' 
-          } 
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al crear producto',
+            module: 'repository',
+            method: 'create'
+          }
         };
       }
 
@@ -234,6 +248,14 @@ export class SupabaseProductRepository implements IProductRepository {
       updatePayload.tabla_info = data.tabla_info ?? null;
     }
 
+    if (data.slug !== undefined) {
+      updatePayload.slug = data.slug ?? null;
+    }
+
+    if (data.canonical_externo !== undefined) {
+      updatePayload.canonical_externo = data.canonical_externo ?? null;
+    }
+
     return updatePayload;
   }
 
@@ -250,6 +272,12 @@ export class SupabaseProductRepository implements IProductRepository {
         .single();
 
       if (error) {
+        if (error.code === PG_UNIQUE_VIOLATION) {
+          return {
+            success: false,
+            error: { code: 'UNIQUE_VIOLATION', message: 'El slug ya está en uso', module: 'repository', method: 'update' },
+          };
+        }
         await logger.logAndReturnError(
           'DB_UPDATE_ERROR',
           error.message,
@@ -257,14 +285,14 @@ export class SupabaseProductRepository implements IProductRepository {
           'SupabaseProductRepository.update',
           { empresaId, details: { code: error.code, hint: error.hint, productId: id } }
         );
-        return { 
-          success: false, 
-          error: { 
-            code: 'DB_ERROR', 
-            message: 'Error al actualizar producto', 
-            module: 'repository', 
-            method: 'update' 
-          } 
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al actualizar producto',
+            module: 'repository',
+            method: 'update'
+          }
         };
       }
 
@@ -307,6 +335,48 @@ export class SupabaseProductRepository implements IProductRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.delete', {
+        empresaId,
+      });
+      return { success: false, error: appError };
+    }
+  }
+
+  /**
+   * Slugs de este empresa_id que empiezan igual que `base`, filtrados en TS
+   * a los que son exactamente `base` o `base-<n>` (un `LIKE base%` también
+   * traería slugs manuales no relacionados, p. ej. "kit-avanzado" para
+   * base="kit").
+   */
+  async findSlugsByPrefix(empresaId: string, base: string): Promise<Result<string[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from("productos")
+        .select("slug")
+        .eq("empresa_id", empresaId)
+        .like("slug", `${base}%`);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.findSlugsByPrefix',
+          { empresaId, details: { code: error.code, hint: error.hint } }
+        );
+        return {
+          success: false,
+          error: { code: 'DB_ERROR', message: 'Error al consultar slugs', module: 'repository', method: 'findSlugsByPrefix' },
+        };
+      }
+
+      const colision = new RegExp(`^${base}(-\\d+)?$`);
+      const slugs = (data ?? [])
+        .map((row: Record<string, unknown>) => row.slug as string)
+        .filter((slug) => colision.test(slug));
+
+      return { success: true, data: slugs };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.findSlugsByPrefix', {
         empresaId,
       });
       return { success: false, error: appError };

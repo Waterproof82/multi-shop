@@ -26,6 +26,8 @@ const baseProduct: Product = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   alergenos: [],
   tabla: null,
+  slug: null,
+  canonicalExterno: null,
 };
 
 describe('toAdminProduct — foto_url_2 (regresión GET /api/admin/productos)', () => {

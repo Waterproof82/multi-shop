@@ -86,6 +86,8 @@ const producto1: Product = {
   createdAt: new Date('2026-01-01'),
   alergenos: [],
   tabla: null,
+  slug: null,
+  canonicalExterno: null,
 };
 
 const categoria1: Category = {

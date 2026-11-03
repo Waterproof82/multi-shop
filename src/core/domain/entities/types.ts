@@ -46,6 +46,8 @@ export interface Product {
   porcentajeImpuestoOverride?: number | null;
   alergenos: string[];
   tabla: ProductoTabla | null;
+  slug: string | null;
+  canonicalExterno: string | null;
 }
 
 export interface Category {
