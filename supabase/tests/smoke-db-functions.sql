@@ -204,9 +204,77 @@ BEGIN
   END;
 
 
+  -- ── 8. Trigger de histórico de slugs (product-detail-pages PR5) ─────────
+  -- trg_productos_slug_historial: al cambiar productos.slug debe nacer una
+  -- fila con el slug SALIENTE, y un slug VIVO reciclado debe borrar
+  -- cualquier histórico que lo tuviera como slug_antiguo (live slug siempre
+  -- gana — si no, un A→B→A se encadenaría en vez de resolver en un salto).
+  --
+  -- Usa una empresa_id de PRUEBA ya existente (es_prueba = true) para no
+  -- tener que adivinar las columnas NOT NULL de `empresas`; si no hay
+  -- ninguna, se salta (igual que el guard de pg_cron en clientes_rgpd). El
+  -- producto de usar-y-tirar se borra al final pase lo que pase.
+
+  DECLARE
+    v_empresa_id  UUID;
+    v_producto_id UUID;
+    v_slug_a      TEXT := 'smoke-slug-a-' || substr(gen_random_uuid()::text, 1, 8);
+    v_slug_b      TEXT := 'smoke-slug-b-' || substr(gen_random_uuid()::text, 1, 8);
+    v_destino     UUID;
+  BEGIN
+    SELECT id INTO v_empresa_id FROM public.empresas WHERE es_prueba LIMIT 1;
+
+    IF v_empresa_id IS NULL THEN
+      RAISE NOTICE '[SMOKE SKIP] trg_productos_slug_historial — no hay ninguna empresa es_prueba=true para probar sin tocar datos reales';
+    ELSE
+      INSERT INTO public.productos (empresa_id, titulo_es, precio, activo, slug)
+      VALUES (v_empresa_id, 'Smoke Test PR5', 1, true, v_slug_a)
+      RETURNING id INTO v_producto_id;
+
+      BEGIN
+        -- Cambia el slug: debe nacer una fila de histórico para el saliente.
+        UPDATE public.productos SET slug = v_slug_b WHERE id = v_producto_id;
+
+        SELECT producto_id INTO v_destino
+          FROM public.productos_slug_historial
+         WHERE empresa_id = v_empresa_id AND slug_antiguo = v_slug_a;
+
+        IF v_destino IS DISTINCT FROM v_producto_id THEN
+          RAISE EXCEPTION '[SMOKE FAIL] trg_productos_slug_historial no registró el slug saliente';
+        END IF;
+
+        -- Recicla el slug de vuelta a A: su propio histórico debe desaparecer
+        -- (un slug vivo siempre gana), o un redirect A→A se encadenaría.
+        UPDATE public.productos SET slug = v_slug_a WHERE id = v_producto_id;
+
+        IF EXISTS (
+          SELECT 1 FROM public.productos_slug_historial
+           WHERE empresa_id = v_empresa_id AND slug_antiguo = v_slug_a
+        ) THEN
+          RAISE EXCEPTION '[SMOKE FAIL] el slug vivo reciclado no limpió su propio histórico';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM public.productos_slug_historial
+           WHERE empresa_id = v_empresa_id AND slug_antiguo = v_slug_b AND producto_id = v_producto_id
+        ) THEN
+          RAISE EXCEPTION '[SMOKE FAIL] el histórico del slug intermedio desapareció sin motivo';
+        END IF;
+
+        RAISE NOTICE '[SMOKE OK] trg_productos_slug_historial — registra el saliente y el slug vivo gana sobre su propio histórico';
+      EXCEPTION WHEN OTHERS THEN
+        DELETE FROM public.productos WHERE id = v_producto_id;
+        RAISE;
+      END;
+
+      DELETE FROM public.productos WHERE id = v_producto_id;
+    END IF;
+  END;
+
+
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════';
-  RAISE NOTICE 'TODOS LOS SMOKE TESTS PASARON (7/7)';
+  RAISE NOTICE 'TODOS LOS SMOKE TESTS PASARON (8/8)';
   RAISE NOTICE '════════════════════════════════════════';
 
 END;
