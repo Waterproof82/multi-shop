@@ -1,10 +1,22 @@
 import { NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { getProductUseCase } from '@/core/infrastructure/database';
+import { getProductUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
 import { resolveAdminContextWithEmpresa, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { catalogTag } from '@/lib/cache-tags';
 import type { Product } from '@/core/domain/entities/types';
+
+/**
+ * `resolveAdminContextWithEmpresa` no expone `empresa.tipo` (confirmado en
+ * PR0, tarea 0.5) y lo usan 60+ rutas admin — añadirlo ahí forzaría una
+ * consulta extra a todas, no solo a productos. Un lookup puntual aquí es el
+ * mismo patrón que ya usa `admin/(protected)/layout.tsx` para resolver el
+ * tipo de empresa client-side.
+ */
+async function resolverEsTienda(empresaId: string): Promise<boolean> {
+  const result = await getEmpresaUseCase().getById(empresaId);
+  return result.success ? result.data?.tipo !== 'restaurante' : true;
+}
 
 // Transform domain format to admin UI format
 export function toAdminProduct(prod: Product) {
@@ -32,6 +44,8 @@ export function toAdminProduct(prod: Product) {
     porcentaje_impuesto_override: prod.porcentajeImpuestoOverride ?? null,
     alergenos: prod.alergenos ?? [],
     tabla_info: prod.tabla,
+    slug: prod.slug,
+    canonical_externo: prod.canonicalExterno,
   };
 }
 
@@ -84,7 +98,8 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.issues[0].message);
   }
 
-  const result = await getProductUseCase().create(parsed.data);
+  const esTienda = await resolverEsTienda(empresaId);
+  const result = await getProductUseCase().create(parsed.data, esTienda);
 
   if (!result.success) {
     return handleResult(result);
@@ -131,7 +146,8 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.issues[0].message);
   }
 
-  const result = await getProductUseCase().update(idParsed.data.id, empresaId, parsed.data);
+  const esTienda = await resolverEsTienda(empresaId);
+  const result = await getProductUseCase().update(idParsed.data.id, empresaId, parsed.data, esTienda);
 
   if (!result.success) {
     return handleResult(result);

@@ -23,6 +23,8 @@ export interface CreateProductData {
   porcentaje_impuesto_override?: number | null;
   alergenos?: string[];
   tabla_info?: ProductoTabla | null;
+  slug?: string | null;
+  canonical_externo?: string | null;
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> {
@@ -35,4 +37,6 @@ export interface IProductRepository {
   findByIds(ids: string[], empresaId: string): Promise<Result<Product[]>>;
   update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Result<Product>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
+  /** Slugs ya ocupados (scoped a empresaId) que empiezan igual que `base` — usado para resolver colisiones. */
+  findSlugsByPrefix(empresaId: string, base: string): Promise<Result<string[]>>;
 }
