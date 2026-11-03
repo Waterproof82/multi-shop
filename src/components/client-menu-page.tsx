@@ -103,6 +103,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     if (isCartOpen) setWaiterSearch("");
   }, [isCartOpen]);
 
+  const isTienda = empresa?.tipo === 'tienda';
+
   const empresaId = empresa?.id;
   useEffect(() => {
     const mesa = mesaId;
@@ -354,6 +356,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           item={waiterSelectedItem}
           open={waiterDialogOpen}
           onOpenChange={(open) => { setWaiterDialogOpen(open); }}
+          isTienda={isTienda}
         />
       )}
 
@@ -397,13 +400,13 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
               <div className="space-y-[clamp(56px,8vw,112px)]">
                 {searchResultsCategory ? (
                   searchResultsCategory.items.length > 0 ? (
-                    <MenuSection category={searchResultsCategory} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority hideImages={showWaiterSearch} />
+                    <MenuSection category={searchResultsCategory} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority hideImages={showWaiterSearch} isTienda={isTienda} />
                   ) : (
                     <p className="text-center text-muted-foreground py-12">{t("searchNoResults", language)}</p>
                   )
                 ) : (
                   visibleCategories.map((category, index) => (
-                    <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority={index === 0} hideImages={showWaiterSearch} />
+                    <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority={index === 0} hideImages={showWaiterSearch} isTienda={isTienda} />
                   ))
                 )}
               </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, memo, useCallback, useEffect, useRef } from "react"
+import Link from "next/link"
 import { ImagenSubida as Image } from './ui/imagen-subida';
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -40,10 +41,13 @@ interface MenuSectionProps {
   showCart?: boolean
   priority?: boolean
   hideImages?: boolean
+  /** Tenant tipo "tienda" (product-detail-pages): oculta los alergenos y
+   * habilita el enlace "Ver producto". Restaurantes (por defecto) no cambian. */
+  isTienda?: boolean
 }
 
 export const MenuSection = memo(function MenuSection(props: Readonly<MenuSectionProps>) {
-  const { category, showCart, priority = false, hideImages = false } = props;
+  const { category, showCart, priority = false, hideImages = false, isTienda = false } = props;
   const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -104,6 +108,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               complementCategoryTranslations={category.complementCategoryTranslations}
               hideImages={hideImages}
               priority={priority && subIndex === 0}
+              isTienda={isTienda}
             />
           ))}
         </div>
@@ -121,6 +126,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
                 complementCategoryName={category.complementCategoryName}
                 complementCategoryTranslations={category.complementCategoryTranslations}
                 hideImages={hideImages}
+                isTienda={isTienda}
               />
             </div>
           ))}
@@ -131,6 +137,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         item={selectedItem}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+        isTienda={isTienda}
       />
 
       <ItemDetailDialog
@@ -140,6 +147,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         language={translationLang}
         complementCategoryName={category.complementCategoryName}
         complementCategoryTranslations={category.complementCategoryTranslations}
+        isTienda={isTienda}
       />
     </section>
   );
@@ -155,8 +163,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
   hideImages?: boolean;
   priority?: boolean;
+  isTienda?: boolean;
 }>) {
-  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, complementCategoryName, complementCategoryTranslations, hideImages = false, priority = false } = props;
+  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, complementCategoryName, complementCategoryTranslations, hideImages = false, priority = false, isTienda = false } = props;
 
   const displayDescripcion = translationLang && subcategory.descripcionTranslations?.[translationLang]
     ? subcategory.descripcionTranslations[translationLang]
@@ -187,6 +196,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
               complementCategoryName={complementCategoryName}
               complementCategoryTranslations={complementCategoryTranslations}
               hideImages={hideImages}
+              isTienda={isTienda}
             />
           </div>
         ))}
@@ -272,8 +282,9 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   complementCategoryName?: string;
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
   hideImages?: boolean;
+  isTienda?: boolean;
 }>) {
-  const { item, language, onItemClick, onDetailClick, showCart, priority = false, complementCategoryName, complementCategoryTranslations, hideImages = false } = props;
+  const { item, language, onItemClick, onDetailClick, showCart, priority = false, complementCategoryName, complementCategoryTranslations, hideImages = false, isTienda = false } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
@@ -356,12 +367,27 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         <h3 className="mb-1.5 min-w-0 [font-variant-numeric:lining-nums] font-serif text-[clamp(20px,1.8vw,24px)] font-normal leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">
           {displayName}
         </h3>
+        {isTienda && item.slug && (
+          // Sibling del boton overlay (z-10), no un envoltorio: evita elementos
+          // interactivos anidados. stopPropagation defensivo, mismo patron que
+          // el boton de "Añadir al carrito" de mas abajo.
+          <Link
+            href={`/producto/${item.slug}`}
+            className="relative z-20 mb-2 inline-flex w-fit min-h-[44px] items-center py-2 text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label={`${t("verProducto", safeLanguage)}: ${displayName}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {t("verProducto", safeLanguage)}
+          </Link>
+        )}
         {displayDescription && (
           <p className="mb-3 text-sm leading-relaxed text-muted-foreground line-clamp-3">
             {displayDescription}
           </p>
         )}
-        <AllergenBadges alergenos={item.alergenos} language={safeLanguage} className="mb-2" />
+        {!isTienda && (
+          <AllergenBadges alergenos={item.alergenos} language={safeLanguage} className="mb-2" />
+        )}
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-foreground/15 pt-3">
           <span className="text-base font-semibold tabular-nums text-foreground">
             {formatPrice(item.price, 'EUR', safeLanguage)}
@@ -415,8 +441,9 @@ function ItemDetailDialog(props: Readonly<{
   language: LanguageKey | undefined;
   complementCategoryName?: string;
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
+  isTienda?: boolean;
 }>) {
-  const { item, open, onOpenChange, language, complementCategoryName, complementCategoryTranslations } = props;
+  const { item, open, onOpenChange, language, complementCategoryName, complementCategoryTranslations, isTienda = false } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
 
@@ -471,7 +498,7 @@ function ItemDetailDialog(props: Readonly<{
             })}
           </div>
         )}
-        <AllergenList alergenos={item.alergenos} language={safeLanguage} />
+        {!isTienda && <AllergenList alergenos={item.alergenos} language={safeLanguage} />}
       </DialogContent>
     </Dialog>
   );
