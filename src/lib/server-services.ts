@@ -90,6 +90,13 @@ export async function resolverEmpresaPublica(
  * antes). El try/catch de aqui devuelve el mismo shape `{ error }` de
  * siempre para no romper el contrato de los callers (`page.tsx`,
  * `api/waiter/catalog`).
+ *
+ * El sufijo `'vm-v2'` en la key (product-detail-pages PR2) versiona el
+ * contenido del VM: la Data Cache sobrevive a los deploys, asi que un VM
+ * cacheado ANTES de que `slug`/`canonicalExterno` existieran seguiria
+ * devolviendose sin esos campos hasta expirar (hasta 3600s), rompiendo
+ * `/producto/{slug}` justo tras desplegar. El tag sigue siendo solo
+ * `catalogTag(empresaId)` — revalidateTag no cambia.
  */
 export async function getCachedMenu(empresaId: string) {
   try {
@@ -99,7 +106,7 @@ export async function getCachedMenu(empresaId: string) {
         if (result.error) throw new Error(result.error);
         return result;
       },
-      [catalogTag(empresaId)],
+      [catalogTag(empresaId), 'vm-v2'],
       { tags: [catalogTag(empresaId)], revalidate: 3600 }
     )();
   } catch (e) {
