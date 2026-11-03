@@ -382,4 +382,46 @@ export class SupabaseProductRepository implements IProductRepository {
       return { success: false, error: appError };
     }
   }
+
+  /**
+   * Igual que `findSlugsByPrefix` pero sobre el histórico
+   * (`productos_slug_historial`, migración product-detail-pages PR5): un
+   * slug antiguo también cuenta como ocupado, para que un producto nuevo
+   * nunca se quede con el slug antiguo de otro (design decisión #13).
+   */
+  async findSlugsHistoricosByPrefix(empresaId: string, base: string): Promise<Result<string[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from("productos_slug_historial")
+        .select("slug_antiguo")
+        .eq("empresa_id", empresaId)
+        .like("slug_antiguo", `${base}%`);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.findSlugsHistoricosByPrefix',
+          { empresaId, details: { code: error.code, hint: error.hint } }
+        );
+        return {
+          success: false,
+          error: { code: 'DB_ERROR', message: 'Error al consultar histórico de slugs', module: 'repository', method: 'findSlugsHistoricosByPrefix' },
+        };
+      }
+
+      const colision = new RegExp(`^${base}(-\\d+)?$`);
+      const slugs = (data ?? [])
+        .map((row: Record<string, unknown>) => row.slug_antiguo as string)
+        .filter((slug) => colision.test(slug));
+
+      return { success: true, data: slugs };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.findSlugsHistoricosByPrefix', {
+        empresaId,
+      });
+      return { success: false, error: appError };
+    }
+  }
 }

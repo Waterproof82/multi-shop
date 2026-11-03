@@ -39,4 +39,10 @@ export interface IProductRepository {
   delete(id: string, empresaId: string): Promise<Result<void>>;
   /** Slugs ya ocupados (scoped a empresaId) que empiezan igual que `base` — usado para resolver colisiones. */
   findSlugsByPrefix(empresaId: string, base: string): Promise<Result<string[]>>;
+  /**
+   * Slugs HISTÓRICOS (scoped a empresaId) que empiezan igual que `base` —
+   * un nuevo producto nunca debe recibir el slug antiguo de otro, o un
+   * redirect (PR5) lo mandaría al producto equivocado (design decisión #13).
+   */
+  findSlugsHistoricosByPrefix(empresaId: string, base: string): Promise<Result<string[]>>;
 }

@@ -49,6 +49,7 @@ function repoStub(overrides: Partial<IProductRepository> = {}): IProductReposito
     update: vi.fn().mockResolvedValue({ success: true, data: producto() }),
     delete: vi.fn(),
     findSlugsByPrefix: vi.fn().mockResolvedValue({ success: true, data: [] }),
+    findSlugsHistoricosByPrefix: vi.fn().mockResolvedValue({ success: true, data: [] }),
     ...overrides,
   };
 }
@@ -96,7 +97,20 @@ describe('ProductUseCase.create — generación de slug', () => {
     await useCase.create({ ...baseData, slug: 'kit-manual' }, true);
 
     expect(repo.findSlugsByPrefix).not.toHaveBeenCalled();
+    expect(repo.findSlugsHistoricosByPrefix).not.toHaveBeenCalled();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ slug: 'kit-manual' }));
+  });
+
+  it('un slug histórico (PR5) cuenta como ocupado: nunca se reasigna a un producto nuevo', async () => {
+    const findSlugsByPrefix = vi.fn().mockResolvedValue({ success: true, data: [] });
+    const findSlugsHistoricosByPrefix = vi.fn().mockResolvedValue({ success: true, data: ['kit-basico'] });
+    const repo = repoStub({ findSlugsByPrefix, findSlugsHistoricosByPrefix });
+    const useCase = new ProductUseCase(repo);
+
+    await useCase.create(baseData, true);
+
+    expect(findSlugsHistoricosByPrefix).toHaveBeenCalledWith('empresa-1', 'kit-basico');
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ slug: 'kit-basico-2' }));
   });
 
   it('23505 en el primer intento: reintenta una vez con un slug libre y persiste ese resultado', async () => {

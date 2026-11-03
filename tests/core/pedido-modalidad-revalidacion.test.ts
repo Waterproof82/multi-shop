@@ -128,6 +128,7 @@ function buildProductRepoMock(): IProductRepository {
     update: vi.fn(),
     delete: vi.fn(),
     findSlugsByPrefix: vi.fn(),
+    findSlugsHistoricosByPrefix: vi.fn(),
   };
 }
 
