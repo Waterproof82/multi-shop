@@ -1,11 +1,12 @@
 /**
  * cargarPaginaProducto — loader de /producto/[slug] (product-detail-pages PR3).
  *
- * Unión discriminada: 'ok' | 'redirigir' (reservado para PR5, histórico de
- * slugs) | 'no-encontrado'. Cubre aquí las tres rutas que colapsan a
- * 'no-encontrado' (spec PR3: restaurant regression guard, cross-tenant slug
- * 404, inactive product 404) — la página solo traduce ese resultado a un
- * notFound() real (ver tests/core/producto-page-guard.test.ts).
+ * Unión discriminada: 'ok' | 'redirigir' (histórico de slugs, PR5 — ver
+ * tests/core/slug-redirect.test.ts) | 'no-encontrado'. Cubre aquí las tres
+ * rutas que colapsan a 'no-encontrado' cuando TAMPOCO hay histórico (spec
+ * PR3: restaurant regression guard, cross-tenant slug 404, inactive
+ * product 404) — la página solo traduce ese resultado a un notFound() real
+ * (ver tests/core/producto-page-guard.test.ts).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -13,6 +14,7 @@ vi.mock('server-only', () => ({}));
 
 const resolverEmpresaPublica = vi.fn();
 const getCachedMenu = vi.fn();
+const resolverSlugActual = vi.fn().mockResolvedValue({ success: true, data: null });
 
 vi.mock('@/lib/server-services', () => ({
   resolverEmpresaPublica: (...args: unknown[]) => resolverEmpresaPublica(...args),
@@ -21,6 +23,14 @@ vi.mock('@/lib/server-services', () => ({
 
 vi.mock('@/lib/domain-utils', () => ({
   getDomainFromHeaders: async () => 'alma-de-arena.com',
+}));
+
+// Las tres rutas de este archivo que llegan a 'no-encontrado' también pasan
+// por el lookup de histórico (PR5): sin histórico, siguen siendo
+// 'no-encontrado'. El comportamiento del lookup en sí vive en
+// slug-redirect.test.ts.
+vi.mock('@/core/infrastructure/database', () => ({
+  getSlugHistoricoUseCase: () => ({ resolverSlugActual: (...args: unknown[]) => resolverSlugActual(...args) }),
 }));
 
 import { cargarPaginaProducto } from '@/lib/catalogo/cargar-producto';

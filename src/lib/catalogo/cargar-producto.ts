@@ -3,17 +3,11 @@ import { cache } from "react";
 import { getCachedMenu, resolverEmpresaPublica } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { findMenuItemBySlug } from "@/lib/catalogo/productos-publicos";
+import { getSlugHistoricoUseCase } from "@/core/infrastructure/database";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model";
 
-/**
- * Resultado de cargar la página de un producto de tienda por su slug.
- *
- * `redirigir` queda reservado para PR5 (histórico de slugs, slug antiguo →
- * current): esta función nunca lo produce todavía — no hay tabla de
- * histórico — pero el tipo ya existe para que `page.tsx` no cambie de forma
- * cuando PR5 lo implemente.
- */
+/** Resultado de cargar la página de un producto de tienda por su slug. */
 export type ResultadoPaginaProducto =
   | { tipo: 'ok'; empresa: EmpresaPublic; isPedidos: boolean; item: MenuItemVM; baseUrl: string }
   | { tipo: 'redirigir'; slug: string }
@@ -37,10 +31,19 @@ async function cargarProducto(slug: string): Promise<ResultadoPaginaProducto> {
   // slug de otro tenant o un producto inactivo (ya filtrado por
   // GetMenuUseCase) simplemente no aparece aquí.
   const item = findMenuItemBySlug(menuResult.data ?? [], slug);
-  if (!item) return { tipo: 'no-encontrado' };
-
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
-  return { tipo: 'ok', empresa, isPedidos, item, baseUrl };
+  if (item) return { tipo: 'ok', empresa, isPedidos, item, baseUrl };
+
+  // El histórico SOLO se consulta cuando el slug vivo no resolvió nada
+  // (spec PR5: "live slug wins over history") — y resuelve siempre al slug
+  // VIVO actual, nunca a otro histórico, así nunca encadena más de un salto
+  // (A→B→A resuelve en uno). Scoped a este empresaId: un slug histórico de
+  // otro tenant, o de un producto ya inactivo, nunca redirige.
+  const historial = await getSlugHistoricoUseCase().resolverSlugActual(empresa.id, slug);
+  if (!historial.success) throw new Error(historial.error.message);
+  if (historial.data) return { tipo: 'redirigir', slug: historial.data };
+
+  return { tipo: 'no-encontrado' };
 }
 
 /**

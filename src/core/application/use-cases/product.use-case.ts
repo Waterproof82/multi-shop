@@ -9,11 +9,22 @@ const UNIQUE_VIOLATION = 'UNIQUE_VIOLATION';
 export class ProductUseCase {
   constructor(private readonly productRepo: IProductRepository) {}
 
-  /** Siguiente slug libre para `tituloEs` dentro de `empresaId` (ver slug.ts). */
+  /**
+   * Siguiente slug libre para `tituloEs` dentro de `empresaId` (ver
+   * slug.ts). El conjunto de ocupados incluye tanto slugs VIVOS como
+   * HISTÓRICOS (PR5): asignar a un producto nuevo el slug antiguo de otro
+   * haría que un redirect lo mandara al producto equivocado.
+   */
   private async resolverSlugAutogenerado(empresaId: string, tituloEs: string): Promise<string> {
     const base = slugify(tituloEs);
-    const ocupadosResult = await this.productRepo.findSlugsByPrefix(empresaId, base);
-    const ocupados = ocupadosResult.success ? new Set(ocupadosResult.data) : new Set<string>();
+    const [actualesResult, historicosResult] = await Promise.all([
+      this.productRepo.findSlugsByPrefix(empresaId, base),
+      this.productRepo.findSlugsHistoricosByPrefix(empresaId, base),
+    ]);
+    const ocupados = new Set<string>([
+      ...(actualesResult.success ? actualesResult.data : []),
+      ...(historicosResult.success ? historicosResult.data : []),
+    ]);
     return siguienteSlugLibre(base, ocupados);
   }
 
