@@ -22,6 +22,7 @@ import type { ProductoFormData } from '@/components/admin/product-form-dialog';
 import { emptyTablaForm, tablaFormFromApi, tablaFormToApi } from '@/components/admin/ProductTablaEditor';
 import type { ImageFit } from '@/core/application/dtos/menu-view-model';
 import type { ProductoTabla } from '@/core/domain/entities/types';
+import type { Language } from '@/lib/language-context';
 import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/format-price';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -56,9 +57,11 @@ interface Producto {
   porcentaje_impuesto_override: number | null;
   alergenos: string[];
   tabla_info: ProductoTabla | null;
+  slug: string | null;
+  canonical_externo: string | null;
 }
 
-const emptyForm: ProductoFormData = {
+export const emptyForm: ProductoFormData = {
   titulo_es: '',
   titulo_en: '',
   titulo_fr: '',
@@ -80,7 +83,58 @@ const emptyForm: ProductoFormData = {
   porcentajeImpuestoOverride: null,
   alergenos: [],
   tabla_info: emptyTablaForm(),
+  slug: '',
+  canonical_externo: '',
 };
+
+/**
+ * Construye el payload para POST/PUT a `/api/admin/productos` a partir del
+ * formulario. Extraído de `handleSubmit` para poder probarlo sin montar la
+ * página completa (useAdmin, fetch de productos/categorías/menús
+ * virtuales...), siguiendo el mismo patrón que `getTiendaModalidadBadgeInfo`
+ * en la página de pedidos.
+ *
+ * `slug`/`canonical_externo` vacíos se mandan como `null`: el Zod del DTO
+ * exige el regex de slug o el prefijo https en `canonical_externo` cuando
+ * no son null, así que un string vacío fallaría la validación en vez de
+ * dejar que el backend autogenere el slug.
+ */
+export function buildProductoPayload(formData: ProductoFormData) {
+  return {
+    ...formData,
+    precio: Number.parseFloat(formData.precio) || 0,
+    categoria_id: formData.categoria_id || null,
+    titulo_en: formData.titulo_en || null,
+    titulo_fr: formData.titulo_fr || null,
+    titulo_it: formData.titulo_it || null,
+    titulo_de: formData.titulo_de || null,
+    descripcion_es: formData.descripcion_es || null,
+    descripcion_en: formData.descripcion_en || null,
+    descripcion_fr: formData.descripcion_fr || null,
+    descripcion_it: formData.descripcion_it || null,
+    descripcion_de: formData.descripcion_de || null,
+    foto_url: formData.foto_url || null,
+    foto_url_2: formData.foto_url_2 || null,
+    foto_object_fit: formData.foto_object_fit || 'contain',
+    porcentaje_impuesto_override: formData.porcentajeImpuestoOverride ?? null,
+    tabla_info: tablaFormToApi(formData.tabla_info),
+    slug: formData.slug.trim() || null,
+    canonical_externo: formData.canonical_externo.trim() || null,
+  };
+}
+
+/**
+ * Resuelve el mensaje de error a mostrar tras un POST/PUT fallido.
+ *
+ * El backend devuelve `"El slug ya está en uso"` en español sin traducir
+ * (`product.use-case.ts`, código `CONFLICT` → 409 vía `errorCodeToStatus`).
+ * El admin puede estar en cualquiera de los 5 idiomas, así que el 409 se
+ * sustituye por un mensaje traducido en vez de mostrar el crudo del backend.
+ */
+export function getSaveErrorMessage(status: number, apiError: string | undefined, language: Language): string {
+  if (status === 409) return t('productSlugConflictError', language);
+  return apiError || t('saveError', language);
+}
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
   if (field !== currentField) {
@@ -170,25 +224,7 @@ export default function ProductosPage() {
       
       const method = editingId ? 'PUT' : 'POST';
 
-      const payload = {
-        ...formData,
-        precio: Number.parseFloat(formData.precio) || 0,
-        categoria_id: formData.categoria_id || null,
-        titulo_en: formData.titulo_en || null,
-        titulo_fr: formData.titulo_fr || null,
-        titulo_it: formData.titulo_it || null,
-        titulo_de: formData.titulo_de || null,
-        descripcion_es: formData.descripcion_es || null,
-        descripcion_en: formData.descripcion_en || null,
-        descripcion_fr: formData.descripcion_fr || null,
-        descripcion_it: formData.descripcion_it || null,
-        descripcion_de: formData.descripcion_de || null,
-        foto_url: formData.foto_url || null,
-        foto_url_2: formData.foto_url_2 || null,
-        foto_object_fit: formData.foto_object_fit || 'contain',
-        porcentaje_impuesto_override: formData.porcentajeImpuestoOverride ?? null,
-        tabla_info: tablaFormToApi(formData.tabla_info),
-      };
+      const payload = buildProductoPayload(formData);
 
       const res = await fetchWithCsrf(url, {
         method,
@@ -201,7 +237,7 @@ export default function ProductosPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || t("saveError", language));
+        throw new Error(getSaveErrorMessage(res.status, data.error, language));
       }
 
       await fetchData();
@@ -238,6 +274,8 @@ export default function ProductosPage() {
       porcentajeImpuestoOverride: producto.porcentaje_impuesto_override ?? null,
       alergenos: producto.alergenos ?? [],
       tabla_info: tablaFormFromApi(producto.tabla_info),
+      slug: producto.slug || '',
+      canonical_externo: producto.canonical_externo || '',
     });
     setEditingId(producto.id);
     setIsModalOpen(true);
