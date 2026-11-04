@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { ProductImageGallery } from "@/components/product-image-gallery";
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog";
 import { SiteFooter } from "@/components/site-footer";
@@ -61,13 +62,19 @@ export function ProductDetailClient({
     <div className="flex min-h-screen flex-col bg-background">
       {header}
       <main id="main-content" className="flex-1">
-        <div className="mx-auto w-full max-w-3xl px-[clamp(16px,4vw,64px)] py-[clamp(32px,5vw,64px)]">
-          <Link
-            href={hrefVolverACarta(item.slug)}
-            className="mb-6 inline-flex min-h-[44px] items-center text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            {t("backToMenu", language)}
-          </Link>
+        {/* Pegada bajo el header sticky (h-16 / md:h-20): volver siempre a mano al hacer scroll. */}
+        <div className="sticky top-16 z-40 border-b border-foreground/10 bg-background md:top-20">
+          <div className="mx-auto w-full max-w-3xl px-[clamp(16px,4vw,64px)]">
+            <Link
+              href={hrefVolverACarta(item.slug)}
+              className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+              {t("backToMenu", language)}
+            </Link>
+          </div>
+        </div>
+        <div className="mx-auto w-full max-w-3xl px-[clamp(16px,4vw,64px)] py-[clamp(24px,4vw,48px)]">
 
           {images.length > 0 && (
             <ProductImageGallery
