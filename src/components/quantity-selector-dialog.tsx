@@ -343,7 +343,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               Dialog; sin descripcion propia del producto usamos el nombre
               como fallback silencioso en vez de dejar el warning en consola. */}
           {displayDescription ? (
-            <DialogDescription>{displayDescription}</DialogDescription>
+            <DialogDescription className="whitespace-pre-line">{displayDescription}</DialogDescription>
           ) : (
             <DialogDescription className="sr-only">{displayName}</DialogDescription>
           )}

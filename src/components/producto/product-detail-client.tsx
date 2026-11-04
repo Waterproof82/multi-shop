@@ -91,7 +91,7 @@ export function ProductDetailClient({
           </h1>
 
           {displayDescription && (
-            <p className="mt-3 max-w-[60ch] text-[15px] leading-relaxed text-muted-foreground">
+            <p className="mt-3 max-w-[60ch] whitespace-pre-line text-[15px] leading-relaxed text-muted-foreground">
               {displayDescription}
             </p>
           )}
