@@ -107,6 +107,15 @@ describe('CategoryNav — categorías con subcategorías', () => {
     expect(screen.queryByText('Vacía')).toBeNull();
   });
 
+  it('cada fila muestra cuántos productos tiene, sin ensuciar el nombre accesible', () => {
+    stubAnchor('category-mermeladas');
+    renderNav([CON_SUBCATEGORIAS]);
+    fireEvent.click(screen.getByRole('button', { name: /Mermeladas/ }));
+
+    const fila = screen.getByRole('button', { name: 'Cítricos' });
+    expect(fila).toHaveTextContent('1');
+  });
+
   it('tras elegir una subcategoría, la pastilla PADRE queda marcada como activa', async () => {
     stubAnchor('subcat-citricos');
     renderNav([CON_SUBCATEGORIAS, SIN_SUBCATEGORIAS]);

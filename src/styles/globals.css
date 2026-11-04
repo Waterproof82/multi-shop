@@ -439,8 +439,16 @@
   transform: scale(0);
 }
 
-.ripple-button.ripple-active::after {
-  animation: ripple 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+@media (prefers-reduced-motion: no-preference) {
+  .ripple-button.ripple-active::after {
+    animation: ripple 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ripple-button::after {
+    animation: none;
+  }
 }
 
 .animate-cart-item-add {
@@ -525,6 +533,10 @@
     display: none;
   }
 
+  .ripple-button::after {
+    animation: none;
+  }
+
   /* Disable all Tailwind animation utilities for Radix components */
   [data-state="open"].animate-in,
   [data-state="closed"].animate-out,
@@ -539,17 +551,17 @@
   [data-state="closed"].slide-out-to-right-full,
   [data-state="open"].slide-in-from-top-full,
   [data-state="open"].sm\:slide-in-from-bottom-full {
-    animation: none !important;
+    animation: none;
   }
 
   /* Global fallback for any remaining animations */
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
   }
 }
 
