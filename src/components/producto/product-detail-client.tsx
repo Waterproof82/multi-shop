@@ -9,6 +9,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
+import { hrefVolverACarta } from "@/lib/catalogo/ancla-producto";
 import type { EmpresaPublic, ModalidadEntrega } from "@/core/domain/entities/types";
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model";
 
@@ -62,7 +63,7 @@ export function ProductDetailClient({
       <main id="main-content" className="flex-1">
         <div className="mx-auto w-full max-w-3xl px-[clamp(16px,4vw,64px)] py-[clamp(32px,5vw,64px)]">
           <Link
-            href="/carta"
+            href={hrefVolverACarta(item.slug)}
             className="mb-6 inline-flex min-h-[44px] items-center text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             {t("backToMenu", language)}

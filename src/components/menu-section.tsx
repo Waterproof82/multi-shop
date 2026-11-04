@@ -324,7 +324,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   };
 
   return (
-    <div className={cardClass(isClickable, item.highlight)}>
+    <div className={cardClass(isClickable, item.highlight)} data-producto-slug={item.slug}>
       {isClickable && (
         <button
           type="button"

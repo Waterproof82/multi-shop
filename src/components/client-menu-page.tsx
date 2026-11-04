@@ -22,6 +22,7 @@ import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
 import { useCarritoGuardado } from "@/lib/use-carrito-guardado"
 import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
+import { ATRIBUTO_ANCLA_PRODUCTO, slugDesdeHash } from "@/lib/catalogo/ancla-producto"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -97,6 +98,19 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     globalThis.history.replaceState(globalThis.history.state, '', url.toString());
     openCart();
   }, [showCart, openCart]);
+
+  // "Volver a la carta" desde /producto/[slug] llega con #producto-<slug>. El
+  // scroll nativo del hash no lo encuentra (es un data-, no un id), así que se
+  // hace a mano tras el scroll de Next (rAF) para no quedar arriba del todo.
+  useEffect(() => {
+    const slug = slugDesdeHash(globalThis.location.hash);
+    if (slug === null) return;
+    const frame = requestAnimationFrame(() => {
+      const card = document.querySelector(`[${ATRIBUTO_ANCLA_PRODUCTO}="${CSS.escape(slug)}"]`);
+      card?.scrollIntoView({ block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   // Close search when cart opens in waiter mode
   useEffect(() => {
