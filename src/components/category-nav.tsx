@@ -239,32 +239,38 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
         open={subcatDialogFor !== null}
         onOpenChange={(open) => { if (!open) setSubcatDialogFor(null) }}
       >
-        <DialogContent style={{ transformOrigin: dialogOrigin }} className="gap-0 rounded-[3px] p-0 shadow-none sm:max-w-sm">
+        <DialogContent style={{ transformOrigin: dialogOrigin }} className="gap-0 overflow-hidden rounded-[3px] p-0 shadow-none sm:max-w-md">
           {activeDialogCategory && (
             <>
               <DialogHeader className="border-b border-foreground/10 px-6 pb-4 pt-6 text-left">
                 <DialogTitle className="font-serif text-2xl font-normal leading-tight tracking-[-0.02em] [font-variant-numeric:lining-nums] pr-8">{catLabel(activeDialogCategory)}</DialogTitle>
                 <DialogDescription className="sr-only">{t("chooseSubcategory", language)}</DialogDescription>
               </DialogHeader>
-              <ul className="max-h-80 overflow-y-auto px-2 py-2">
-                <li className="border-b border-foreground/10">
+              {/* Filas tipo tabla: franjas alternas en vez de filetes, porque los
+                  nombres largos ocupan dos lineas y un filete de 10% no basta
+                  para ver donde acaba una fila y empieza la siguiente. */}
+              <ul className="max-h-[min(70vh,28rem)] overflow-y-auto">
+                <li className="border-b border-foreground/15">
                   <button
                     type="button"
                     onClick={() => pickAndClose(activeDialogCategory.id, activeDialogCategory.id)}
-                    className="flex min-h-[48px] w-full items-center gap-2 px-4 text-left text-sm font-semibold text-foreground underline decoration-primary decoration-1 underline-offset-[6px] outline-none hover:decoration-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="flex min-h-[48px] w-full items-center gap-2 px-6 text-left text-sm font-semibold text-foreground underline decoration-primary decoration-1 underline-offset-[6px] outline-none hover:decoration-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {t("viewAllCollection", language)}
                   </button>
                 </li>
-                {subcategoriasConProductos(activeDialogCategory).map((subcat) => (
-                  <li key={subcat.id} className="border-b border-foreground/10 last:border-0">
+                {subcategoriasConProductos(activeDialogCategory).map((subcat, index) => (
+                  <li key={subcat.id} className={cn(index % 2 === 1 && "bg-foreground/[0.05]")}>
                     <button
                       type="button"
                       onClick={() => pickAndClose(subcat.id, activeDialogCategory.id)}
-                      className="flex min-h-[48px] w-full items-center px-4 text-left font-serif text-lg font-normal text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      className="flex min-h-[48px] w-full items-center justify-between gap-4 px-6 py-3 text-left text-[15px] font-medium leading-snug text-foreground outline-none transition-colors hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
-                      {(language !== "es" && subcat.translations?.[language]?.name) || subcat.nombre}
+                      <span>{(language !== "es" && subcat.translations?.[language]?.name) || subcat.nombre}</span>
+                      <span aria-hidden="true" className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {subcat.products.length}
+                      </span>
                     </button>
                   </li>
                 ))}
