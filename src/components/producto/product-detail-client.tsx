@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ProductImageGallery } from "@/components/product-image-gallery";
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog";
+import { ProductTable } from "@/components/producto/product-table";
 import { SiteFooter } from "@/components/site-footer";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -108,6 +109,15 @@ export function ProductDetailClient({
             >
               {t("addToCart", language)}
             </button>
+          )}
+
+          {item.table && (
+            <section className="mt-10">
+              <h2 className="mb-3 font-serif text-[clamp(20px,3vw,26px)] font-normal leading-tight tracking-[-0.01em] text-foreground">
+                {t("productTableSectionLabel", language)}
+              </h2>
+              <ProductTable table={item.table} language={language} />
+            </section>
           )}
         </div>
       </main>
