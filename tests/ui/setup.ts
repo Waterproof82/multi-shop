@@ -58,3 +58,12 @@ if (!window.IntersectionObserver) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = vi.fn();
 }
+
+// jsdom no expone CSS.escape, que usar `instalarIdAnclaProducto` para montar un
+// selector de atributo seguro con slugs arbitrarios. Escapar manualmente los
+// caracteres no identificador, igual que hace la especificación.
+if (typeof CSS === 'undefined' || typeof CSS.escape !== 'function') {
+  (globalThis as unknown as { CSS: { escape: (value: string) => string } }).CSS = {
+    escape: (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, (ch) => `\\${ch}`),
+  };
+}
