@@ -8,6 +8,7 @@ import { ProductImageGallery } from "@/components/product-image-gallery";
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog";
 import { ProductTable } from "@/components/producto/product-table";
 import { SiteFooter } from "@/components/site-footer";
+import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
@@ -37,6 +38,10 @@ function descripcionTraducida(item: MenuItemVM, language: string): string | unde
   return (lang && item.translations?.[lang]?.description) || item.description;
 }
 
+function necesitaSelector(item: MenuItemVM): boolean {
+  return (item.complements?.length ?? 0) > 0 || (item.complementGroups?.length ?? 0) > 0;
+}
+
 interface ProductDetailClientProps {
   empresa: EmpresaPublic;
   item: MenuItemVM;
@@ -53,11 +58,20 @@ export function ProductDetailClient({
   modalidadesEntrega,
 }: Readonly<ProductDetailClientProps>) {
   const { language } = useLanguage();
+  const { addItem } = useCart();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const displayName = nombreTraducido(item, language);
   const displayDescription = descripcionTraducida(item, language);
   const images = [item.image, item.image2].filter((src): src is string => Boolean(src));
+
+  const handleAddToCart = () => {
+    if (necesitaSelector(item)) {
+      setDialogOpen(true);
+      return;
+    }
+    addItem(item);
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -104,7 +118,7 @@ export function ProductDetailClient({
           {showCart && (
             <button
               type="button"
-              onClick={() => setDialogOpen(true)}
+              onClick={handleAddToCart}
               className="mt-6 min-h-[48px] w-full rounded-[3px] bg-foreground px-6 text-[15px] font-semibold text-background hover:bg-foreground/85 sm:w-auto sm:px-10"
             >
               {t("addToCart", language)}
