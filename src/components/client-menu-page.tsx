@@ -22,7 +22,7 @@ import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
 import { useCarritoGuardado } from "@/lib/use-carrito-guardado"
 import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
-import { ATRIBUTO_ANCLA_PRODUCTO, instalarIdAnclaProducto, slugDesdeHash } from "@/lib/catalogo/ancla-producto"
+import { intentarScrollAnclaReiteradamente, instalarIdAnclaProducto } from "@/lib/catalogo/ancla-producto"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -110,16 +110,12 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     instalarIdAnclaProducto();
   }, []);
   // Como refuerzo para la carga dura (el SSR no tiene el id; el scroll nativo
-  // del navegador queda en top), el scroll manual a la card — en un rAF para
-  // correr después del scroll que Next aplique en el commit.
+  // del navegador queda en top), el scroll manual a la card. Se REPITE durante
+  // ~1,5 s porque en una recarga el navegador restaura su posición guardada de
+  // forma asíncrona y pisa un scroll de un solo intento. Rationale completa en
+  // `intentarScrollAnclaReiteradamente`.
   useEffect(() => {
-    const slug = slugDesdeHash(globalThis.location.hash);
-    if (slug === null) return;
-    const frame = requestAnimationFrame(() => {
-      const card = document.querySelector(`[${ATRIBUTO_ANCLA_PRODUCTO}="${CSS.escape(slug)}"]`);
-      card?.scrollIntoView({ block: 'center' });
-    });
-    return () => cancelAnimationFrame(frame);
+    return intentarScrollAnclaReiteradamente();
   }, []);
 
   // Close search when cart opens in waiter mode
