@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState, useMemo, useEffect, useCallback } from "react"
+import { ReactNode, useState, useMemo, useEffect, useLayoutEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import dynamic from "next/dynamic"
@@ -22,7 +22,7 @@ import { mesaSesionChannel } from "@/lib/realtime-channels"
 import { useMesaId } from "@/lib/mesa/use-mesa-id"
 import { useCarritoGuardado } from "@/lib/use-carrito-guardado"
 import { PARAM_ABRIR_CARRITO, VALOR_ABRIR_CARRITO } from "@/lib/cart-abrir-param"
-import { ATRIBUTO_ANCLA_PRODUCTO, slugDesdeHash } from "@/lib/catalogo/ancla-producto"
+import { ATRIBUTO_ANCLA_PRODUCTO, instalarIdAnclaProducto, slugDesdeHash } from "@/lib/catalogo/ancla-producto"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -99,9 +99,19 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     openCart();
   }, [showCart, openCart]);
 
-  // "Volver a la carta" desde /producto/[slug] llega con #producto-<slug>. El
-  // scroll nativo del hash no lo encuentra (es un data-, no un id), así que se
-  // hace a mano tras el scroll de Next (rAF) para no quedar arriba del todo.
+  // "Volver a la carta" desde /producto/[slug] llega con #producto-<slug>.
+  // Primero, en un layout effect (corre ANTES que el handler de scroll del
+  // segmento de Next, que es su ancestro y procesa el hash en su propio layout
+  // effect), se instala el `id` real sobre la primera card con ese slug: le da
+  // a `document.getElementById(hash)` de Next un objetivo que sí encuentra y
+  // su scroll nativo apunta al producto en vez de caer al top (fallback a la
+  // raíz del segmento). Rationale completa en `instalarIdAnclaProducto`.
+  useLayoutEffect(() => {
+    instalarIdAnclaProducto();
+  }, []);
+  // Como refuerzo para la carga dura (el SSR no tiene el id; el scroll nativo
+  // del navegador queda en top), el scroll manual a la card — en un rAF para
+  // correr después del scroll que Next aplique en el commit.
   useEffect(() => {
     const slug = slugDesdeHash(globalThis.location.hash);
     if (slug === null) return;
