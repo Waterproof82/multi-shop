@@ -163,8 +163,11 @@ function MiniImagenFila({ value, empresaId, onChange, ariaUpload, ariaChange, ar
         body: formData,
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error ?? 'Error al subir imagen');
+        // La API responde `{ code, message }`; `error` se acepta por si algún
+        // endpoint devuelve el shape viejo. Sin esto el usuario solo ve el
+        // genérico "Error al subir imagen" y se pierde la causa real.
+        const data = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        throw new Error(data.error ?? data.message ?? 'Error al subir imagen');
       }
       const data = await res.json() as { publicUrl?: string };
       if (!data.publicUrl) throw new Error('No se recibió la URL de la imagen');
