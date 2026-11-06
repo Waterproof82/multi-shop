@@ -28,6 +28,7 @@ vi.mock('@/lib/server-services', () => ({
 
 vi.mock('@/lib/domain-utils', () => ({
   getDomainFromHeaders: async () => 'desconocido.com',
+  parseMainDomain: (d: string) => d,
 }));
 
 import { CartaRoute } from '@/components/carta-route';

@@ -6,7 +6,7 @@ import { ImagenSubida as Image } from './ui/imagen-subida';
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
 import { getWaiterMesa } from "@/components/waiter-login-form";
@@ -18,9 +18,10 @@ interface SiteHeaderClientProps {
   readonly showCart: boolean;
   readonly empresa?: EmpresaPublic | null;
   readonly mostrarVolverLanding?: boolean;
+  readonly urlInicio?: string;
 }
 
-export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = false }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = false, urlInicio = '/' }: SiteHeaderClientProps) {
   const { openCart, totalItems } = useCart();
   const { language } = useLanguage();
   const [animate, setAnimate] = useState(false);
@@ -65,6 +66,12 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
   }, [totalItems]);
 
   const logoUrl = empresa?.logoUrl ?? null;
+
+  const hrefInicio = useMemo(() => {
+    if (urlInicio === '/') return '/';
+    const sep = urlInicio.includes('?') ? '&' : '?';
+    return `${urlInicio}${sep}lang=${language}`;
+  }, [urlInicio, language]);
 
   // Igual que el logo de la landing: sube al inicio (sin animacion si el
   // usuario pidio reducir movimiento).
@@ -113,7 +120,7 @@ export function SiteHeaderClient({ showCart, empresa, mostrarVolverLanding = fal
         <div className="flex items-center gap-1">
           {mostrarVolverLanding && (
             <Link
-              href="/"
+              href={hrefInicio}
               aria-label={t("landingBackToHomeAria", language)}
               title={t("landingBackToHome", language)}
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-foreground/80 transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

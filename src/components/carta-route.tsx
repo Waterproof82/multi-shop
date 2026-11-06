@@ -1,5 +1,6 @@
 import { getCachedMenu, resolverEmpresaPublica, getModalidadesEntregaPublicas, getSeccionesLandingActivas } from "@/lib/server-services"
 import { anclasDelPie } from "@/lib/landing/anclas-pie"
+import { resolverVolverALanding } from "@/lib/landing/volver-a-landing"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
@@ -54,11 +55,15 @@ export async function CartaRoute({
   // - mesa URL with mesas disabled: never (overrides all the above)
   const showCart = !mesaDisabledContext && (isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant));
 
-  // Enlace de vuelta a la landing solo para el visitante normal de /carta:
-  // con QR de mesa, modo camarero o subdominio de pedidos, `/` sirve la
-  // carta directamente (bypass), asi que el enlace no llevaria a la landing.
-  // Si landing_habilitada = false, tampoco mostrar el enlace.
-  const mostrarVolverLanding = desdeRutaCarta && !rawMesaParam && !isWaiterMode && !isPedidos && (empresa?.landingHabilitada ?? false);
+  const volverALanding = resolverVolverALanding({
+    fullDomain,
+    desdeRutaCarta,
+    isPedidos,
+    rawMesaParam,
+    isWaiterMode,
+    landingHabilitada: empresa?.landingHabilitada ?? false,
+  });
+  const mostrarVolverLanding = volverALanding.mostrar;
   // Arranca ya, en paralelo con el menu: el pie enlaza los mismos apartados que la landing.
   const seccionesLandingPromise = mostrarVolverLanding && empresaId ? getSeccionesLandingActivas(empresaId) : Promise.resolve([]);
 
@@ -86,9 +91,9 @@ export async function CartaRoute({
     : [];
 
   const navegacionPie = mostrarVolverLanding
-    ? { enlaceInicio: true, anclas: anclasDelPie(await seccionesLandingPromise) }
+    ? { enlaceInicio: true, anclas: anclasDelPie(await seccionesLandingPromise), baseUrl: volverALanding.baseUrl }
     : {};
-  const header = await SiteHeaderWrapper({ showCart, empresa, mostrarVolverLanding });
+  const header = await SiteHeaderWrapper({ showCart, empresa, mostrarVolverLanding, urlInicio: volverALanding.urlInicio });
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
 
   return (

@@ -22,6 +22,7 @@ export interface FooterNavegacion {
   readonly enlaceInicio?: boolean;
   readonly enlaceCarta?: boolean;
   readonly anclas?: readonly SeccionAncla[];
+  readonly baseUrl?: string;
 }
 
 interface SiteFooterProps {
@@ -41,12 +42,16 @@ const ETIQUETA_ANCLA = {
 const footerLinkClass = "inline-flex min-h-[44px] items-center text-sm text-footer-fg/85 hover:text-footer-fg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-footer-bg rounded-sm";
 
 function FooterNav({ navegacion, language }: Readonly<{ navegacion: FooterNavegacion; language: Lang }>) {
+  const base = navegacion.baseUrl ?? '';
+  const langSuffix = base ? `?lang=${language}` : '';
+  const hrefInicio = base ? `${base}/${langSuffix}` : '/';
+  const hrefAncla = (ancla: SeccionAncla) => (base ? `${base}/${langSuffix}#${ancla}` : `/#${ancla}`);
   return (
     <nav aria-label={t("footerNavTitle", language)} className="space-y-4">
       <h3 className="text-xs font-semibold text-footer-fg uppercase tracking-wider">{t("footerNavTitle", language)}</h3>
       <ul className="space-y-1">
         {navegacion.enlaceInicio && (
-          <li><Link href="/" className={footerLinkClass}>{t("landingBackToHome", language)}</Link></li>
+          <li><Link href={hrefInicio} className={footerLinkClass}>{t("landingBackToHome", language)}</Link></li>
         )}
         {navegacion.enlaceCarta && (
           <li><Link href="/carta" className={footerLinkClass}>{t("viewMenu", language)}</Link></li>
@@ -54,7 +59,7 @@ function FooterNav({ navegacion, language }: Readonly<{ navegacion: FooterNavega
         {navegacion.anclas?.map((ancla) => (
           <li key={ancla}>
             {navegacion.enlaceInicio
-              ? <Link href={`/#${ancla}`} className={footerLinkClass}>{t(ETIQUETA_ANCLA[ancla], language)}</Link>
+              ? <Link href={hrefAncla(ancla)} className={footerLinkClass}>{t(ETIQUETA_ANCLA[ancla], language)}</Link>
               : <a href={`#${ancla}`} className={footerLinkClass}>{t(ETIQUETA_ANCLA[ancla], language)}</a>}
           </li>
         ))}
