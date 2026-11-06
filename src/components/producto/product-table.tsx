@@ -1,5 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import type { ProductoTablaVM, TablaFilaVM, TablaCeldaVM } from "@/core/application/dtos/menu-view-model";
 import { ImagenSubida } from "@/components/ui/imagen-subida";
+import { ImageZoomDialog } from "@/components/image-zoom-dialog";
 import { t } from "@/lib/translations";
 
 // `Lang` según la firma real de t() (regla del repo: no cast a secas).
@@ -37,6 +41,32 @@ function filaKey(fila: TablaFilaVM): string {
   return fila.celdas.map((celda) => celda.es).join("|");
 }
 
+// Pie de la ampliación: la primera celda con texto de la fila (modelo,
+// referencia...). Si la fila está vacía, cae al nombre del apartado.
+function captionDeFila(fila: TablaFilaVM, language: string): string {
+  return fila.celdas.map((celda) => resolveCelda(celda, language)).find(Boolean) ?? '';
+}
+
+interface ImagenAmpliada {
+  src: string;
+  alt: string;
+}
+
+function zoomDeFila(fila: TablaFilaVM, language: string): ImagenAmpliada | null {
+  if (!fila.imagen) return null;
+  return {
+    src: fila.imagen,
+    alt: captionDeFila(fila, language) || t('productTableImageLabel', language as Lang),
+  };
+}
+
+function ariaZoomDeFila(fila: TablaFilaVM, language: string): string {
+  // Mismo label que la carta y el carrito para la misma acción.
+  const etiqueta = t('viewImage', language as Lang);
+  const caption = captionDeFila(fila, language);
+  return caption ? `${etiqueta}: ${caption}` : etiqueta;
+}
+
 function zipCeldaConColumna(
   fila: TablaFilaVM,
   columnas: TablaCeldaVM[]
@@ -44,22 +74,29 @@ function zipCeldaConColumna(
   return fila.celdas.map((celda, idx) => ({ celda, columnaKey: columnas[idx]?.es ?? celda.es }));
 }
 
-function ImagenFila({ src }: Readonly<{ src: string }>) {
-  // Miniatura decorativa de la fila: la información ya está en la fila;
-  // `ImagenSubida` porque la imagen ya viene optimizada (480px WebP)
-  // desde el uploader del admin y no debe re-optimizarse.
+function ImagenFila({ src, ariaLabel, onZoom }: Readonly<{ src: string; ariaLabel: string; onZoom: () => void }>) {
+  // Miniatura de la fila: `ImagenSubida` porque la imagen ya viene optimizada
+  // (480px WebP) desde el uploader del admin y no debe re-optimizarse. Al
+  // pulsarla se amplía con el MISMO diálogo que las fotos de producto.
   return (
-    <span className="relative block h-10 w-10 rounded-md overflow-hidden border border-border/50 bg-muted flex-shrink-0">
-      <ImagenSubida src={src} alt="" fill sizes="40px" className="object-cover" />
-    </span>
+    <button
+      type="button"
+      onClick={onZoom}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      className="relative block h-11 w-11 flex-shrink-0 rounded-md overflow-hidden border border-border/50 bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <ImagenSubida src={src} alt="" fill sizes="44px" className="object-cover" />
+    </button>
   );
 }
 
-function ProductTableRowMobile({ fila, columnas, language, startIndex }: Readonly<{
+function ProductTableRowMobile({ fila, columnas, language, startIndex, onZoom }: Readonly<{
   fila: TablaFilaVM;
   columnas: TablaCeldaVM[];
   language: string;
   startIndex: number;
+  onZoom: () => void;
 }>) {
   const contenido = zipCeldaConColumna(fila, columnas).map(({ celda, columnaKey }, idx) => {
     const isOdd = (startIndex + idx) % 2 === 1;
@@ -81,7 +118,7 @@ function ProductTableRowMobile({ fila, columnas, language, startIndex }: Readonl
   return (
     <div className="flex flex-col">
       <div className="px-3 pt-2">
-        <ImagenFila src={fila.imagen} />
+        <ImagenFila src={fila.imagen} ariaLabel={ariaZoomDeFila(fila, language)} onZoom={onZoom} />
       </div>
       {contenido}
     </div>
@@ -89,6 +126,7 @@ function ProductTableRowMobile({ fila, columnas, language, startIndex }: Readonl
 }
 
 export function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; language: string }>) {
+  const [imagenAmpliada, setImagenAmpliada] = useState<ImagenAmpliada | null>(null);
   const filas = normalizarFilasVM(table.filas);
   const conImagen = filas.some((fila) => Boolean(fila.imagen));
 
@@ -102,6 +140,7 @@ export function ProductTable({ table, language }: Readonly<{ table: ProductoTabl
             columnas={table.columnas}
             language={language}
             startIndex={r * table.columnas.length}
+            onZoom={() => setImagenAmpliada(zoomDeFila(fila, language))}
           />
         ))}
       </div>
@@ -131,7 +170,13 @@ export function ProductTable({ table, language }: Readonly<{ table: ProductoTabl
               <tr key={filaKey(fila)} className={r % 2 === 1 ? "bg-muted/30" : "bg-primary/5"}>
                 {conImagen && (
                   <td className="px-3 py-2">
-                    {fila.imagen ? <ImagenFila src={fila.imagen} /> : null}
+                    {fila.imagen ? (
+                      <ImagenFila
+                        src={fila.imagen}
+                        ariaLabel={ariaZoomDeFila(fila, language)}
+                        onZoom={() => setImagenAmpliada(zoomDeFila(fila, language))}
+                      />
+                    ) : null}
                   </td>
                 )}
                 {zipCeldaConColumna(fila, table.columnas).map(({ celda, columnaKey }) => (
@@ -144,6 +189,15 @@ export function ProductTable({ table, language }: Readonly<{ table: ProductoTabl
           </tbody>
         </table>
       </div>
+
+      <ImageZoomDialog
+        images={imagenAmpliada ? [imagenAmpliada.src] : []}
+        alt={imagenAmpliada?.alt ?? ''}
+        open={imagenAmpliada !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setImagenAmpliada(null);
+        }}
+      />
     </div>
   );
 }
