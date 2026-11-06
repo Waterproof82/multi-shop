@@ -8,9 +8,20 @@ export interface TablaCelda {
   de?: string | null;
 }
 
+/**
+ * Fila de la tabla de información de un producto. Normalizado por
+ * `tablaDesdeApi` (core/domain/productos/tabla.ts): las filas históricas
+ * guardadas como `TablaCelda[]` plano (sin imagen) se aplanan a este shape
+ * con `imagen: null` al leerlas.
+ */
+export interface TablaFila {
+  celdas: TablaCelda[];
+  imagen: string | null;
+}
+
 export interface ProductoTabla {
   columnas: TablaCelda[];
-  filas: TablaCelda[][];
+  filas: TablaFila[];
 }
 
 export interface TablaPlantilla {

@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { IProductRepository, CreateProductData, UpdateProductData } from "@/core/domain/repositories/IProductRepository";
-import { Product, ProductoTabla, Result } from "@/core/domain/entities/types";
+import { Product, Result } from "@/core/domain/entities/types";
+import { tablaDesdeApi } from "@/core/domain/productos/tabla";
 import { logger } from "../logging/logger";
 
 // PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
@@ -63,7 +64,7 @@ export class SupabaseProductRepository implements IProductRepository {
       tipoProducto: (row.tipo_producto as string) === 'bebida' ? 'bebida' : 'comida',
       porcentajeImpuestoOverride: (row.porcentaje_impuesto_override as number | null) ?? null,
       alergenos: (row.alergenos as string[]) ?? [],
-      tabla: (row.tabla_info as ProductoTabla | null) ?? null,
+      tabla: tablaDesdeApi(row.tabla_info),
       createdAt: new Date(row.created_at as string),
       slug: (row.slug as string | null) ?? null,
       canonicalExterno: (row.canonical_externo as string | null) ?? null,

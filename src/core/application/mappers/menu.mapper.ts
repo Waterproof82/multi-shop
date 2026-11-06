@@ -55,7 +55,10 @@ function mapTablaCelda(celda: TablaCelda): TablaCeldaVM {
 function mapTabla(tabla: ProductoTabla): ProductoTablaVM {
   return {
     columnas: tabla.columnas.map(mapTablaCelda),
-    filas: tabla.filas.map((fila) => fila.map(mapTablaCelda)),
+    filas: tabla.filas.map((fila) => ({
+      celdas: fila.celdas.map(mapTablaCelda),
+      imagen: fila.imagen || undefined,
+    })),
   };
 }
 
