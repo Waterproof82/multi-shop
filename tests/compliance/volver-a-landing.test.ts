@@ -36,11 +36,16 @@ describe('resolverVolverALanding', () => {
     expect(r.urlInicio).toBe('http://localhost/');
   });
 
-  it('landing deshabilitada: no mostrar', () => {
+  it('pedidos con landing deshabilitada: SI mostrar (vuelve a la carta del dominio principal)', () => {
     const r = resolverVolverALanding({ ...base, fullDomain: 'pedidos.almadearena.es', isPedidos: true, landingHabilitada: false });
+    expect(r.mostrar).toBe(true);
+    expect(r.urlInicio).toBe('https://almadearena.es/');
+    expect(r.baseUrl).toBe('https://almadearena.es');
+  });
+
+  it('dominio principal /carta con landing deshabilitada: no mostrar', () => {
+    const r = resolverVolverALanding({ ...base, fullDomain: 'almadearena.es', desdeRutaCarta: true, landingHabilitada: false });
     expect(r.mostrar).toBe(false);
-    expect(r.urlInicio).toBe('/');
-    expect(r.baseUrl).toBe('');
   });
 
   it('?mesa presente: no mostrar', () => {

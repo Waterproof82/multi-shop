@@ -20,10 +20,14 @@ function esLocalhost(domain: string): boolean {
 }
 
 export function resolverVolverALanding(input: VolverALandingInput): VolverALandingResult {
-  const mostrar = input.landingHabilitada
-    && !input.rawMesaParam
+  // En el subdominio de pedidos SIEMPRE hay una "pagina inicial" a la que
+  // volver (la landing si esta habilitada, o la carta del dominio principal
+  // si no): el enlace es cross-domain y nunca es un no-op. En el dominio
+  // principal (/carta) solo se muestra si la landing esta habilitada, porque
+  // si no, "/" y "/carta" sirven la misma carta.
+  const mostrar = !input.rawMesaParam
     && !input.isWaiterMode
-    && (input.desdeRutaCarta || input.isPedidos);
+    && (input.isPedidos || (input.desdeRutaCarta && input.landingHabilitada));
 
   const mainDomain = parseMainDomain(input.fullDomain);
   const enSubdominio = input.isPedidos && mainDomain !== input.fullDomain;
