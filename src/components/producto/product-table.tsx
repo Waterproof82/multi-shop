@@ -11,6 +11,22 @@ function asLanguageKey(language: string): LanguageKey | undefined {
   return (["en", "fr", "it", "de"].includes(language) ? language : undefined) as LanguageKey | undefined;
 }
 
+/**
+ * Normaliza las filas VM al shape `{ celdas, imagen? }`. La cache de menú
+ * (`unstable_cache`, TTL 1h) guarda el SERIALIZADO con el shape que había en
+ * el deploy: la cache vieja contiene `filas: [[celda]]` (legacy, sin `celdas`)
+ * y seguirá sirviéndose hasta expirar porque `revalidateTag` solo corre al
+ * guardar desde el admin. Otros consumidores ya toleran los dos shapes
+ * (`tablaDesdeApi`/`filaDesdeApi` en dominio); aquí lo protege el propio
+ * render para que la transición no rompa la ficha de producto.
+ */
+function normalizarFilasVM(filas: TablaFilaVM[] | undefined): TablaFilaVM[] {
+  if (!Array.isArray(filas)) return [];
+  return filas.map((fila) =>
+    Array.isArray(fila) ? { celdas: fila as TablaCeldaVM[] } : fila
+  );
+}
+
 function resolveCelda(celda: TablaCeldaVM, language: string): string {
   const lang = asLanguageKey(language);
   if (lang && celda[lang]) return celda[lang];
@@ -19,10 +35,6 @@ function resolveCelda(celda: TablaCeldaVM, language: string): string {
 
 function filaKey(fila: TablaFilaVM): string {
   return fila.celdas.map((celda) => celda.es).join("|");
-}
-
-function tieneImagen(table: ProductoTablaVM): boolean {
-  return table.filas.some((fila) => Boolean(fila.imagen));
 }
 
 function zipCeldaConColumna(
@@ -77,14 +89,15 @@ function ProductTableRowMobile({ fila, columnas, language, startIndex }: Readonl
 }
 
 export function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; language: string }>) {
-  const conImagen = tieneImagen(table);
+  const filas = normalizarFilasVM(table.filas);
+  const conImagen = filas.some((fila) => Boolean(fila.imagen));
 
   return (
     <div className="rounded-xl border border-border overflow-hidden shadow-xs">
       <div className="md:hidden">
-        {table.filas.map((fila, r) => (
+        {filas.map((fila, r) => (
           <ProductTableRowMobile
-            key={filaKey(fila) + fila.imagen}
+            key={filaKey(fila)}
             fila={fila}
             columnas={table.columnas}
             language={language}
@@ -114,8 +127,8 @@ export function ProductTable({ table, language }: Readonly<{ table: ProductoTabl
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {table.filas.map((fila, r) => (
-              <tr key={filaKey(fila) + fila.imagen} className={r % 2 === 1 ? "bg-muted/30" : "bg-primary/5"}>
+            {filas.map((fila, r) => (
+              <tr key={filaKey(fila)} className={r % 2 === 1 ? "bg-muted/30" : "bg-primary/5"}>
                 {conImagen && (
                   <td className="px-3 py-2">
                     {fila.imagen ? <ImagenFila src={fila.imagen} /> : null}
