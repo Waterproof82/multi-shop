@@ -92,9 +92,16 @@ async function getCsrfTokenWithFallback(): Promise<string | null> {
   return csrfToken;
 }
 
-function buildCsrfHeaders(csrfToken: string | null, existingHeaders?: HeadersInit): Headers {
+function buildCsrfHeaders(csrfToken: string | null, existingHeaders?: HeadersInit, body?: BodyInit | null): Headers {
   const headers = new Headers(existingHeaders);
-  headers.set('Content-Type', 'application/json');
+  const esFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (esFormData) {
+    // Con FormData el navegador DEBE fijar `multipart/form-data; boundary=...`.
+    // Forzar application/json aquí rompe `request.formData()` en el servidor.
+    headers.delete('Content-Type');
+  } else {
+    headers.set('Content-Type', 'application/json');
+  }
   if (csrfToken) {
     headers.set('x-csrf-token', csrfToken);
   }
@@ -159,7 +166,7 @@ export async function fetchWithCsrf(
     });
   }
 
-  const headers = buildCsrfHeaders(csrfToken, options.headers);
+  const headers = buildCsrfHeaders(csrfToken, options.headers, options.body);
   const requestOptions = { ...options, headers };
 
   const response = await executeWithRetry(url, requestOptions, maxRetries, baseDelay, maxDelay, retryOn);
@@ -170,7 +177,7 @@ export async function fetchWithCsrf(
     clearCsrfToken();
     const freshToken = await ensureCsrfToken();
     if (freshToken) {
-      const retryHeaders = buildCsrfHeaders(freshToken, options.headers);
+      const retryHeaders = buildCsrfHeaders(freshToken, options.headers, options.body);
       return fetch(url, { ...options, headers: retryHeaders });
     }
   }

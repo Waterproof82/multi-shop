@@ -114,8 +114,9 @@ export function ImageUploader({
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error ?? 'Error al subir imagen');
+        // La API responde `{ code, message }`; `error` se acepta por el shape viejo.
+        const data = await response.json().catch(() => ({})) as { error?: string; message?: string };
+        throw new Error(data.error ?? data.message ?? 'Error al subir imagen');
       }
 
       const data = await response.json() as { publicUrl?: string };
