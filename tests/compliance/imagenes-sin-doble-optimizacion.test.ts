@@ -57,6 +57,8 @@ const DEBEN_USAR_ENVOLTORIO = [
   'src/app/admin/(protected)/productos/page.tsx',
   'src/app/admin/(protected)/promociones/page.tsx',
   'src/app/admin/(protected)/toogoodtogo/page.tsx',
+  'src/components/admin/ProductTablaEditor.tsx',
+  'src/components/producto/product-table.tsx',
 ];
 
 /**

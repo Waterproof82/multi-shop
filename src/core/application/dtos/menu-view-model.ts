@@ -8,9 +8,14 @@ export interface TablaCeldaVM {
   de?: string;
 }
 
+export interface TablaFilaVM {
+  celdas: TablaCeldaVM[];
+  imagen?: string;
+}
+
 export interface ProductoTablaVM {
   columnas: TablaCeldaVM[];
-  filas: TablaCeldaVM[][];
+  filas: TablaFilaVM[];
 }
 
 export interface ComplementVM {
