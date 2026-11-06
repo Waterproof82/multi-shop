@@ -21,7 +21,10 @@ export function hrefVolverACarta(slug: string | undefined): string {
  * el hash limpio que debe escribirse en la URL.
  */
 export function hashDeProductoDesde(hash: string): Readonly<{ slug: string | null; hashLimpio: string | null }> {
-  const partes = hash.split('#').filter((parte) => parte !== '');
+  // Sin '#' inicial no es un fragmento del navegador (contrato del ancla: solo
+  // se interpreta lo que el navegador trae en location.hash).
+  if (!hash.startsWith('#')) return { slug: null, hashLimpio: null };
+  const partes = hash.slice(1).split('#').filter((parte) => parte !== '');
   if (partes.length === 0) return { slug: null, hashLimpio: null };
   const ultima = partes[partes.length - 1];
   if (!ultima.startsWith(PREFIJO) || ultima.length === PREFIJO.length) return { slug: null, hashLimpio: null };
