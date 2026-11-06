@@ -14,14 +14,45 @@ export function hrefVolverACarta(slug: string | undefined): string {
   return slug ? `/carta#${PREFIJO}${encodeURIComponent(slug)}` : "/carta";
 }
 
-export function slugDesdeHash(hash: string): string | null {
-  const marca = `#${PREFIJO}`;
-  if (!hash.startsWith(marca) || hash.length === marca.length) return null;
+/**
+ * Parse del hash de producto. Tolera URLs "envenenadas" con Mas de un
+ * fragmento (`#producto-uno#producto-dos`, posible residuo de historial antiguo):
+ * en ese caso el objetivo es el ULTIMO fragmento (el mas reciente) y se reporta
+ * el hash limpio que debe escribirse en la URL.
+ */
+export function hashDeProductoDesde(hash: string): Readonly<{ slug: string | null; hashLimpio: string | null }> {
+  const partes = hash.split('#').filter((parte) => parte !== '');
+  if (partes.length === 0) return { slug: null, hashLimpio: null };
+  const ultima = partes[partes.length - 1];
+  if (!ultima.startsWith(PREFIJO) || ultima.length === PREFIJO.length) return { slug: null, hashLimpio: null };
+  let slug: string | null;
   try {
-    return decodeURIComponent(hash.slice(marca.length));
+    slug = decodeURIComponent(ultima.slice(PREFIJO.length));
   } catch {
-    return null;
+    return { slug: null, hashLimpio: null };
   }
+  // El residuo se limpia con el fragmento tal cual esta en la URL (ya codificado):
+  // reconstruirlo desde el slug decodificado reintroduciria encodings dobles.
+  if (partes.length > 1) return { slug, hashLimpio: `#${ultima}` };
+  return { slug, hashLimpio: null };
+}
+
+export function slugDesdeHash(hash: string): string | null {
+  return hashDeProductoDesde(hash).slug;
+}
+
+/**
+ * Si la URL actual tiene un hash envenenado (doble fragmento), lo reescribe a
+ * un unico fragmento con `history.replaceState`. Sin esto, el residuo
+ * sobrevive a las recargas y el ancla queda rota para siempre en esa pestaña.
+ * Conserva `history.state` (Next lo usa para navegar).
+ */
+export function limpiarHashEnvenenado(): void {
+  const { slug, hashLimpio } = hashDeProductoDesde(globalThis.location.hash);
+  if (slug === null || hashLimpio === null) return;
+  // Se concatena a mano (pathname + search + fragmento ya codificado): asignar
+  // `url.hash` reintroduciria la codificacion del '%' (un '%20' entraria como '%%20').
+  globalThis.history.replaceState(globalThis.history.state, '', globalThis.location.pathname + globalThis.location.search + hashLimpio);
 }
 
 /** El `id` real que instala `instalarIdAnclaProducto` sobre la primera card coincidente. */
@@ -124,6 +155,7 @@ export function intentarScrollAnclaReiteradamente(
   maxFrames: number = MAX_FRAMES_INTENTO_ANCLA,
   reloj: ProgramadorAncla = relojAnclaPorDefecto(),
 ): () => void {
+  limpiarHashEnvenenado();
   if (slugDesdeHash(globalThis.location.hash) === null) return () => undefined;
 
   let anulado = false;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { instalarIdAnclaProducto, idAnclaProducto, ATRIBUTO_ANCLA_PRODUCTO } from '@/lib/catalogo/ancla-producto';
+import { instalarIdAnclaProducto, idAnclaProducto, ATRIBUTO_ANCLA_PRODUCTO, hashDeProductoDesde, limpiarHashEnvenenado } from '@/lib/catalogo/ancla-producto';
 
 /**
  * Rationale del mecanismo (por qué hace falta un `id` real además del `data-`):
@@ -79,5 +79,66 @@ describe('instalarIdAnclaProducto', () => {
 
     expect(() => instalarIdAnclaProducto()).not.toThrow();
     expect(document.getElementById('producto-bateria-25ah')).toBeNull();
+  });
+});
+
+/**
+ * Residuo real del usuario (2026-11-06): la URL llego con DOBLE fragmento
+ * (`#producto-uno#producto-dos`) y el slug con `#` no matcheaba ninguna card —
+ * el aterrizaje quedaba en top para siempre, sobreviviendo a las recargas.
+ */
+describe('hash de producto con doble fragmento (residuo envenenado)', () => {
+  it('toma el ULTIMO fragmento y reporta el hash limpio', () => {
+    const { slug, hashLimpio } = hashDeProductoDesde('#producto-gafas-antivaho#producto-torniquete-tactico');
+    expect(slug).toBe('torniquete-tactico');
+    expect(hashLimpio).toBe('#producto-torniquete-tactico');
+  });
+
+  it('un fragmento simple no reporta limpieza (no es envenenado)', () => {
+    const { slug, hashLimpio } = hashDeProductoDesde('#producto-torniquete-tactico');
+    expect(slug).toBe('torniquete-tactico');
+    expect(hashLimpio).toBeNull();
+  });
+
+  it('si el ultimo fragmento no es de producto, no hay objetivo', () => {
+    const { slug, hashLimpio } = hashDeProductoDesde('#producto-gafas#top');
+    expect(slug).toBeNull();
+    expect(hashLimpio).toBeNull();
+  });
+
+  it('limpiarHashEnvenenado reescribe la URL a un solo fragmento conservando pathname, search y state', () => {
+    // location.hash no sirve para esto: el setter codifica el segundo '#' como %23.
+    history.replaceState({ marca: 'next' }, '', '/carta?lang=es#producto-gafas#producto-torniquete');
+
+    limpiarHashEnvenenado();
+
+    expect(location.pathname + location.search + location.hash).toBe('/carta?lang=es#producto-torniquete');
+    expect(history.state).toEqual({ marca: 'next' });
+  });
+
+  it('con hash simple limpiarHashEnvenenado no toca nada', () => {
+    history.replaceState({}, '', '/carta#producto-torniquete');
+
+    limpiarHashEnvenenado();
+
+    expect(location.hash).toBe('#producto-torniquete');
+  });
+
+  it('el fragmento codificado sobrevive limpio (%20 no se duplica)', () => {
+    history.replaceState({}, '', '/carta#producto-gafas#producto-caf%C3%A9%20con%20leche');
+
+    limpiarHashEnvenenado();
+
+    expect(location.hash).toBe('#producto-caf%C3%A9%20con%20leche');
+    expect(hashDeProductoDesde(location.hash).slug).toBe('café con leche');
+  });
+
+  it('instalarIdAnclaProducto instala el id del ULTIMO fragmento aunque la URL siga envenenada', () => {
+    history.replaceState({}, '', '/carta#producto-bateria-25ah#producto-inversor-1kw');
+    const card = crearCard('inversor-1kw', 'la card del ultimo fragmento');
+
+    instalarIdAnclaProducto();
+
+    expect(document.getElementById('producto-inversor-1kw')).toBe(card);
   });
 });
