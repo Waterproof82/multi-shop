@@ -72,7 +72,7 @@
     "recharts": "3.10.1",
     "tailwind-merge": "^3.3.1",
     "uuid": "^14.0.3",
-    "zod": "4.6.2"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
