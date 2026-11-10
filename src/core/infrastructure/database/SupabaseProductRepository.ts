@@ -21,10 +21,41 @@ export function emptyStringToNull(value: string | null | undefined): string | nu
   return value === "" ? null : value;
 }
 
+// Campos de UpdateProductData que mapUpdateProductPayload copia 1:1 sin
+// transformación. Los que llevan lógica especial (string vacío → null,
+// `?? null`) están aparte en SPECIAL_CASED_UPDATE_FIELDS — la unión de
+// ambos DEBE cubrir exactamente las claves de updateProductSchema (menos
+// `id`), o un campo nuevo del DTO se descartaría en silencio en el UPDATE.
+// Lo vigila tests/compliance/product-update-fields-sync.test.ts.
+export const DIRECT_MAPPED_UPDATE_FIELDS = [
+  'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
+  'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
+  'precio', 'es_especial', 'activo', 'foto_object_fit', 'tipo_producto', 'alergenos',
+] as const;
+
+export const SPECIAL_CASED_UPDATE_FIELDS = [
+  'foto_url', 'foto_url_2', 'porcentaje_impuesto_override', 'tabla_info', 'slug', 'canonical_externo',
+] as const;
+
+// Columnas explícitas en vez de "*": esta query corre también con el
+// cliente anon (GetMenuUseCase, via getMenuUseCase() en
+// server-services.ts), que desde la migración
+// 20261110000002_restrict_productos_anon_columns.sql solo tiene GRANT
+// SELECT sobre estas columnas. Es exactamente el conjunto que
+// mapToDomain() lee hoy más las columnas de filtro/orden (empresa_id,
+// created_at) — secure by default: una columna nueva no la ve `anon` hasta
+// que se añada aquí Y en esa migración.
+// Literal (no array + join): supabase-js infiere el shape del resultado a
+// partir del TIPO literal de la cadena de `.select()`; una cadena
+// computada en runtime pierde esa inferencia y el `.map` posterior no
+// compila.
+const PRODUCT_PUBLIC_COLUMNS =
+  "id, empresa_id, categoria_id, titulo_es, titulo_en, titulo_fr, titulo_it, titulo_de, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, precio, foto_url, foto_url_2, foto_object_fit, es_especial, activo, tipo_producto, porcentaje_impuesto_override, alergenos, tabla_info, created_at, slug, canonical_externo" as const;
+
 function findAllByTenantQuery(client: SupabaseClient, empresaId: string) {
   return client
     .from("productos")
-    .select("*")
+    .select(PRODUCT_PUBLIC_COLUMNS)
     .eq("empresa_id", empresaId)
     .order("created_at", { ascending: false });
 }
@@ -221,13 +252,8 @@ export class SupabaseProductRepository implements IProductRepository {
 
   private mapUpdateProductPayload(data: Partial<UpdateProductData>): Record<string, unknown> {
     const updatePayload: Record<string, unknown> = {};
-    const fieldsToMap = [
-      'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
-      'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
-      'precio', 'es_especial', 'activo', 'foto_object_fit', 'tipo_producto', 'alergenos'
-    ];
 
-    for (const field of fieldsToMap) {
+    for (const field of DIRECT_MAPPED_UPDATE_FIELDS) {
       if (data[field as keyof UpdateProductData] !== undefined) {
         updatePayload[field] = data[field as keyof UpdateProductData];
       }
