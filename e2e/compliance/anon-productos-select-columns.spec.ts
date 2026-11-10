@@ -1,5 +1,5 @@
 /**
- * E2E — productos: anon must never be able to SELECT * (OWASP A01/A05,
+ * E2E — productos: anon reads only explicitly granted columns (OWASP A01/A05,
  * same bug class as public.empresas).
  *
  * Historial: 20260527000000_explicit_grants_data_api.sql granted table-wide
@@ -14,9 +14,11 @@
  * actually reads (SupabaseProductRepository.findAllByTenantQuery, via
  * GetMenuUseCase).
  *
- * NOTA: este test corre contra la BD real (husky pre-push). Falla hasta que
- * la migración se aplique con `supabase db push --linked` — el owner la
- * aplica, no este commit.
+ * Hoy el GRANT cubre las 26 columnas existentes, así que `select=*` sigue
+ * respondiendo 200: la protección es para las columnas FUTURAS, que quedan
+ * ocultas a anon hasta que una migración las conceda. Ese invariante (GRANT
+ * == columnas del código) lo vigila tests/compliance/productos-anon-grant-sync.test.ts;
+ * este E2E comprueba contra la BD real que el storefront sigue funcionando.
  *
  * Requiere: NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY
  */
@@ -44,16 +46,9 @@ const STOREFRONT_COLUMNS = [
   'alergenos', 'tabla_info', 'created_at', 'slug', 'canonical_externo',
 ];
 
-test.describe('productos — anon no puede hacer select=* (columnas no otorgadas)', () => {
+test.describe('productos — anon lee solo las columnas concedidas', () => {
   test.beforeEach(() => {
     test.skip(!supabaseUrl() || !anonKey(), 'NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY not set');
-  });
-
-  test('anon select=* is denied', async ({ request }) => {
-    const res = await request.get(`${supabaseUrl()}/rest/v1/productos?select=*&limit=1`, {
-      headers: anonHeaders(),
-    });
-    expect(res.ok()).toBe(false);
   });
 
   test('anon can still read the storefront column list', async ({ request }) => {
