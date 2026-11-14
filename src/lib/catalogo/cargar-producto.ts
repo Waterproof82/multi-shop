@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getCachedMenu, resolverEmpresaPublica } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { findMenuItemBySlug } from "@/lib/catalogo/productos-publicos";
+import { cargarPeopleConfig } from "@/lib/catalogo/people-config";
 import { getSlugHistoricoUseCase } from "@/core/infrastructure/database";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model";
@@ -32,7 +33,22 @@ async function cargarProducto(slug: string): Promise<ResultadoPaginaProducto> {
   // GetMenuUseCase) simplemente no aparece aquí.
   const item = findMenuItemBySlug(menuResult.data ?? [], slug);
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
-  if (item) return { tipo: 'ok', empresa, isPedidos, item, baseUrl };
+  if (item) {
+    // Enriquecimiento del PDP con el configurador de personas (kits): una
+    // query service_role extra por petición, SOLO para el producto
+    // resuelto — el menú cacheado (unstable_cache, TTL 1h) queda intacto.
+    // Sin tabla o sin config → item tal cual (feature invisible).
+    const peopleConfig = item.table
+      ? await cargarPeopleConfig(empresa.id, item.id, item.table.filas.length)
+      : null;
+    return {
+      tipo: 'ok',
+      empresa,
+      isPedidos,
+      item: peopleConfig ? { ...item, peopleConfig } : item,
+      baseUrl,
+    };
+  }
 
   // El histórico SOLO se consulta cuando el slug vivo no resolvió nada
   // (spec PR5: "live slug wins over history") — y resuelve siempre al slug
