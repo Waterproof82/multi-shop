@@ -24,6 +24,7 @@ export interface CartItem {
   justRemoved?: boolean
   deferred?: boolean      // waiter marked this item to send later (comida only)
   pase?: PaseKey  // waiter: course assignment for this item
+  personas?: number       // configurador de personas (kits): cada N es una línea de carrito propia
 }
 
 function newCartId(): string {
@@ -49,7 +50,7 @@ export interface AddedItemInfo {
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[], deferred?: boolean, note?: string, pase?: 'primer' | 'segundo' | 'postre') => void
+  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[], deferred?: boolean, note?: string, pase?: 'primer' | 'segundo' | 'postre', personas?: number) => void
   removeItem: (cartId: string) => void
   updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
@@ -106,8 +107,8 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     }
   }, [])
 
-  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[], deferred?: boolean, note?: string, pase?: 'primer' | 'segundo' | 'postre') => {
-    const itemKey = getItemKey(item, selectedComplements, note, pase);
+  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[], deferred?: boolean, note?: string, pase?: 'primer' | 'segundo' | 'postre', personas?: number) => {
+    const itemKey = getItemKey(item, selectedComplements, note, pase, personas);
     const complementPrice = selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
     const totalItemPrice = (item.price + complementPrice) * quantity;
 
@@ -123,14 +124,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
       // Only merge with a non-deferred entry of the same product + same pase.
       // If the existing entry is deferred, add a separate non-deferred entry instead.
       const existingIndex = prev.findIndex((ci) =>
-        getItemKey(ci.item, ci.selectedComplements, ci.note, ci.pase) === itemKey && !ci.deferred
+        getItemKey(ci.item, ci.selectedComplements, ci.note, ci.pase, ci.personas) === itemKey && !ci.deferred
       );
       if (existingIndex >= 0) {
         return prev.map((ci, index) =>
           index === existingIndex ? { ...ci, quantity: ci.quantity + quantity } : ci
         )
       }
-      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, note: note || undefined, justAdded: true, deferred: deferred ?? undefined, pase }]
+      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, note: note || undefined, justAdded: true, deferred: deferred ?? undefined, pase, personas }]
     })
   }, [])
 

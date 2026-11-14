@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { ProductoTablaVM, TablaFilaVM, TablaCeldaVM } from "@/core/application/dtos/menu-view-model";
+import type { ProductoTablaVM, TablaFilaVM, TablaCeldaVM, PeopleConfigVM } from "@/core/application/dtos/menu-view-model";
+import { escalaCeldaCantidad } from "@/lib/catalogo/escala-people";
 import { ImagenSubida } from "@/components/ui/imagen-subida";
 import { ImageZoomDialog } from "@/components/image-zoom-dialog";
 import { t } from "@/lib/translations";
@@ -74,6 +75,43 @@ function zipCeldaConColumna(
   return fila.celdas.map((celda, idx) => ({ celda, columnaKey: columnas[idx]?.es ?? celda.es }));
 }
 
+// La columna "Cantidad" se localiza por su CABECERA (es o el idioma activo):
+// los kits de KEC la traen en el índice 2, pero otros tenants pueden no
+// tenerla — y una posición hardcodeada sería una regresión silenciosa.
+const CANTIDAD_HEADER_RE = /cantidad/i;
+
+function indiceColumnaCantidad(columnas: TablaCeldaVM[], language: string): number {
+  return columnas.findIndex(
+    (columna) => CANTIDAD_HEADER_RE.test(columna.es) || CANTIDAD_HEADER_RE.test(resolveCelda(columna, language))
+  );
+}
+
+// Escalado display-only del configurador de personas: solo la celda de la
+// columna Cantidad cambia (todas sus variantes de idioma), con la regla de
+// SU fila. Ni las celdas de precio/activo ni el cobro se tocan aquí.
+function escalarFilaCantidad(
+  fila: TablaFilaVM,
+  regla: PeopleConfigVM['filas'][number] | null,
+  personas: number,
+  cantidadIdx: number
+): TablaFilaVM {
+  if (cantidadIdx < 0) return fila;
+  return {
+    ...fila,
+    celdas: fila.celdas.map((celda, idx) => {
+      if (idx !== cantidadIdx) return celda;
+      return {
+        ...celda,
+        es: escalaCeldaCantidad(celda.es, regla, personas),
+        ...(celda.en ? { en: escalaCeldaCantidad(celda.en, regla, personas) } : {}),
+        ...(celda.fr ? { fr: escalaCeldaCantidad(celda.fr, regla, personas) } : {}),
+        ...(celda.it ? { it: escalaCeldaCantidad(celda.it, regla, personas) } : {}),
+        ...(celda.de ? { de: escalaCeldaCantidad(celda.de, regla, personas) } : {}),
+      };
+    }),
+  };
+}
+
 function ImagenFila({ src, ariaLabel, onZoom }: Readonly<{ src: string; ariaLabel: string; onZoom: () => void }>) {
   // Miniatura de la fila: `ImagenSubida` porque la imagen ya viene optimizada
   // (480px WebP) desde el uploader del admin y no debe re-optimizarse. Al
@@ -125,17 +163,33 @@ function ProductTableRowMobile({ fila, columnas, language, startIndex, onZoom }:
   );
 }
 
-export function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; language: string }>) {
+export function ProductTable({ table, language, peopleConfig, personas }: Readonly<{
+  table: ProductoTablaVM;
+  language: string;
+  peopleConfig?: PeopleConfigVM;
+  personas?: number;
+}>) {
   const [imagenAmpliada, setImagenAmpliada] = useState<ImagenAmpliada | null>(null);
-  const filas = normalizarFilasVM(table.filas);
-  const conImagen = filas.some((fila) => Boolean(fila.imagen));
+  const filasBase = normalizarFilasVM(table.filas);
+  const conImagen = filasBase.some((fila) => Boolean(fila.imagen));
+
+  // Configurador de personas (kits): la cantidad base de la tabla corresponde
+  // a personas_min, y el factor de cada regla es relativo a esa base, así que
+  // a N = min el escalado es un no-op y no hace falta renderizarlo. Las keys
+  // de fila se calculan sobre las filas BASE: cambiar N no remonta el DOM.
+  const cantidadIdx = peopleConfig && personas !== undefined
+    ? indiceColumnaCantidad(table.columnas, language)
+    : -1;
+  const filas = (peopleConfig && personas !== undefined && cantidadIdx >= 0)
+    ? filasBase.map((fila, r) => escalarFilaCantidad(fila, peopleConfig.filas[r] ?? null, personas, cantidadIdx))
+    : filasBase;
 
   return (
     <div className="rounded-xl border border-border overflow-hidden shadow-xs">
       <div className="md:hidden">
         {filas.map((fila, r) => (
           <ProductTableRowMobile
-            key={filaKey(fila)}
+            key={filaKey(filasBase[r])}
             fila={fila}
             columnas={table.columnas}
             language={language}
@@ -167,7 +221,7 @@ export function ProductTable({ table, language }: Readonly<{ table: ProductoTabl
           </thead>
           <tbody className="divide-y divide-border">
             {filas.map((fila, r) => (
-              <tr key={filaKey(fila)} className={r % 2 === 1 ? "bg-muted/30" : "bg-primary/5"}>
+              <tr key={filaKey(filasBase[r])} className={r % 2 === 1 ? "bg-muted/30" : "bg-primary/5"}>
                 {conImagen && (
                   <td className="px-3 py-2">
                     {fila.imagen ? (
