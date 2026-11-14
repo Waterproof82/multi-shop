@@ -99,6 +99,11 @@ export class SupabaseProductRepository implements IProductRepository {
       createdAt: new Date(row.created_at as string),
       slug: (row.slug as string | null) ?? null,
       canonicalExterno: (row.canonical_externo as string | null) ?? null,
+      // Configurador de personas: solo presentes cuando la query las pidió
+      // (findByIds); en el resto de queries el row no las trae → null.
+      personas_min: (row.personas_min as number | null | undefined) ?? null,
+      personas_max: (row.personas_max as number | null | undefined) ?? null,
+      personas_paso_cents: (row.personas_paso_cents as number | null | undefined) ?? null,
     };
   }
 
@@ -183,9 +188,14 @@ export class SupabaseProductRepository implements IProductRepository {
     try {
       if (ids.length === 0) return { success: true, data: [] };
 
+      // Solo lo llama PedidoUseCase (path de pedido, service_role): incluye
+      // las columnas del configurador de personas para calcular el precio
+      // unitario escalado en el servidor. El catálogo público
+      // (findAllByTenantQuery / PRODUCT_PUBLIC_COLUMNS) NO las lee — anon no
+      // tiene GRANT sobre ellas (20261110000002 + store_people_configurator).
       const { data, error } = await this.supabase
         .from("productos")
-        .select("id, precio, empresa_id, tipo_producto")
+        .select("id, precio, empresa_id, tipo_producto, personas_min, personas_max, personas_paso_cents")
         .in("id", ids)
         .eq("empresa_id", empresaId)
         .eq("activo", true);

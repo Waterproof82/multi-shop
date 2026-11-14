@@ -1,5 +1,18 @@
 type TranslationEntry = { name: string; description?: string };
 
+import type { PeopleRegla } from "@/core/domain/entities/types";
+
+/** Configurador de personas (kits): límites del contador, paso de precio
+ * (céntimos por persona extra) y regla de escalado por fila de
+ * `table.filas` (índice alineado con ese array; null = fila sin regla,
+ * cantidad base). Ausente = el producto no tiene configurador. */
+export interface PeopleConfigVM {
+  min: number;
+  max: number;
+  pasoCents: number;
+  filas: (PeopleRegla | null)[];
+}
+
 export interface TablaCeldaVM {
   es: string;
   en?: string;
@@ -69,9 +82,10 @@ export interface MenuItemVM {
   complementGroups?: ComplementGroupVM[];
   alergenos?: string[];
   table?: ProductoTablaVM;
+  /** Configurador de personas (kits). Ausente en restaurantes y en productos sin configurador. */
+  peopleConfig?: PeopleConfigVM;
   /** Solo productos de tienda (product-detail-pages). Ausente en restaurantes. */
-  slug?: string;
-  /** URL externa (p. ej. kitemergenciacanarias.es): cuando está presente, la
+  slug?: string;  /** URL externa (p. ej. kitemergenciacanarias.es): cuando está presente, la
    * página /producto/{slug} no emite JSON-LD de Product y queda fuera del sitemap. */
   canonicalExterno?: string;
 }

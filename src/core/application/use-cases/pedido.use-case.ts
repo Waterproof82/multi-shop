@@ -4,7 +4,9 @@ import { IProductRepository } from "@/core/domain/repositories/IProductRepositor
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
 import { ModalidadEntregaUseCase } from "@/core/application/use-cases/modalidad-entrega.use-case";
-import { AppError, Pedido, Result } from "@/core/domain/entities/types";
+import { AppError, Pedido, Product, Result } from "@/core/domain/entities/types";
+import type { PedidoRepoItem } from "@/core/domain/repositories/IPedidoRepository";
+import { precioUnitarioPeople } from "@/lib/catalogo/escala-people";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { IDEMPOTENCY_REPLAY_CODE, puedeTenerSeguimiento } from "@/core/domain/constants/pedido";
 import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } from '@/core/infrastructure/services/telegram.service';
@@ -33,6 +35,8 @@ export interface CreatePedidoDTO {
     quantity: number;
     selectedComplements?: { id: string; name: string; price: number }[];
     note?: string;
+    /** Personas del configurador (kits). Solo informativa para el server: él la clampa y la descarta si no procede. */
+    personas?: number;
   }[];
   /** Client-supplied total is ignored — the server recalculates it from DB prices */
   total?: number;
@@ -97,6 +101,16 @@ export interface PedidoStats {
  */
 function tieneDireccionValida(data: Pick<CreatePedidoDTO, 'direccion_entrega' | 'latitude_entrega' | 'longitude_entrega'>): boolean {
   return !!data.direccion_entrega?.trim() && data.latitude_entrega !== undefined && data.longitude_entrega !== undefined;
+}
+
+/**
+ * Config de personas de un producto del pedido (kits); null = sin
+ * configurador (las tres columnas aparecen o desaparecen juntas — CHECK en
+ * DB — y aquí se re-verifica defensivamente).
+ */
+function personasConfigDe(p: Product | undefined): { min: number; max: number; pasoCents: number } | null {
+  if (!p || p.personas_min == null || p.personas_max == null || p.personas_paso_cents == null) return null;
+  return { min: p.personas_min, max: p.personas_max, pasoCents: p.personas_paso_cents };
 }
 
 /**
@@ -222,7 +236,15 @@ export class PedidoUseCase {
   private async validateProductPrices(
     empresaId: string,
     data: CreatePedidoDTO['items']
-  ): Promise<Result<{ priceMap: Map<string, number>; tipoProductoMap: Map<string, 'comida' | 'bebida'>; serverTotal: number }>> {
+  ): Promise<Result<{
+    priceMap: Map<string, number>;
+    tipoProductoMap: Map<string, 'comida' | 'bebida'>;
+    serverTotal: number;
+    /** Precio unitario por línea (índice = data.items): precio de DB + escalado del configurador de personas. */
+    linePrices: number[];
+    /** Personas ya clampadas por línea; undefined = producto sin configurador (la del cliente se descarta). */
+    linePersonas: (number | undefined)[];
+  }>> {
     const productIds = data
       .map(ci => ci.item?.id)
       .filter((id): id is string => Boolean(id));
@@ -235,7 +257,10 @@ export class PedidoUseCase {
     const allIds = [...new Set([...productIds, ...complementIds])];
 
     if (allIds.length === 0) {
-      return { success: true, data: { priceMap: new Map(), tipoProductoMap: new Map(), serverTotal: 0 } };
+      return {
+        success: true,
+        data: { priceMap: new Map(), tipoProductoMap: new Map(), serverTotal: 0, linePrices: [], linePersonas: [] },
+      };
     }
 
     const productsResult = await this.productRepo.findByIds(allIds, empresaId);
@@ -245,6 +270,7 @@ export class PedidoUseCase {
 
     const priceMap = new Map(productsResult.data.map(p => [p.id, p.precio]));
     const tipoProductoMap = new Map(productsResult.data.map(p => [p.id, p.tipoProducto]));
+    const productMap = new Map(productsResult.data.map(p => [p.id, p]));
 
     // Verify all product IDs exist
     for (const ci of data) {
@@ -264,18 +290,37 @@ export class PedidoUseCase {
       // Their price is taken from the client payload (already sourced from DB in the frontend).
     }
 
-    const serverTotal = data.reduce((sum, ci) => {
-      const unitPrice = priceMap.get(ci.item?.id ?? '') ?? 0;
+    // Precio y personas POR LÍNEA, siempre del servidor: con configurador,
+    // personas se clampa a [personas_min, personas_max] (default = min) y el
+    // precio unitario se recalcula desde la DB (precio + paso × (N − min));
+    // sin configurador, la personas que mande el cliente se descarta en
+    // silencio (mismo patrón que modalidad_entrega_precio_cents) y el precio
+    // es el de la DB.
+    const linePrices: number[] = [];
+    const linePersonas: (number | undefined)[] = [];
+    for (const ci of data) {
+      const config = personasConfigDe(ci.item?.id ? productMap.get(ci.item.id) : undefined);
+      if (config) {
+        const n = Math.min(config.max, Math.max(config.min, ci.personas ?? config.min));
+        linePersonas.push(n);
+        linePrices.push(precioUnitarioPeople(priceMap.get(ci.item?.id ?? '') ?? 0, config.pasoCents, config.min, n));
+      } else {
+        linePersonas.push(undefined);
+        linePrices.push(priceMap.get(ci.item?.id ?? '') ?? 0);
+      }
+    }
+
+    const serverTotal = data.reduce((sum, ci, i) => {
       const complementsTotal = (ci.selectedComplements ?? []).reduce(
         // For old-system complements (products), validate server price.
         // For new-system opcion IDs not in priceMap, trust the client-sent price.
         (cs, c) => cs + (priceMap.get(c.id) ?? c.price),
         0
       );
-      return sum + (unitPrice + complementsTotal) * ci.quantity;
+      return sum + (linePrices[i] + complementsTotal) * ci.quantity;
     }, 0);
 
-    return { success: true, data: { priceMap, tipoProductoMap, serverTotal } };
+    return { success: true, data: { priceMap, tipoProductoMap, serverTotal, linePrices, linePersonas } };
   }
 
   /**
@@ -466,7 +511,8 @@ export class PedidoUseCase {
     creado: Readonly<{ id: string; numero_pedido: number; total: number }>,
     empresaId: string,
     clienteId: string,
-    data: CreatePedidoDTO,
+    datosCliente: Pick<CreatePedidoDTO, 'nombre' | 'email' | 'telefono'>,
+    repoItems: PedidoRepoItem[],
     trackingToken: string | undefined,
     entrega: EntregaPersistida
   ): Pedido {
@@ -475,12 +521,12 @@ export class PedidoUseCase {
       empresa_id: empresaId,
       cliente_id: clienteId,
       numero_pedido: creado.numero_pedido,
-      detalle_pedido: data.items.map(ci => ({
-        producto_id: ci.item?.id,
-        nombre: ci.item?.name ?? '',
-        precio: ci.item?.price ?? 0,
-        cantidad: ci.quantity,
-        complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
+      detalle_pedido: repoItems.map(ri => ({
+        producto_id: ri.producto_id,
+        nombre: ri.nombre,
+        precio: ri.precio,
+        cantidad: ri.cantidad,
+        complementos: ri.complementos ?? [],
       })),
       total: creado.total,
       moneda: null,
@@ -489,7 +535,7 @@ export class PedidoUseCase {
       tracking_token: trackingToken ?? null,
       estimated_minutes: null,
       estimated_ready_at: null,
-      clientes: { nombre: data.nombre, email: data.email ?? '', telefono: data.telefono },
+      clientes: { nombre: datosCliente.nombre, email: datosCliente.email ?? '', telefono: datosCliente.telefono },
       // Lo MISMO que se persiste (tipo y precio validados, dirección solo a
       // domicilio): el aviso no puede contar una entrega distinta a la guardada.
       origen: entrega.origen ?? null,
@@ -812,6 +858,27 @@ export class PedidoUseCase {
         ? crypto.randomUUID()
         : undefined;
 
+      // Ítems de persistencia: nombre, precio y personas SIEMPRE del
+      // servidor (precio de DB + escalado del configurador) — el jsonb deja
+      // de copiar `ci.item.price` del cliente (mismo patrón que la ruta de
+      // mesa, que ya persistía el precio de DB). El eco de Telegram usa los
+      // mismos ítems: el aviso no puede contar un precio distinto al
+      // guardado.
+      const repoItems: PedidoRepoItem[] = data.items.map((ci, i) => {
+        const personas = priceResult.data.linePersonas[i];
+        return {
+          producto_id: ci.item?.id,
+          nombre: ci.item?.name ?? '',
+          precio: priceResult.data.linePrices[i] ?? 0,
+          cantidad: ci.quantity,
+          tipo_producto: priceResult.data.tipoProductoMap.get(ci.item?.id ?? '') ?? 'comida',
+          translations: ci.item?.translations,
+          complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
+          nota: ci.note || undefined,
+          ...(personas !== undefined ? { personas } : {}),
+        };
+      });
+
       // Step 4: Create the order
       // Pass origen for both delivery and recogida so the Redsys webhook can identify order type
       const entrega: EntregaPersistida = {
@@ -821,7 +888,7 @@ export class PedidoUseCase {
       const pedidoResult = await this.pedidoRepo.create(
         empresaId,
         clienteResult.data.clienteId,
-        data.items,
+        repoItems,
         finalTotal,
         discountData,
         trackingToken,
@@ -841,7 +908,7 @@ export class PedidoUseCase {
       // Delivery/pickup-with-payment orders skip — webhook confirms payment first
       const pedidoParaNotificar = this.buildTelegramPedido(
         pedidoResult.data, empresaId, clienteResult.data.clienteId,
-        data, trackingToken, entrega
+        data, repoItems, trackingToken, entrega
       );
       await this.notifyTelegramForCreate(
         telegramChatId, pedidoParaNotificar, empresaTipo, esPedidos,
