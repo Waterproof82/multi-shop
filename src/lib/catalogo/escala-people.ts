@@ -54,8 +54,7 @@ export function escalaCantidad(base: number, regla: PeopleRegla | null, personas
   return Math.round(base * factorPeople(regla, personas));
 }
 
-/**
- * Escala la CELDA "Cantidad" de la tabla (texto con un número al inicio:
+/** Escala la CELDA "Cantidad" de la tabla (texto con un número al inicio:
  * "1", "2"...). Sin número → la celda se queda igual (fila compartida o
  * celda no numérica). Display-only: lo que cobra es el server.
  */
@@ -65,4 +64,17 @@ export function escalaCeldaCantidad(celda: string, regla: PeopleRegla | null, pe
   const base = Number.parseFloat(m[1].replace(',', '.'));
   if (!Number.isFinite(base)) return celda;
   return `${escalaCantidad(base, regla, personas)}${m[2]}`;
+}
+
+/**
+ * `?personas=N` de la URL del PDP (el server lo lee en el searchParams de la
+ * página y lo pasa como prop). Tolerante: primer entero ≥ 1 del valor (o de
+ * la primera entrada si viniera repetido); cualquier otra cosa → null y el
+ * cliente arranca en el mínimo del configurador.
+ */
+export function parsePersonasParam(valor: string | string[] | undefined): number | null {
+  const crudo = Array.isArray(valor) ? valor[0] : valor;
+  if (typeof crudo !== 'string') return null;
+  const n = Number.parseInt(crudo, 10);
+  return Number.isInteger(n) && n >= 1 ? n : null;
 }
