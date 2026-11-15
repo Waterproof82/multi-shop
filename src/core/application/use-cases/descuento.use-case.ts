@@ -5,13 +5,13 @@ import { logger } from '@/core/infrastructure/logging/logger';
 import { sendEmail } from '@/lib/brevo-email';
 import { escapeHtml } from '@/lib/html-utils';
 
-function generateCodigo(): string {
+function generateCodigo(prefix: string): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let suffix = '';
   for (let i = 0; i < 6; i++) {
     suffix += chars[Math.floor(Math.random() * chars.length)];
   }
-  return `BIENVENIDO-${suffix}`;
+  return `${prefix}-${suffix}`;
 }
 
 function getEmailSubject(idioma: string, empresaNombre: string, porcentaje: number): string {
@@ -99,6 +99,44 @@ function buildEmailHtml(
   return { htmlContent, textContent };
 }
 
+/**
+ * Aviso al propietario por cada código emitido desde la tienda (popup de
+ * bienvenida). No hay pantalla de admin que liste `codigos_descuento`, así
+ * que este correo es la única traza inmediata de la petición — los códigos
+ * usados sí se ven luego en el pedido con su descuento aplicado.
+ */
+function buildOwnerNotificationHtml(
+  empresaNombre: string,
+  email: string,
+  codigo: string,
+  porcentaje: number,
+  fechaExpiracion: Date
+): { htmlContent: string; textContent: string } {
+  const safeNombre = escapeHtml(empresaNombre);
+  const safeEmail = escapeHtml(email);
+  const safeCodigo = escapeHtml(codigo);
+  const fechaStr = fechaExpiracion.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#18181b;background:#fafafa">
+  <h1 style="color:#18181b;font-size:22px;margin-bottom:8px">Nuevo código de descuento solicitado</h1>
+  <p style="color:#52525b;font-size:15px;margin:0 0 16px">Un visitante ha solicitado el descuento de bienvenida en ${safeNombre}.</p>
+  <table role="presentation" cellpadding="8" style="border-collapse:collapse;background:#fff;border:1px solid #d4d4d8;font-size:14px;color:#18181b">
+    <tr><td style="color:#71717a">Correo</td><td style="font-weight:bold">${safeEmail}</td></tr>
+    <tr><td style="color:#71717a">Código</td><td style="font-family:monospace;font-weight:bold;letter-spacing:2px">${safeCodigo}</td></tr>
+    <tr><td style="color:#71717a">Descuento</td><td>${porcentaje}%</td></tr>
+    <tr><td style="color:#71717a">Caduca</td><td>${fechaStr}</td></tr>
+  </table>
+</body>
+</html>`;
+
+  const textContent = `Nuevo código de descuento solicitado en ${empresaNombre}.\n\nCorreo: ${email}\nCódigo: ${codigo} (${porcentaje}%)\nCaduca: ${fechaStr}`;
+
+  return { htmlContent, textContent };
+}
+
 export class DescuentoUseCase {
   constructor(
     private readonly descuentoRepo: ICodigoDescuentoRepository,
@@ -132,7 +170,7 @@ export class DescuentoUseCase {
       const porcentaje = empresa?.descuentoBienvenidaPorcentaje ?? 5;
       const senderEmail = empresa?.emailNotification || undefined;
 
-      const codigo = generateCodigo();
+      const codigo = generateCodigo('BIENVENIDO');
       const fechaExpiracion = new Date();
       fechaExpiracion.setDate(fechaExpiracion.getDate() + duracionDias);
 
@@ -145,6 +183,31 @@ export class DescuentoUseCase {
       });
 
       if (!createResult.success) return createResult;
+
+      // Owner notification (best-effort — the visitor flow never depends on
+      // it, and a missing emailNotification just skips the send).
+      if (empresa?.emailNotification) {
+        try {
+          const { htmlContent, textContent } = buildOwnerNotificationHtml(
+            empresaNombre,
+            email,
+            codigo,
+            porcentaje,
+            fechaExpiracion
+          );
+          await sendEmail({
+            to: empresa.emailNotification,
+            subject: `Nuevo código de descuento solicitado — ${empresaNombre}`,
+            htmlContent,
+            textContent,
+            senderName: empresaNombre,
+            senderEmail,
+          });
+        } catch (ownerErr) {
+          await logger.logFromCatch(ownerErr, 'use-case', 'DescuentoUseCase.subscribe.notifyOwner', { details: { empresaId } });
+          // Continue — code was saved, owner notification failure is non-fatal
+        }
+      }
 
       // Send email (best-effort — don't fail the subscription if email fails)
       try {
@@ -165,6 +228,62 @@ export class DescuentoUseCase {
       return { success: true, data: { codigo } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'DescuentoUseCase.subscribe', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  /**
+   * Código solicitado desde una captación externa (el form «lista PDF» de la
+   * web de marketing). Diferencias con `subscribe`:
+   * - NO envía el email de bienvenida: la web ya manda el suyo con el PDF y
+   *   el código incrustados, y este método solo devuelve los datos.
+   * - Reutiliza el código vigente si el email ya tiene uno
+   *   (UNIQUE(empresa_id, cliente_email) impide crear una segunda fila).
+   * - Si el código existente está usado o caducado NO emite uno nuevo:
+   *   devuelve `codigo: null` y el llamador envía su entregable sin código.
+   */
+  async subscribeExternal(
+    empresaId: string,
+    email: string,
+    duracionDias: number
+  ): Promise<Result<{ codigo: string | null; porcentaje: number; fechaExpiracion: Date | null }>> {
+    try {
+      const existingResult = await this.descuentoRepo.findByEmail(email, empresaId);
+      if (!existingResult.success) return existingResult;
+
+      const existing = existingResult.data;
+      if (existing) {
+        const vigente = !existing.usado && new Date(existing.fechaExpiracion) >= new Date();
+        return {
+          success: true,
+          data: vigente
+            ? { codigo: existing.codigo, porcentaje: existing.porcentajeDescuento, fechaExpiracion: new Date(existing.fechaExpiracion) }
+            : { codigo: null, porcentaje: 0, fechaExpiracion: null },
+        };
+      }
+
+      const empresaResult = await this.empresaRepo.getById(empresaId);
+      if (!empresaResult.success) return { success: false, error: empresaResult.error };
+      const empresa = empresaResult.data;
+      const porcentaje = empresa?.descuentoBienvenidaPorcentaje ?? 5;
+
+      const codigo = generateCodigo('LISTA');
+      const fechaExpiracion = new Date();
+      fechaExpiracion.setDate(fechaExpiracion.getDate() + duracionDias);
+
+      const createResult = await this.descuentoRepo.create({
+        empresaId,
+        clienteEmail: email.toLowerCase(),
+        codigo,
+        porcentajeDescuento: porcentaje,
+        fechaExpiracion,
+      });
+
+      if (!createResult.success) return createResult;
+
+      return { success: true, data: { codigo, porcentaje, fechaExpiracion } };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'DescuentoUseCase.subscribeExternal', { empresaId });
       return { success: false, error: appError };
     }
   }

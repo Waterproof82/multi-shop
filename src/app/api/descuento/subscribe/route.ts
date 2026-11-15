@@ -38,10 +38,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { email } = parsed.data;
+  const { email, origen } = parsed.data;
   const idioma = (request.headers.get('accept-language') || 'es').split(',')[0].split('-')[0].slice(0, 2);
   const validIdiomas = ['es', 'en', 'fr', 'it', 'de'];
   const resolvedIdioma = validIdiomas.includes(idioma) ? idioma : 'es';
+
+  // Canal externo: el form «lista PDF» de la web de marketing. La web ya
+  // envía su propio email (PDF + código) y su propio aviso al propietario,
+  // así que aquí solo se emite/gestiona el código y se guarda el lead sin
+  // consentimiento de marketing.
+  if (origen === 'lista-pdf') {
+    const result = await getDescuentoUseCase().subscribeExternal(empresa.id, email, duracion);
+    if (!result.success) {
+      return NextResponse.json({ error: 'Error al procesar la solicitud' }, { status: 500 });
+    }
+
+    const { codigo, porcentaje, fechaExpiracion } = result.data;
+
+    // Persist the lead WITHOUT marketing consent (RGPD Art.6.1.a): the web
+    // form's consent covers delivering the list + its code, not future
+    // campaigns — aceptar_promociones stays false so the Promociones module
+    // audience never includes them. Best effort, non-blocking.
+    try {
+      const clienteRepo = getClienteRepository();
+      const existing = await clienteRepo.findByEmail(email, empresa.id);
+      if (!(existing.success && existing.data)) {
+        await clienteRepo.create({
+          empresaId: empresa.id,
+          email: email.toLowerCase(),
+          aceptar_promociones: false,
+        });
+      }
+    } catch {
+      // Non-fatal — the code was issued, lead persistence failed
+    }
+
+    return NextResponse.json({
+      success: true,
+      codigo,
+      porcentaje,
+      fechaExpiracion: fechaExpiracion ? fechaExpiracion.toISOString() : null,
+    });
+  }
 
   const result = await getDescuentoUseCase().subscribe(empresa.id, email, empresa.nombre, resolvedIdioma, duracion);
 
