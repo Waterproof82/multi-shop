@@ -351,6 +351,10 @@ function mapCartItemPayload(ci: CartItem) {
     quantity: ci.quantity,
     selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
     note: ci.note,
+    // Configurador de personas (kits): informativo — el server la clampa a
+    // [personas_min, personas_max] y recalcula el precio; sin configurador la
+    // descarta en silencio.
+    personas: ci.personas,
   };
 }
 

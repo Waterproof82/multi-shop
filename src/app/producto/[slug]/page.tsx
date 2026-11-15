@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { cargarPaginaProducto } from "@/lib/catalogo/cargar-producto";
+import { parsePersonasParam } from "@/lib/catalogo/escala-people";
 import { buildProductPageMetadata } from "@/lib/seo/tenant-seo";
 import { buildProductJsonLdGraph, safeJsonStringify } from "@/lib/seo/json-ld";
 import { getEmpresaLegalUseCase } from "@/core/infrastructure/database";
@@ -28,15 +29,23 @@ export async function generateMetadata({ params, searchParams }: Readonly<Produc
   return buildProductPageMetadata({ empresa: resultado.empresa, item: resultado.item, langParam: resolvedParams.lang });
 }
 
-export default async function ProductoPage({ params }: Readonly<ProductoPageProps>) {
+export default async function ProductoPage({ params, searchParams }: Readonly<ProductoPageProps>) {
   const { slug } = await params;
-  const resultado = await cargarPaginaProducto(slug);
+  const [resultado, resolvedSearchParams] = await Promise.all([
+    cargarPaginaProducto(slug),
+    searchParams,
+  ]);
 
   // notFound()/permanentRedirect() ANTES de cualquier JSX: un loading.tsx en
   // este árbol pintaría su fallback (200) antes de llegar aquí (F7) — por
   // eso esta ruta no tiene loading.tsx (ver producto-sin-loading.test.ts).
   if (resultado.tipo === 'redirigir') permanentRedirect(`/producto/${resultado.slug}`);
   if (resultado.tipo !== 'ok') notFound();
+
+  // Preselección del configurador de personas (kits) desde la web (PR3
+  // añade ?personas=N a los enlaces del finder): solo para el producto
+  // cargado; el cliente la clampa a [personas_min, personas_max].
+  const initialPersonas = parsePersonasParam(resolvedSearchParams.personas) ?? undefined;
 
   const { empresa, isPedidos, item, baseUrl } = resultado;
   const showCart = isPedidos || empresa.mostrarCarrito;
@@ -56,7 +65,7 @@ export default async function ProductoPage({ params }: Readonly<ProductoPageProp
   return (
     <EmpresaThemeProvider colores={empresa.colores || null}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <ProductDetailClient empresa={empresa} item={item} header={header} showCart={showCart} modalidadesEntrega={modalidadesEntrega} />
+      <ProductDetailClient empresa={empresa} item={item} header={header} showCart={showCart} modalidadesEntrega={modalidadesEntrega} initialPersonas={initialPersonas} />
     </EmpresaThemeProvider>
   );
 }

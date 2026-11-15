@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Minus, Plus } from "lucide-react";
 import { ProductImageGallery } from "@/components/product-image-gallery";
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog";
 import { ProductTable } from "@/components/producto/product-table";
@@ -12,9 +12,10 @@ import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
+import { precioUnitarioPeople } from "@/lib/catalogo/escala-people";
 import { hrefVolverACarta } from "@/lib/catalogo/ancla-producto";
 import type { EmpresaPublic, ModalidadEntrega } from "@/core/domain/entities/types";
-import type { MenuItemVM } from "@/core/application/dtos/menu-view-model";
+import type { MenuItemVM, PeopleConfigVM } from "@/core/application/dtos/menu-view-model";
 
 // Carga perezosa: solo hace falta cuando el carrito está activo, igual que en MenuPage.
 const CartDrawer = dynamic(
@@ -42,12 +43,21 @@ function necesitaSelector(item: MenuItemVM): boolean {
   return (item.complements?.length ?? 0) > 0 || (item.complementGroups?.length ?? 0) > 0;
 }
 
+/** Personas inicial del configurador: la de la URL clampada a [min, max] (o min). */
+function personasInicial(n: number | undefined, config: PeopleConfigVM | undefined): number {
+  if (!config) return 1;
+  if (n === undefined) return config.min;
+  return Math.min(config.max, Math.max(config.min, n));
+}
+
 interface ProductDetailClientProps {
   empresa: EmpresaPublic;
   item: MenuItemVM;
   header?: ReactNode;
   showCart: boolean;
   modalidadesEntrega: ModalidadEntrega[];
+  /** `?personas=N` resuelto por el server (page.tsx): preselección del configurador. */
+  initialPersonas?: number;
 }
 
 export function ProductDetailClient({
@@ -56,16 +66,35 @@ export function ProductDetailClient({
   header,
   showCart,
   modalidadesEntrega,
+  initialPersonas,
 }: Readonly<ProductDetailClientProps>) {
   const { language } = useLanguage();
   const { addItem } = useCart();
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Configurador de personas (kits). Sin peopleConfig es invisible: el estado
+  // queda en 1 y ni el stepper ni el escalado de tabla se renderizan.
+  const peopleConfig = item.peopleConfig;
+  const [personas, setPersonas] = useState(() => personasInicial(initialPersonas, peopleConfig));
 
   const displayName = nombreTraducido(item, language);
   const displayDescription = descripcionTraducida(item, language);
   const images = [item.image, item.image2].filter((src): src is string => Boolean(src));
+  // Precio vivo del configurador: base + paso × (N − min), ESPEJO del que
+  // recalcula el server al cobrar (PedidoUseCase, siempre autoridad).
+  const precioMostrado = peopleConfig
+    ? precioUnitarioPeople(item.price, peopleConfig.pasoCents, peopleConfig.min, personas)
+    : item.price;
 
   const handleAddToCart = () => {
+    if (peopleConfig) {
+      // Los kits con configurador no tienen grupos de complementos (verificado
+      // en DB: producto_complemento_grupos = 0), así que el diálogo no aplica:
+      // añadido directo. El ítem del carrito lleva el precio ESCALADO (para
+      // que el total mostrado coincida con el cobro del server) y las
+      // personas como campo propio: cada N es una línea de carrito distinta.
+      addItem({ ...item, price: precioMostrado }, 1, undefined, undefined, undefined, undefined, personas);
+      return;
+    }
     if (necesitaSelector(item)) {
       setDialogOpen(true);
       return;
@@ -112,8 +141,46 @@ export function ProductDetailClient({
           )}
 
           <p className="mt-6 text-2xl font-semibold tabular-nums">
-            {formatPrice(item.price, empresa.moneda || "EUR", language)}
+            {formatPrice(precioMostrado, empresa.moneda || "EUR", language)}
           </p>
+
+          {showCart && peopleConfig && (
+            <div className="mt-6 flex items-center gap-4">
+              <span
+                id="people-config-label"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                {t("peopleConfigLabel", language)}
+              </span>
+              <div
+                className="flex items-center rounded-[3px] border border-border"
+                role="group"
+                aria-labelledby="people-config-label"
+              >
+                <button
+                  type="button"
+                  aria-label={t("reducePeople", language)}
+                  disabled={personas <= peopleConfig.min}
+                  onClick={() => setPersonas(p => Math.max(peopleConfig.min, p - 1))}
+                  className="grid min-h-[44px] w-11 place-items-center text-foreground transition-colors hover:bg-muted/60 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                >
+                  <Minus aria-hidden="true" className="size-4" />
+                </button>
+                <span aria-live="polite" className="min-w-[3rem] text-center text-lg font-semibold tabular-nums text-foreground">
+                  {personas}
+                </span>
+                <button
+                  type="button"
+                  aria-label={t("increasePeople", language)}
+                  disabled={personas >= peopleConfig.max}
+                  onClick={() => setPersonas(p => Math.min(peopleConfig.max, p + 1))}
+                  className="grid min-h-[44px] w-11 place-items-center text-foreground transition-colors hover:bg-muted/60 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                >
+                  <Plus aria-hidden="true" className="size-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {showCart && (
             <button
@@ -130,7 +197,7 @@ export function ProductDetailClient({
               <h2 className="mb-3 font-serif text-[clamp(20px,3vw,26px)] font-normal leading-tight tracking-[-0.01em] text-foreground">
                 {t("productTableSectionLabel", language)}
               </h2>
-              <ProductTable table={item.table} language={language} />
+              <ProductTable table={item.table} language={language} peopleConfig={peopleConfig} personas={personas} />
             </section>
           )}
         </div>
