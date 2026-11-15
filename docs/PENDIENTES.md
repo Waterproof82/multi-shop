@@ -57,3 +57,34 @@ mergeados y desplegados). Lo que queda es edición, deudas heredadas y un gate m
   `supabase/tests/smoke-db-functions.sql` (hogar natural del espejo SQL).
 - Test jsdom del selector del PDP con `?personas` preseleccionado (hoy la
   preselección está verificada por SSR en vivo, no por test de componente).
+
+---
+
+## Hallazgo 2026-11-15: el contador de personas NO está en la carta de la tienda
+
+Dónde vive hoy el flujo de incremento de personas (verificado en código y en vivo):
+
+| Superficie | ¿Contador? | Nota |
+|---|---|---|
+| Home web (finder + cards) | ✅ | misma `ProductCard` con `PeopleSelector` |
+| Catálogo web `/kits-de-emergencia` | ✅ | verificado en vivo: `−1+` en Estándar/Plus, ausente en Mochila/antiapagón |
+| PDP web | ✅ | preselección client-side via `?personas` |
+| **PDP tienda** | ✅ | el configurador de este cambio (server-side `?personas`) |
+| **Carta tienda `/carta`** | ❌ | por diseño — menú cacheado tenant-wide (TTL 1h) sin `peopleConfig` |
+
+**Por qué**: la decisión de diseño (spec store-people-configurator) fue enriquecer
+solo el PDP por request (service-role, 1 producto) y dejar el cache del menú
+intacto. La carta muestra precios base estáticos; el flujo en la tienda es
+carta → PDP (configurar) → carrito.
+
+**Decisión pendiente del owner**: extender el contador a las cards de la carta
+(nuevo cambio SDD) o mantener carta = ojear / PDP = configurar.
+
+**Notas técnicas si se extiende** (todo lo demás ya está listo):
+- `CartItem.personas` ya existe server-side: `PedidoUseCase.create` clampa a
+  `[personas_min, personas_max]` y cobra `precio + paso × (N − min)` desde la DB —
+  el money-path no necesita cambios.
+- Falta: `peopleConfig` en el VM del menú de la carta (query batched de
+  `receta_items` para los productos CON configurador — hoy solo 2), versionar la
+  cache key del menú (precedente: `get-cached-menu-cache-key-v2`) y el contador en
+  la card llevando `personas` al add-to-cart.
