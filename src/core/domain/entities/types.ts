@@ -24,6 +24,15 @@ export interface ProductoTabla {
   filas: TablaFila[];
 }
 
+/**
+ * Regla de escalado por personas de una fila de receta (configurador de
+ * kits, tienda). Multiplicador RELATIVO sobre la cantidad base de la fila:
+ * `por_persona` → base × N, `pack:C` → base × ceil(N/C), `compartido` → base.
+ * NULL (ausente) = fila sin configurar: se deduce ×1 como siempre.
+ * Espejo en SQL: `factor_regla()` (migración store_people_configurator).
+ */
+export type PeopleRegla = 'por_persona' | `pack:${number}` | 'compartido';
+
 export interface TablaPlantilla {
   id: string;
   empresaId: string;
@@ -59,6 +68,16 @@ export interface Product {
   tabla: ProductoTabla | null;
   slug: string | null;
   canonicalExterno: string | null;
+  /**
+   * Configurador de personas (kits): personas que cubre el kit base, tope
+   * del contador y precio por persona extra en céntimos. Los tres NOT NULL
+   * (juntos, CHECK en DB) = el producto tiene configurador; cualquiera NULL
+   * = sin configurador. Solo los rellena el path de pedido
+   * (`findByIds`, service_role) — el catálogo público anon no las lee.
+   */
+  personas_min?: number | null;
+  personas_max?: number | null;
+  personas_paso_cents?: number | null;
 }
 
 export interface Category {
@@ -244,6 +263,8 @@ export interface PedidoItem {
   cantidad: number;
   complementos?: PedidoComplemento[];
   nota?: string;
+  /** Personas del configurador (kits). Solo productos con configurador; lo calcula y clampa el server. */
+  personas?: number;
 }
 
 export interface CartItem {
@@ -256,6 +277,8 @@ export interface CartItem {
   quantity: number;
   selectedComplements?: { name: string; price: number }[];
   note?: string;
+  /** Personas del configurador (kits). El server la clampa a [min, max] y la descarta si el producto no tiene configurador. */
+  personas?: number;
 }
 
 export interface Pedido {

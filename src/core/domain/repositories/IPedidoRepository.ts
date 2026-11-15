@@ -1,4 +1,24 @@
-import { Pedido, CartItem, Result } from "../entities/types";
+import { Pedido, Result } from "../entities/types";
+
+/**
+ * Línea de `pedidos.detalle_pedido` ya validada por el use-case: nombre,
+ * precio (SIEMPRE revalidado contra la DB) y personas del configurador
+ * salen del servidor — el payload del cliente solo aporta identidad y
+ * cantidad. La usan `create` (tienda) y `createMesaOrder` (mesa).
+ */
+export interface PedidoRepoItem {
+  producto_id?: string;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  tipo_producto?: string;
+  translations?: unknown;
+  complementos?: { nombre: string; precio: number }[];
+  nota?: string;
+  /** Personas del configurador (kits). Solo productos con configurador; ausente = sin configurador. */
+  personas?: number;
+  pase?: string | null;
+}
 
 export interface KitchenBarCounts {
   cocina: { total: number; listos: number; retenidos: number };
@@ -126,7 +146,7 @@ export interface IPedidoRepository {
   createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; nota?: string; complementos?: { nombre: string; precio: number }[]; pase?: string | null }[];
+    items: PedidoRepoItem[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
@@ -148,7 +168,7 @@ export interface IPedidoRepository {
   create(
     empresaId: string,
     clienteId: string | null,
-    items: CartItem[],
+    items: PedidoRepoItem[],
     total: number,
     discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number },
     trackingToken?: string,

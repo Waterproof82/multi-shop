@@ -23,6 +23,10 @@ const itemsSchema = z.array(z.object({
     }).optional(),
   }),
   quantity: z.number().int().min(1).max(99),
+  // Personas del configurador (kits). Cap de cordura aquí; el clamp REAL
+  // ([personas_min, personas_max] del producto, o descarte si no tiene
+  // configurador) vive en PedidoUseCase — nunca se confía en el cliente.
+  personas: z.number().int().min(1).max(50).optional(),
   selectedComplements: z.array(z.object({
     id: z.uuid(),
     name: z.string().max(200),

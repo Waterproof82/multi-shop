@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository, WaiterBadgeCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
+import { Pedido, PedidoItem, Result } from "@/core/domain/entities/types";
+import { IPedidoRepository, PedidoRepoItem, WaiterBadgeCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
 
@@ -697,7 +697,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async create(
     empresaId: string,
     clienteId: string | null,
-    items: CartItem[],
+    items: PedidoRepoItem[],
     total: number,
     discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number },
     trackingToken?: string,
@@ -737,14 +737,15 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         empresa_id: empresaId,
         numero_pedido: nuevoNumeroPedido,
         cliente_id: clienteId,
-        detalle_pedido: items.map(ci => ({
-          producto_id: ci.item?.id,
-          nombre: ci.item?.name,
-          translations: ci.item?.translations,
-          precio: ci.item?.price,
-          cantidad: ci.quantity,
-          complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
-          ...(ci.note ? { nota: ci.note } : {}),
+        detalle_pedido: items.map(item => ({
+          ...(item.producto_id ? { producto_id: item.producto_id } : {}),
+          nombre: item.nombre,
+          ...(item.translations ? { translations: item.translations } : {}),
+          precio: item.precio,
+          cantidad: item.cantidad,
+          complementos: item.complementos ?? [],
+          ...(item.nota ? { nota: item.nota } : {}),
+          ...(item.personas !== undefined ? { personas: item.personas } : {}),
         })),
         total: total,
         estado: 'pendiente',
@@ -1006,7 +1007,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[]; nota?: string; pase?: string | null }[];
+    items: PedidoRepoItem[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
