@@ -64,7 +64,9 @@ const TIENE_DB = Boolean(SUPABASE_URL && SUPABASE_KEY);
 // invariantes generales no llegan a tocarlos).
 const KITS_KEC: Record<string, { min: number; max: number; pasoCents: number }> = {
   'kit-estandar-72h': { min: 1, max: 10, pasoCents: 10000 },
-  'kit-estandar-plus-72h': { min: 1, max: 10, pasoCents: 10000 },
+  // Decisión del propietario 2026-11-16 (revisión de márgenes): el Plus
+  // sube 180 € por persona extra, no los 100 € del brief inicial.
+  'kit-estandar-plus-72h': { min: 1, max: 10, pasoCents: 18000 },
 };
 
 interface ProductoConfig {
