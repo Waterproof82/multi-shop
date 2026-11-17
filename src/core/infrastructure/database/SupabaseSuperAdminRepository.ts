@@ -60,6 +60,7 @@ interface EmpresaRow {
   delivery_habilitado: boolean;
   landing_habilitada: boolean;
   tpv_habilitado: boolean | null;
+  kits_caducidad_habilitado: boolean | null;
   verifactu_mode: string | null;
   es_prueba: boolean | null;
   google_reviews_url: string | null;
@@ -428,6 +429,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       deliveryHabilitado: row.delivery_habilitado ?? false,
       landingHabilitada: row.landing_habilitada ?? true,
       tpvHabilitado: row.tpv_habilitado ?? false,
+      kitsCaducidadHabilitado: row.kits_caducidad_habilitado ?? false,
       verifactuMode: row.verifactu_mode ?? null,
       esPrueba: row.es_prueba ?? false,
       googleReviewsUrl: row.google_reviews_url ?? null,

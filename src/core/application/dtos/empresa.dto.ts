@@ -51,6 +51,8 @@ export const superadminUpdateEmpresaSchema = updateEmpresaSchema.extend({
   pagos_mesa_habilitados: z.boolean().optional(),
   pagos_pickup_habilitados: z.boolean().optional(),
   validacion_pedidos_habilitada: z.boolean().optional(),
+  /** Módulo de kits de emergencia con caducidad real (kit-expiry-reminders M4). Solo superadmin. */
+  kits_caducidad_habilitado: z.boolean().optional(),
 });
 
 export type SuperadminUpdateEmpresaDTO = z.infer<typeof superadminUpdateEmpresaSchema>;

@@ -34,6 +34,7 @@ interface Empresa {
   deliveryHabilitado: boolean;
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
+  kitsCaducidadHabilitado: boolean;
   verifactuMode: string | null;
   esPrueba: boolean;
   googleReviewsUrl: string | null;
@@ -274,6 +275,7 @@ export default async function SuperAdminPage() {
               seoStatus: e.seoStatus,
               landingHabilitada: e.landingHabilitada,
               tpvHabilitado: e.tpvHabilitado,
+              kitsCaducidadHabilitado: e.kitsCaducidadHabilitado,
               verifactuMode: e.verifactuMode,
               esPrueba: e.esPrueba,
             }))}
