@@ -3,10 +3,6 @@
 // el dominio. Las formas de salida son `CreateKitLoteInput`/`Pagina` de
 // `kit-caducidad-types.ts`.
 //
-// `replaceCaducidadesSchema` (DD9: XOR por ítem + duplicado
-// (ingredienteId, parte)) se añade en M4a2b junto con
-// `replaceKitLoteCaducidades.use-case.ts` (ver nota en
-// IKitCaducidadRepository.ts).
 import { z } from 'zod';
 
 export const createKitLoteSchema = z.object({
@@ -28,3 +24,49 @@ export const generarSeriesSchema = z.object({
 });
 /** @public — consumido por `generarSeriesLote.use-case.ts` en M4c. */
 export type GenerarSeriesDTO = z.infer<typeof generarSeriesSchema>;
+
+/**
+ * DD9: por ítem, el `.refine()` exige exactamente una fuente de fecha
+ * (`albaranCompraItemId` xor `caducaEl`) y que una fecha manual lleve
+ * `parte` no vacía (R-M4.3.1/R-M4.3.2). El CHECK `kit_lote_caducidades_una_fuente`
+ * de la migración M1 es la segunda barrera (defensa en profundidad, DD5).
+ */
+const caducidadItemSchema = z
+  .object({
+    ingredienteId: z.uuid(),
+    parte: z.string().trim().max(120).default(''),
+    albaranCompraItemId: z.uuid().nullable().optional(),
+    caducaEl: z.iso.date().nullable().optional(),
+  })
+  .refine(
+    (item) => Boolean(item.albaranCompraItemId) !== Boolean(item.caducaEl),
+    {
+      message: 'Cada ingrediente lleva exactamente una fuente de fecha: una línea de albarán o una fecha manual, no ambas ni ninguna',
+      path: ['caducaEl'],
+    },
+  )
+  .refine(
+    (item) => !item.caducaEl || item.parte.length > 0,
+    { message: 'La fecha manual requiere indicar la parte (p. ej. botiquín)', path: ['parte'] },
+  );
+
+/** DD9: `superRefine` rechaza un `(ingredienteId, parte)` duplicado en el mismo payload. */
+export const replaceCaducidadesSchema = z
+  .object({ items: z.array(caducidadItemSchema).max(100) })
+  .superRefine((data, ctx) => {
+    const vistos = new Set<string>();
+    data.items.forEach((item, index) => {
+      const clave = `${item.ingredienteId}::${item.parte}`;
+      if (vistos.has(clave)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Combinación de ingrediente y parte duplicada',
+          path: ['items', index, 'parte'],
+        });
+        return;
+      }
+      vistos.add(clave);
+    });
+  });
+export type ReplaceCaducidadesDTO = z.infer<typeof replaceCaducidadesSchema>;
+export type CaducidadItemDTO = z.infer<typeof caducidadItemSchema>;

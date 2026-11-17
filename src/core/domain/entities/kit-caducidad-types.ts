@@ -25,9 +25,30 @@ export interface KitLote {
   productoNombre?: string;
 }
 
-// `KitLoteCaducidad`/`CaducidadInput` se añaden en M4a2b (editor de
-// caducidades) y `LineaCandidata` en M4b1 (ver nota en
-// IKitCaducidadRepository.ts).
+/** DD5/DD9: fila ya guardada del editor de caducidades de un lote. */
+export interface KitLoteCaducidad {
+  ingredienteId: string;
+  parte: string;
+  albaranCompraItemId: string | null;
+  caducaEl: string | null;
+}
+
+/** Forma que acepta la RPC `kit_lote_reemplazar_caducidades` (DD5/DD9). */
+export interface CaducidadInput {
+  ingredienteId: string;
+  parte: string;
+  albaranCompraItemId: string | null;
+  caducaEl: string | null;
+}
+
+/** Combinación que necesita el editor de un lote (M4a2b). */
+export interface KitLoteEditor {
+  lote: KitLote;
+  consumibles: ConsumibleKit[];
+  caducidades: KitLoteCaducidad[];
+}
+
+// `LineaCandidata` se añade en M4b1 (ver nota en IKitCaducidadRepository.ts).
 
 export interface Paginado<T> {
   items: T[];

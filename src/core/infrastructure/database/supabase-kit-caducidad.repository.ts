@@ -6,7 +6,7 @@
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import type {
-  ProductoKit, ConsumibleKit, KitLote,
+  ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput,
   Paginado, CreateKitLoteInput, Pagina,
 } from '@/core/domain/entities/kit-caducidad-types';
 import type { Result, AppError } from '@/core/domain/entities/types';
@@ -59,8 +59,14 @@ function mapKitLote(row: Record<string, unknown>): KitLote {
   };
 }
 
-// `mapKitLoteCaducidad` (DD5) se añade en M4a2b junto con
-// `findCaducidades`/`replaceCaducidades` (ver nota al final de esta clase).
+function mapKitLoteCaducidad(row: Record<string, unknown>): KitLoteCaducidad {
+  return {
+    ingredienteId: row.ingrediente_id as string,
+    parte: row.parte as string,
+    albaranCompraItemId: (row.albaran_compra_item_id as string | null) ?? null,
+    caducaEl: (row.caduca_el as string | null) ?? null,
+  };
+}
 
 function mapConsumibleKit(row: Record<string, unknown>): ConsumibleKit {
   const ingrediente = row.ingredientes as Record<string, unknown> | null | undefined;
@@ -209,10 +215,50 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
     }
   }
 
-  // `findCaducidades`/`replaceCaducidades` (DD5, RPC transaccional
-  // `kit_lote_reemplazar_caducidades`) se añaden en M4a2b junto con
-  // `getKitLoteEditor`/`replaceKitLoteCaducidades.use-case.ts`.
-  //
+  async findCaducidades(empresaId: string, loteId: string): Promise<Result<KitLoteCaducidad[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kit_lote_caducidades')
+        .select('ingrediente_id, parte, albaran_compra_item_id, caduca_el')
+        .eq('empresa_id', empresaId)
+        .eq('lote_id', loteId);
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'findCaducidades') };
+      }
+      return { success: true, data: (data as Record<string, unknown>[]).map(mapKitLoteCaducidad) };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findCaducidades') };
+    }
+  }
+
+  // DD5: reemplazo transaccional vía RPC (no delete+insert por PostgREST) —
+  // si el CHECK/trigger falla, el lote conserva el conjunto anterior en vez
+  // de quedarse sin fechas.
+  async replaceCaducidades(empresaId: string, loteId: string, items: CaducidadInput[]): Promise<Result<void>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.rpc('kit_lote_reemplazar_caducidades', {
+        p_empresa_id: empresaId,
+        p_lote_id: loteId,
+        p_items: items.map((item) => ({
+          ingrediente_id: item.ingredienteId,
+          parte: item.parte,
+          albaran_compra_item_id: item.albaranCompraItemId,
+          caduca_el: item.caducaEl,
+        })),
+      });
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'replaceCaducidades') };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'replaceCaducidades') };
+    }
+  }
+
   // `findLineasCandidatas`/`findPartesUsadas` (DD8/R-M4.3.5) se añaden en
   // M4b1, junto con `api/admin/kits/candidatas/route.ts` (ver nota en
   // IKitCaducidadRepository.ts).
