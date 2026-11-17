@@ -49,6 +49,8 @@ import { SupabaseStockRepository } from '../repositories/supabase-stock.reposito
 import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
 import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
 import { SupabaseComprasRepository } from './supabase-compras.repository';
+import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
+import { SupabaseKitCaducidadRepository } from './supabase-kit-caducidad.repository';
 import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
 import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
 import { SupabaseAuditLogRepository } from '../repositories/supabase-audit-log.repository';
@@ -324,6 +326,12 @@ let _comprasRepository: IComprasRepository | undefined;
 export function getComprasRepository(): IComprasRepository {
   _comprasRepository ??= new SupabaseComprasRepository();
   return _comprasRepository;
+}
+
+let _kitCaducidadRepository: IKitCaducidadRepository | undefined;
+export function getKitCaducidadRepository(): IKitCaducidadRepository {
+  _kitCaducidadRepository ??= new SupabaseKitCaducidadRepository();
+  return _kitCaducidadRepository;
 }
 
 let _analyticsRepository: SupabaseAnalyticsRepository | undefined;
