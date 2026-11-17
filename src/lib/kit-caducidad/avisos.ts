@@ -24,8 +24,10 @@ export type AvisoDebido = {
   marcar: string[];
 };
 
-export function claveAviso(serie: string, consumible: string, parte: string, umbral: UmbralAviso): string {
-  return [serie, consumible, parte, umbral, 'email'].join('|');
+// Clave = PK de kit_avisos_enviados. Usa el id del ingrediente, no su nombre:
+// renombrarlo no debe volver a disparar un aviso ya enviado.
+export function claveAviso(serie: string, ingredienteId: string, parte: string, umbral: UmbralAviso): string {
+  return [serie, ingredienteId, parte, umbral, 'email'].join('|');
 }
 
 // El umbral más cercano que ya se ha alcanzado, o null si aún falta.
@@ -43,10 +45,10 @@ function avisoDelElemento(
 ): { elemento: ElementoAviso; marcar: string[] } | null {
   const umbral = umbralAlcanzado(diasHasta(hoy, c.caducaEl));
   if (umbral === null) return null;
-  if (enviados.has(claveAviso(serie, c.consumible, c.parte, umbral))) return null;
+  if (enviados.has(claveAviso(serie, c.ingredienteId, c.parte, umbral))) return null;
   // Si ya toca el de 15, el de 30 (si no salió) se da por cubierto: un solo email.
   const marcar = UMBRALES_AVISO_DIAS.filter((u) => u >= umbral)
-    .map((u) => claveAviso(serie, c.consumible, c.parte, u))
+    .map((u) => claveAviso(serie, c.ingredienteId, c.parte, u))
     .filter((clave) => !enviados.has(clave));
   return { elemento: { ...c, umbralDias: umbral }, marcar };
 }

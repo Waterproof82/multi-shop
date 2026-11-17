@@ -9,7 +9,8 @@ export type EstadoElemento = 'al_dia' | 'caduca_pronto' | 'caducado';
 export type EstadoGeneral = EstadoElemento | 'sin_datos';
 
 export type Caducidad = {
-  consumible: string; // nombre de fila del inventario, idéntico a la web
+  ingredienteId: string; // FK a ingredientes: la identidad del consumible
+  consumible: string; // nombre para mostrar (ingredientes.nombre)
   parte: string; // '' = la fila entera; botiquín: una fila por parte (D5)
   caducaEl: string; // ISO date
 };

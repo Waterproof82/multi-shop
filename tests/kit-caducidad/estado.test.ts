@@ -4,8 +4,8 @@ import { estadoDelKit, diasHasta } from '@/lib/kit-caducidad/estado';
 // sdd kit-expiry-reminders R3.0: estado por elemento (el botiquín por
 // partes) y estado general = el peor, o «Todo al día».
 
-const pastillas = { consumible: 'Pastillas Potabilizadoras de Agua (50 uds.)', parte: '' };
-const antiseptico = { consumible: 'Botiquín de primeros auxilios conforme a DIN 13164', parte: 'Antiséptico' };
+const pastillas = { ingredienteId: "11111111-1111-4111-8111-111111111111", consumible: 'Pastillas Potabilizadoras de Agua (50 uds.)', parte: '' };
+const antiseptico = { ingredienteId: "22222222-2222-4222-8222-222222222222", consumible: 'Botiquín de primeros auxilios conforme a DIN 13164', parte: 'Antiséptico' };
 
 describe('diasHasta', () => {
   it('cuenta días naturales entre fechas ISO sin depender de la zona horaria', () => {

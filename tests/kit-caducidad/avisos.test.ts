@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { avisosDebidos, claveAviso, type KitParaAvisos } from '@/lib/kit-caducidad/avisos';
 
 // sdd kit-expiry-reminders R4: avisos a 30 y 15 días, una sola vez por
-// (serie, consumible, parte, umbral), con recuperación de días perdidos.
+// (serie, ingrediente, parte, umbral), con recuperación de días perdidos.
+// La clave usa el id del ingrediente (FK), nunca su nombre.
 
 const PASTILLAS = 'Pastillas Potabilizadoras de Agua (50 uds.)';
+const PASTILLAS_ID = "11111111-1111-4111-8111-111111111111";
+const BOTIQUIN_ID = "22222222-2222-4222-8222-222222222222";
 const BOTIQUIN = 'Botiquín de primeros auxilios conforme a DIN 13164';
 
 function kit(caducidades: KitParaAvisos['caducidades'], extra: Partial<KitParaAvisos> = {}): KitParaAvisos {
@@ -12,15 +15,15 @@ function kit(caducidades: KitParaAvisos['caducidades'], extra: Partial<KitParaAv
 }
 
 describe('avisosDebidos', () => {
-  const lote = [{ consumible: PASTILLAS, parte: '', caducaEl: '2031-03-01' }];
+  const lote = [{ ingredienteId: PASTILLAS_ID, consumible: PASTILLAS, parte: '', caducaEl: '2031-03-01' }];
 
   it('envía el aviso de 30 días el día que faltan 30', () => {
     // Act
     const [aviso] = avisosDebidos('2031-01-30', [kit(lote)], new Set());
 
     // Assert
-    expect(aviso.elementos).toEqual([{ consumible: PASTILLAS, parte: '', caducaEl: '2031-03-01', umbralDias: 30 }]);
-    expect(aviso.marcar).toEqual([claveAviso('KEC-AAAA-BBBB-C', PASTILLAS, '', 30)]);
+    expect(aviso.elementos).toEqual([{ ingredienteId: PASTILLAS_ID, consumible: PASTILLAS, parte: '', caducaEl: '2031-03-01', umbralDias: 30 }]);
+    expect(aviso.marcar).toEqual([claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 30)]);
   });
 
   it('no envía nada a más de 30 días', () => {
@@ -28,7 +31,7 @@ describe('avisosDebidos', () => {
   });
 
   it('envía el de 15 días aunque ya se enviara el de 30', () => {
-    const enviados = new Set([claveAviso('KEC-AAAA-BBBB-C', PASTILLAS, '', 30)]);
+    const enviados = new Set([claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 30)]);
 
     const [aviso] = avisosDebidos('2031-02-14', [kit(lote)], enviados);
 
@@ -37,8 +40,8 @@ describe('avisosDebidos', () => {
 
   it('no repite un aviso ya enviado', () => {
     const enviados = new Set([
-      claveAviso('KEC-AAAA-BBBB-C', PASTILLAS, '', 30),
-      claveAviso('KEC-AAAA-BBBB-C', PASTILLAS, '', 15),
+      claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 30),
+      claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 15),
     ]);
 
     expect(avisosDebidos('2031-02-14', [kit(lote)], enviados)).toEqual([]);
@@ -50,7 +53,7 @@ describe('avisosDebidos', () => {
     expect(aviso.elementos).toHaveLength(1);
     expect(aviso.elementos[0].umbralDias).toBe(15);
     expect(aviso.marcar.sort()).toEqual(
-      [claveAviso('KEC-AAAA-BBBB-C', PASTILLAS, '', 30), claveAviso('KEC-AAAA-BBBB-C', PASTILLAS, '', 15)].sort(),
+      [claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 30), claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 15)].sort(),
     );
   });
 
@@ -64,14 +67,26 @@ describe('avisosDebidos', () => {
       [
         kit([
           ...lote,
-          { consumible: BOTIQUIN, parte: 'Antiséptico', caducaEl: '2031-02-10' },
-          { consumible: BOTIQUIN, parte: 'Gasas estériles', caducaEl: '2035-01-01' },
+          { ingredienteId: BOTIQUIN_ID, consumible: BOTIQUIN, parte: 'Antiséptico', caducaEl: '2031-02-10' },
+          { ingredienteId: BOTIQUIN_ID, consumible: BOTIQUIN, parte: 'Gasas estériles', caducaEl: '2035-01-01' },
         ]),
       ],
       new Set(),
     );
 
     expect(aviso.elementos.map((e) => e.parte)).toEqual(['', 'Antiséptico']);
+  });
+
+  it('no repite un aviso aunque el ingrediente cambie de nombre', () => {
+    // Arrange
+    const enviados = new Set([claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 30)]);
+    const renombrado = [{ ...lote[0], consumible: 'Tabletas potabilizadoras (50 uds.)' }];
+
+    // Act
+    const avisos = avisosDebidos('2031-01-30', [kit(renombrado)], enviados);
+
+    // Assert
+    expect(avisos).toEqual([]);
   });
 
   it('ignora los kits sin avisos por email activos', () => {

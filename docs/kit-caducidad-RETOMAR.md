@@ -10,7 +10,7 @@ Ese documento cubre el estado del trabajo, el orden de lo pendiente, los bloqueo
 ## Lo que ya hay en este repo
 
 - `src/lib/kit-caducidad/`: series KEC, estado del kit y avisos debidos. Es lógica pura y tiene 22 tests en `tests/kit-caducidad/`.
-- `supabase/migrations/20261117000001_kit_caducidades.sql`: crea 5 tablas con RLS.
+- `supabase/migrations/20261117000001_kit_caducidades.sql`: crea 5 tablas con RLS y una vista. Reutiliza el modelo existente: `kit_lotes.producto_id` → `productos`, consumibles por `ingrediente_id` → `ingredientes` y fecha desde `albaranes_compra_items.fecha_caducidad` (o `caduca_el` solo para las partes del botiquín).
   - ⚠️ **No está aplicada.** Para aplicarla, ejecuta `supabase db push --linked` y después `pnpm db:smoke` y `pnpm e2e:db`.
 
 ## Siguiente en este repo
