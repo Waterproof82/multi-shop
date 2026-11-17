@@ -10,7 +10,7 @@ import {
   UtensilsCrossed, MapPin, Star, Archive, BookOpen, History,
   ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt,
   FileText, TrendingUp, DollarSign, Grid2X2, CalendarDays,
-  ArrowLeftRight, ChevronDown, LayoutTemplate, Scale,
+  ArrowLeftRight, ChevronDown, LayoutTemplate, Scale, Boxes, CalendarClock,
 } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
@@ -34,6 +34,7 @@ interface NavItemDef {
   requiresDelivery?: boolean;
   requiresLanding?: boolean;
   requiresTpv?: boolean;
+  requiresKits?: boolean;
 }
 
 interface NavGroupDef {
@@ -54,6 +55,7 @@ interface FilterCtx {
   isTienda: boolean;
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
+  kitsHabilitado: boolean;
 }
 
 // ── Color config (must use complete Tailwind class strings) ───────────────────
@@ -168,6 +170,18 @@ const NAV_ENTRIES: NavEntry[] = [
       ],
     },
   },
+  {
+    type: 'group',
+    def: {
+      id: 'kits',
+      labelKey: 'sidebarKits',
+      icon: Boxes,
+      color: 'amber',
+      items: [
+        { href: '/admin/kits/lotes', labelKey: 'sidebarKitsLotes', icon: CalendarClock, requiresKits: true },
+      ],
+    },
+  },
   { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresTpv: true } },
   { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresTpv: true } },
   { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate, requiresLanding: true } },
@@ -195,6 +209,9 @@ export function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
   if (item.requiresLanding && !ctx.landingHabilitada) return false;
   // Empleados TPV y auditoría: solo con el TPV contratado (lo activa el superadmin).
   if (item.requiresTpv && !ctx.tpvHabilitado) return false;
+  // R-M4.1.3: el grupo «Kits» no aparece si el tenant no tiene el módulo
+  // contratado (empresas.kits_caducidad_habilitado).
+  if (item.requiresKits && !ctx.kitsHabilitado) return false;
   return true;
 }
 
@@ -379,6 +396,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     deliveryHabilitado,
     landingHabilitada,
     tpvHabilitado,
+    kitsHabilitado,
   } = useAdmin();
   const { language } = useLanguage();
 
@@ -403,6 +421,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     isTienda: empresaTipo === 'tienda',
     landingHabilitada,
     tpvHabilitado,
+    kitsHabilitado,
   };
 
   const visibleEntries = NAV_ENTRIES

@@ -10,6 +10,7 @@ import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { SuperadminBanner } from '@/components/superadmin-banner';
 import { TextoTraducido } from '@/components/texto-traducido';
 import { tpvHabilitadoParaEmpresa } from '@/lib/tpv/tpv-habilitado';
+import { kitsCaducidadHabilitadoParaEmpresa } from '@/lib/kit-caducidad/kits-habilitado';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,6 +80,17 @@ export default async function AdminProtectedLayout({
   // Mismo flag y misma caché que el proxy: si el superadmin apaga el TPV, aquí
   // desaparecen "Ir al TPV", empleados y auditoría (como mucho 60 s después).
   const tpvHabilitado = await tpvHabilitadoParaEmpresa(empresaId);
+  // DD2 (design.md) hace fail-closed esta comprobación y LANZA ante un error
+  // de BD para que la API de /api/admin/kits/* responda 503 sin datos. Aquí,
+  // en el layout compartido por TODO el admin, lanzar tiraría el panel
+  // entero por un fallo transitorio ajeno a esta sección: el equivalente
+  // fail-closed en la UI es ocultar el grupo «Kits», no reventar el layout.
+  let kitsHabilitado = false;
+  try {
+    kitsHabilitado = await kitsCaducidadHabilitadoParaEmpresa(empresaId);
+  } catch {
+    kitsHabilitado = false;
+  }
 
   return (
     <LanguageProvider>
@@ -94,6 +106,7 @@ export default async function AdminProtectedLayout({
         deliveryHabilitado={deliveryHabilitado}
         landingHabilitada={landingHabilitada}
         tpvHabilitado={tpvHabilitado}
+        kitsHabilitado={kitsHabilitado}
         overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
         isSuperAdmin={isSuperAdminView}
       >

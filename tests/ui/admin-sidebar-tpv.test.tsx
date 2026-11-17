@@ -8,7 +8,7 @@ const ITEM_EMPLEADOS = { href: '/admin/empleados-tpv', labelKey: 'sidebarEmplead
 
 const BASE_CTX = {
   mostrarPromociones: false, mostrarTgtg: false, isRestaurant: false, deliveryHabilitado: false,
-  isTienda: true, landingHabilitada: true,
+  isTienda: true, landingHabilitada: true, kitsHabilitado: false,
 };
 
 describe('isItemVisible — items del TPV', () => {
