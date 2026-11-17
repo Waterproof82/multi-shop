@@ -87,6 +87,8 @@ export interface EmpresaWithStats {
   landingHabilitada: boolean;
   /** TPV + registro de jornada + facturación en este sistema. Solo superadmin. */
   tpvHabilitado: boolean;
+  /** Módulo de kits de emergencia con caducidad real (kit-expiry-reminders M4). Solo superadmin. */
+  kitsCaducidadHabilitado: boolean;
   verifactuMode: string | null;
   /** Solo lectura: se fija al crear la empresa y es inmutable en BD. Nunca en un DTO. */
   esPrueba: boolean;
