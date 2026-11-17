@@ -48,7 +48,21 @@ export interface KitLoteEditor {
   caducidades: KitLoteCaducidad[];
 }
 
-// `LineaCandidata` se añade en M4b1 (ver nota en IKitCaducidadRepository.ts).
+/** DD8/R-M4.3.5: línea de albarán candidata a fuente de fecha de un ingrediente. */
+export interface LineaCandidata {
+  albaranCompraItemId: string;
+  ingredienteId: string;
+  numeroLote: string | null;
+  fechaCaducidad: string;
+  numeroAlbaran: string;
+  fechaRecepcion: string;
+}
+
+/** Combinación que necesita el editor para el autocompletado (M4b1). */
+export interface CandidatasLote {
+  lineas: LineaCandidata[];
+  partesUsadas: string[];
+}
 
 export interface Paginado<T> {
   items: T[];

@@ -6,7 +6,7 @@
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import type {
-  ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput,
+  ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput, LineaCandidata,
   Paginado, CreateKitLoteInput, Pagina,
 } from '@/core/domain/entities/kit-caducidad-types';
 import type { Result, AppError } from '@/core/domain/entities/types';
@@ -77,7 +77,18 @@ function mapConsumibleKit(row: Record<string, unknown>): ConsumibleKit {
   };
 }
 
-// `mapLineaCandidata` (DD8) se añade en M4b1 junto con `findLineasCandidatas`.
+function mapLineaCandidata(row: Record<string, unknown>): LineaCandidata {
+  const albaran = row.albaranes_compra as Record<string, unknown> | null | undefined;
+  const catalogo = row.catalogo_compra as Record<string, unknown> | null | undefined;
+  return {
+    albaranCompraItemId: row.id as string,
+    ingredienteId: catalogo?.ingrediente_id as string,
+    numeroLote: (row.numero_lote as string | null) ?? null,
+    fechaCaducidad: row.fecha_caducidad as string,
+    numeroAlbaran: albaran?.numero_albaran as string,
+    fechaRecepcion: albaran?.fecha_recepcion as string,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Repository
@@ -259,7 +270,54 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
     }
   }
 
-  // `findLineasCandidatas`/`findPartesUsadas` (DD8/R-M4.3.5) se añaden en
-  // M4b1, junto con `api/admin/kits/candidatas/route.ts` (ver nota en
-  // IKitCaducidadRepository.ts).
+  // DD8: solo albaranes `recibido` (inalterables, Ley 11/2021), con fecha de
+  // caducidad futura; las líneas ya usadas por otros lotes no se excluyen
+  // (D-M4-3). `ingredienteIds` vacío no llega aquí — el caso de uso corta
+  // antes de llamar si el kit no tiene consumibles perecederos.
+  async findLineasCandidatas(empresaId: string, ingredienteIds: string[], desde: string): Promise<Result<LineaCandidata[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('albaranes_compra_items')
+        .select('id, numero_lote, fecha_caducidad, albaranes_compra!inner(numero_albaran, fecha_recepcion, empresa_id, estado), catalogo_compra!inner(ingrediente_id)')
+        .eq('albaranes_compra.empresa_id', empresaId)
+        .eq('albaranes_compra.estado', 'recibido')
+        .in('catalogo_compra.ingrediente_id', ingredienteIds)
+        .not('fecha_caducidad', 'is', null)
+        .gte('fecha_caducidad', desde)
+        .order('fecha_caducidad', { ascending: true })
+        .limit(200);
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'findLineasCandidatas') };
+      }
+      return { success: true, data: (data as Record<string, unknown>[]).map(mapLineaCandidata) };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findLineasCandidatas') };
+    }
+  }
+
+  // R-M4.3.5: autocompletado de `parte`, solo valores ya usados por la propia empresa.
+  async findPartesUsadas(empresaId: string): Promise<Result<string[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kit_lote_caducidades')
+        .select('parte')
+        .eq('empresa_id', empresaId)
+        .neq('parte', '');
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'findPartesUsadas') };
+      }
+      const partes = new Set<string>();
+      for (const row of data as Record<string, unknown>[]) {
+        const parte = row.parte as string;
+        if (parte) partes.add(parte);
+      }
+      return { success: true, data: Array.from(partes).sort() };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findPartesUsadas') };
+    }
+  }
 }

@@ -32,6 +32,8 @@ function fakeRepo(overrides: Partial<IKitCaducidadRepository> = {}): IKitCaducid
     findLoteById: vi.fn().mockResolvedValue({ success: true, data: loteEjemplo }),
     findCaducidades: vi.fn(),
     replaceCaducidades: vi.fn().mockResolvedValue({ success: true, data: undefined }),
+    findLineasCandidatas: vi.fn(),
+    findPartesUsadas: vi.fn(),
     ...overrides,
   };
 }

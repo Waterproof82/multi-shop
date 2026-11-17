@@ -70,3 +70,7 @@ export const replaceCaducidadesSchema = z
   });
 export type ReplaceCaducidadesDTO = z.infer<typeof replaceCaducidadesSchema>;
 export type CaducidadItemDTO = z.infer<typeof caducidadItemSchema>;
+
+/** `?loteId=` de `GET /api/admin/kits/candidatas` (M4b1). */
+export const loteIdQuerySchema = z.object({ loteId: z.uuid() });
+export type LoteIdQueryDTO = z.infer<typeof loteIdQuerySchema>;
