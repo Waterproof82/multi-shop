@@ -15,3 +15,13 @@
 
 /** @public — consumido por `generarEtiquetasLote.use-case.ts` (M5a2). */
 export const KIT_ESTADO_PUBLICO_LIVE = true;
+
+// kit-expiry-m2b (docs/sdd/kit-expiry-reminders/m2b/), D-M2b-8/R-M2b.8.1:
+// mientras no exista el cron de avisos (M3), publicitar el alta sería
+// publicidad engañosa. El formulario de `/kit/{serie}` (M2b8a) y las rutas
+// `POST /api/kit-avisos/{alta,enlace}` (M2b6a/M2b6b) comprueban esta
+// bandera; la de confirmación/baja (`/api/kit-avisos/gestion`) NO la
+// comprueba — la revocación nunca puede depender de una bandera (D-M2b-8).
+// La pone a `true` el último commit de M3, junto con su propio test.
+/** @public — consumido por el formulario de alta y por las rutas de alta/enlace. */
+export const KIT_AVISOS_ALTA_LIVE = false;
