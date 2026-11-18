@@ -1,13 +1,10 @@
 'use client';
 
-// kit-expiry-reminders M4b2a — listado + alta de lotes de kit (R-M4.2.*).
-// El editor de caducidades por lote (R-M4.3.*) se monta aquí en M4b2b
-// (`lote-caducidades-editor.tsx`, apilada sobre esta rama): esta PR ya roza
-// el presupuesto de 400 líneas solo con el listado/alta + la paridad de
-// traducciones de 5 idiomas, así que se trocea igual que M4a2/M4a2b.
+// kit-expiry-reminders M4b2b — monta el editor de caducidades por lote
+// (R-M4.3.*) sobre el listado/alta de M4b2a.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, CalendarClock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -15,6 +12,7 @@ import { useLanguage } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 import type { KitLote, Paginado, ProductoKit } from '@/core/domain/entities/kit-caducidad-types';
+import { LoteCaducidadesEditor } from './lote-caducidades-editor';
 
 function withEmpresaId(url: string, overrideEmpresaId: string | undefined, empresaId: string | undefined): string {
   const id = overrideEmpresaId || empresaId;
@@ -34,6 +32,7 @@ export default function KitsLotesPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [loteAbiertoId, setLoteAbiertoId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -78,6 +77,7 @@ export default function KitsLotesPage() {
       setCodigo('');
       setFechaMontaje('');
       setLotes((prev) => [nuevoLote, ...prev]);
+      setLoteAbiertoId(nuevoLote.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -142,6 +142,7 @@ export default function KitsLotesPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t('kitsCodigoLote', language)}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t('kitsProducto', language)}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t('kitsFechaMontaje', language)}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase">{t('actions', language)}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
@@ -150,17 +151,32 @@ export default function KitsLotesPage() {
                   <td className="px-4 py-3 text-slate-200">{lote.codigo}</td>
                   <td className="px-4 py-3 text-slate-200">{lote.productoNombre ?? lote.productoId}</td>
                   <td className="px-4 py-3 text-slate-200">{lote.fechaMontaje}</td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLoteAbiertoId(loteAbiertoId === lote.id ? null : lote.id)}
+                    >
+                      <CalendarClock className="h-4 w-4" />
+                      {t('kitsEditorTitle', language)}
+                    </Button>
+                  </td>
                 </tr>
               ))}
               {lotes.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-slate-400">{t('kitsSinLotes', language)}</td>
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400">{t('kitsSinLotes', language)}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {loteAbiertoId && (
+        <LoteCaducidadesEditor loteId={loteAbiertoId} onSaved={cargar} />
+      )}
     </div>
   );
 }
