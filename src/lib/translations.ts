@@ -1158,6 +1158,11 @@ export const translations = {
     kitsSerie: 'Serie',
     kitsSerieRegistrada: 'Registrada',
     kitsSerieSinRegistrar: 'Sin registrar',
+    // Etiquetas PDF del lote (kit-expiry-reminders M5c)
+    kitsDescargarEtiquetas: 'Descargar etiquetas (PDF)',
+    kitsDescargandoEtiquetas: 'Generando PDF…',
+    kitsErrorEtiquetas: 'No se pudieron generar las etiquetas',
+    kitsEtiquetasMuestraAviso: 'El PDF lleva la marca de muestra hasta que el kit se publique',
     // Kits registrados (kit-expiry-reminders M4d)
     sidebarKitsRegistrados: 'Registrados',
     kitsRegistradosTitle: 'Kits registrados',
@@ -2715,6 +2720,11 @@ export const translations = {
     kitsSerie: 'Serial',
     kitsSerieRegistrada: 'Registered',
     kitsSerieSinRegistrar: 'Not registered',
+    // Etiquetas PDF del lote (kit-expiry-reminders M5c)
+    kitsDescargarEtiquetas: 'Download labels (PDF)',
+    kitsDescargandoEtiquetas: 'Generating PDF…',
+    kitsErrorEtiquetas: 'Could not generate the labels',
+    kitsEtiquetasMuestraAviso: 'The PDF carries a sample mark until the kit goes live',
     // Kits registrados (kit-expiry-reminders M4d)
     sidebarKitsRegistrados: 'Registered',
     kitsRegistradosTitle: 'Registered kits',
@@ -4320,6 +4330,11 @@ export const translations = {
     kitsSerie: 'Série',
     kitsSerieRegistrada: 'Enregistrée',
     kitsSerieSinRegistrar: 'Non enregistrée',
+    // Etiquetas PDF del lote (kit-expiry-reminders M5c)
+    kitsDescargarEtiquetas: 'Télécharger les étiquettes (PDF)',
+    kitsDescargandoEtiquetas: 'Génération du PDF…',
+    kitsErrorEtiquetas: "Impossible de générer les étiquettes",
+    kitsEtiquetasMuestraAviso: "Le PDF porte la mention d'échantillon jusqu'à la publication du kit",
     // Kits registrados (kit-expiry-reminders M4d)
     sidebarKitsRegistrados: 'Enregistrés',
     kitsRegistradosTitle: 'Kits enregistrés',
@@ -5878,6 +5893,11 @@ export const translations = {
     kitsSerie: 'Serie',
     kitsSerieRegistrada: 'Registrata',
     kitsSerieSinRegistrar: 'Non registrata',
+    // Etiquetas PDF del lote (kit-expiry-reminders M5c)
+    kitsDescargarEtiquetas: 'Scarica etichette (PDF)',
+    kitsDescargandoEtiquetas: 'Generazione PDF…',
+    kitsErrorEtiquetas: 'Impossibile generare le etichette',
+    kitsEtiquetasMuestraAviso: 'Il PDF porta il segno di campione finché il kit non viene pubblicato',
     // Kits registrados (kit-expiry-reminders M4d)
     sidebarKitsRegistrados: 'Registrati',
     kitsRegistradosTitle: 'Kit registrati',
@@ -7436,6 +7456,11 @@ export const translations = {
     kitsSerie: 'Seriennummer',
     kitsSerieRegistrada: 'Registriert',
     kitsSerieSinRegistrar: 'Nicht registriert',
+    // Etiquetas PDF del lote (kit-expiry-reminders M5c)
+    kitsDescargarEtiquetas: 'Etiketten herunterladen (PDF)',
+    kitsDescargandoEtiquetas: 'PDF wird erstellt…',
+    kitsErrorEtiquetas: 'Die Etiketten konnten nicht erstellt werden',
+    kitsEtiquetasMuestraAviso: 'Das PDF trägt den Musterhinweis, bis der Kit veröffentlicht wird',
     // Kits registrados (kit-expiry-reminders M4d)
     sidebarKitsRegistrados: 'Registriert',
     kitsRegistradosTitle: 'Registrierte Kits',
