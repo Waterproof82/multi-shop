@@ -185,9 +185,12 @@ describe('qué rutas exigen autenticación (sin credenciales)', () => {
     '/api/glovo/quote',
     // El cron valida CRON_SECRET dentro de la propia ruta.
     '/api/laborcontrol/cron/seal',
-    // kit-expiry-m2b (M2b6a), R-M2b.6.3: ruta pública sin sesión, protegida
-    // por su propia bandera + límites + esPeticionJsonPublicaValida.
+    // kit-expiry-m2b (M2b6a/M2b6b), R-M2b.6.3: rutas públicas sin sesión,
+    // protegidas por su propia bandera (alta/enlace) o por
+    // rateLimitPublic + esPeticionJsonPublicaValida (gestión, que nunca
+    // depende de una bandera — D-M2b-8).
     '/api/kit-avisos/alta',
+    '/api/kit-avisos/gestion',
   ];
 
   it.each(PUBLICAS)('%s deja pasar sin credenciales', async (ruta) => {
