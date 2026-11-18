@@ -14,5 +14,11 @@ export function categoriasDatosDe(f: FlagsLegales): CategoriaDatos[] {
     lista.push({ titulo: 'Datos de dirección', descripcion: 'dirección de entrega, solo para pedidos con entrega a domicilio.' });
   }
   lista.push({ titulo: 'Datos económicos', descripcion: 'importe del pedido. No se almacenan datos de tarjeta de crédito.' });
+  if (f.kitsCaducidadHabilitado) {
+    lista.push({
+      titulo: 'Datos de avisos de caducidad del kit',
+      descripcion: 'email y, opcionalmente, teléfono de quien registra la serie del kit; y la fecha y la versión de cada consentimiento.',
+    });
+  }
   return lista;
 }

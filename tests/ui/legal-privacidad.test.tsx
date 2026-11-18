@@ -67,3 +67,26 @@ describe('PrivacidadContenido — encargado y derechos', () => {
     expect(screen.getByRole('heading', { name: /cambios en esta política/i })).toBeInTheDocument();
   });
 });
+
+describe('PrivacidadContenido — avisos de caducidad del kit', () => {
+  it('sin el módulo de kits no menciona los avisos de caducidad', () => {
+    render(<PrivacidadContenido ctx={contextoDePrueba()} />);
+    expect(screen.queryByText('Avisos de caducidad del kit')).not.toBeInTheDocument();
+  });
+
+  it('con el módulo de kits declara la finalidad, su base y cómo revocarla', () => {
+    render(<PrivacidadContenido ctx={contextoDePrueba({ flags: { kitsCaducidadHabilitado: true } })} />);
+    expect(screen.getByText('Avisos de caducidad del kit')).toBeInTheDocument();
+    expect(screen.getByText(/Consentimiento/).textContent).toMatch(/6\.1\.a RGPD/);
+    expect(screen.getByText(/6\.1\.a RGPD/).textContent).toMatch(/21\.1 LSSI/);
+    expect(screen.getByText(/30 y 15 días/)).toBeInTheDocument();
+    expect(screen.getByText(/WhatsApp/)).toBeInTheDocument();
+    expect(screen.getByText(/enlace de cada email o.*escribiendo a/)).toBeInTheDocument();
+  });
+
+  it('con el módulo de kits declara los plazos de conservación de 48 horas y 12 meses', () => {
+    render(<PrivacidadContenido ctx={contextoDePrueba({ flags: { kitsCaducidadHabilitado: true } })} />);
+    expect(screen.getByText(/48 horas/)).toBeInTheDocument();
+    expect(screen.getByText(/12 meses/)).toBeInTheDocument();
+  });
+});

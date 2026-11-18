@@ -22,7 +22,7 @@ interface Finalidad {
 }
 
 /** Finalidades a partir de la 3.3, según lo que tenga activo el tenant. */
-function finalidadesAdicionales(flags: LegalContext['flags']): Finalidad[] {
+function finalidadesAdicionales(flags: LegalContext['flags'], emailTitular: string | null): Finalidad[] {
   const lista: Finalidad[] = [];
   if (flags.descuentoBienvenidaActivo) {
     lista.push({
@@ -44,6 +44,19 @@ function finalidadesAdicionales(flags: LegalContext['flags']): Finalidad[] {
       titulo: 'Atención de garantías y reclamaciones',
       base: 'Obligación legal e interés legítimo (Art. 6.1.c y 6.1.f RGPD)',
       descripcion: `Conservamos los datos de su pedido durante el plazo de la garantía legal (${RETENCION_CLIENTES_SIN_TPV_ANIOS} años) para poder atender una reclamación.`,
+    });
+  }
+  if (flags.kitsCaducidadHabilitado) {
+    lista.push({
+      titulo: 'Avisos de caducidad del kit',
+      base: 'Consentimiento (Art. 6.1.a RGPD; Art. 21.1 LSSI-CE)',
+      descripcion:
+        'Si registra la serie de su kit, le avisamos por email 30 y 15 días antes de que caduque algún consumible, ' +
+        'con un enlace para comprar el recambio. Los avisos por WhatsApp solo estarán disponibles en el futuro y ' +
+        'requieren su propio consentimiento. Puede revocarlo en cualquier momento con el enlace de cada email' +
+        (emailTitular ? ` o escribiendo a ${emailTitular}` : '') +
+        '. El alta sin confirmar se conserva 48 horas; la confirmada, hasta que se dé de baja o durante 12 meses ' +
+        'tras la última caducidad de su kit.',
     });
   }
   return lista;
@@ -106,7 +119,7 @@ export function PrivacidadContenido({ ctx }: Readonly<{ ctx: LegalContext }>) {
             descripcion="Sus datos son necesarios para procesar y entregar su pedido. Sin ellos no es posible prestar el servicio." />
           <FinalidadItem numero="3.2" titulo="Comunicaciones sobre el pedido" base="Ejecución del contrato e interés legítimo (Art. 6.1.b y 6.1.f RGPD)"
             descripcion="Le enviamos la confirmación del pedido y, en su caso, información sobre su estado o envío." />
-          {finalidadesAdicionales(flags).map((f, i) => (
+          {finalidadesAdicionales(flags, titular.email).map((f, i) => (
             <FinalidadItem key={f.titulo} numero={`3.${i + 3}`} titulo={f.titulo} base={f.base} descripcion={f.descripcion} />
           ))}
         </div>
