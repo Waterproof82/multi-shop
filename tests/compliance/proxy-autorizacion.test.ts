@@ -191,6 +191,7 @@ describe('qué rutas exigen autenticación (sin credenciales)', () => {
     // depende de una bandera — D-M2b-8).
     '/api/kit-avisos/alta',
     '/api/kit-avisos/gestion',
+    '/api/kit-avisos/enlace',
   ];
 
   it.each(PUBLICAS)('%s deja pasar sin credenciales', async (ruta) => {
