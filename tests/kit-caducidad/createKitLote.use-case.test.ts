@@ -30,6 +30,8 @@ function fakeRepo(overrides: Partial<IKitCaducidadRepository> = {}): IKitCaducid
     findPartesUsadas: vi.fn(),
     insertSeriesIgnorandoDuplicados: vi.fn(),
     findSeriesDeLote: vi.fn(),
+    findRegistrados: vi.fn(),
+    findContacto: vi.fn(),
     ...overrides,
   };
 }
