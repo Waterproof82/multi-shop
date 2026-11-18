@@ -51,6 +51,8 @@ import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepo
 import { SupabaseComprasRepository } from './supabase-compras.repository';
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import { SupabaseKitCaducidadRepository } from './supabase-kit-caducidad.repository';
+import type { IKitAvisosRepository } from '@/core/domain/repositories/IKitAvisosRepository';
+import { SupabaseKitAvisosRepository } from './supabase-kit-avisos.repository';
 import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
 import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
 import { SupabaseAuditLogRepository } from '../repositories/supabase-audit-log.repository';
@@ -332,6 +334,13 @@ let _kitCaducidadRepository: IKitCaducidadRepository | undefined;
 export function getKitCaducidadRepository(): IKitCaducidadRepository {
   _kitCaducidadRepository ??= new SupabaseKitCaducidadRepository();
   return _kitCaducidadRepository;
+}
+
+// kit-expiry-m2b (M2b3), DD1: repositorio nuevo, independiente de IKitCaducidadRepository.
+let _kitAvisosRepository: IKitAvisosRepository | undefined;
+export function getKitAvisosRepository(): IKitAvisosRepository {
+  _kitAvisosRepository ??= new SupabaseKitAvisosRepository();
+  return _kitAvisosRepository;
 }
 
 let _analyticsRepository: SupabaseAnalyticsRepository | undefined;
