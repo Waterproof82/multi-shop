@@ -9,6 +9,11 @@ import type { Metadata } from "next";
 import { cargarEstadoKitPublico } from "@/lib/kit-caducidad/cargar-estado-publico";
 import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { EstadoKitPublico } from "@/components/kit-publico/estado-kit-publico";
+// kit-expiry-m2b (M2b8a), R-M2b.1.1/R-M2b.4.1: los dos formularios de avisos
+// van detrás de la misma bandera que las rutas de alta/enlace (DD10).
+import { KIT_AVISOS_ALTA_LIVE } from "@/lib/kit-caducidad/publico";
+import { FormularioAvisosKit } from "@/components/kit-publico/formulario-avisos-kit";
+import { EnlaceGestionKit } from "@/components/kit-publico/enlace-gestion-kit";
 
 // R-M2a.3.2: nada de unstable_cache ni otra caché compartida de datos por
 // serie — el tenant depende del host y la serie es de un solo cliente.
@@ -42,6 +47,12 @@ export default async function KitPublicoPage({ params }: Readonly<KitPublicoPage
     <EmpresaThemeProvider colores={empresa.colores || null}>
       <main id="main-content" className="min-h-screen bg-background">
         <EstadoKitPublico estado={estado} />
+        {KIT_AVISOS_ALTA_LIVE && (
+          <div className="mx-auto max-w-2xl px-4">
+            <FormularioAvisosKit serie={estado.serie} />
+            <EnlaceGestionKit serie={estado.serie} />
+          </div>
+        )}
       </main>
     </EmpresaThemeProvider>
   );
