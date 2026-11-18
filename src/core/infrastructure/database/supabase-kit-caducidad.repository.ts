@@ -383,6 +383,10 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
 
   // DD11: exportación completa de las series de un lote, sin tope de 1000 —
   // recorre `.range()` en bloques hasta agotar, para que M5 la consuma.
+  // DD7 (kit-expiry-m5): desempate por `serie` tras `created_at` — una
+  // misma tanda de `generarSeriesLoteUseCase` comparte `created_at`, así que
+  // sin este segundo `order` el orden entre peticiones no es estable y la
+  // paginación de las etiquetas PDF podría repetir u omitir series.
   async findSeriesDeLote(empresaId: string, loteId: string): Promise<Result<KitSerie[]>> {
     try {
       const supabase = getSupabaseClient();
@@ -395,6 +399,7 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
           .eq('empresa_id', empresaId)
           .eq('lote_id', loteId)
           .order('created_at', { ascending: true })
+          .order('serie', { ascending: true })
           .range(desde, desde + BLOQUE_EXPORTACION_SERIES - 1);
 
         if (error) {

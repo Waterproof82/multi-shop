@@ -116,3 +116,25 @@ export interface Pagina {
   page: number;
   pageSize: number;
 }
+
+// ---- Etiquetas PDF con QR (kit-expiry-m5) ----
+
+/** Una fila de la hoja de etiquetas: su serie y la URL de su QR 1 (R-M5.2.1/R-M5.2.2). */
+export interface EtiquetaKit {
+  serie: string;
+  urlEstado: string;
+}
+
+/**
+ * Página del PDF de etiquetas de un lote (R-M5.1.3/R-M5.1.4/R-M5.4.1). El
+ * email/telefono de `kits_registrados` nunca llegan aquí (R-M5.2.4) — solo
+ * la serie, ya emparejada con su URL de estado.
+ */
+export interface EtiquetasLote {
+  codigoLote: string;
+  etiquetas: EtiquetaKit[];
+  urlLista: string;
+  muestra: boolean;
+  pagina: number;
+  totalPaginas: number;
+}

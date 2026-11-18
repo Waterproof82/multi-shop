@@ -74,3 +74,13 @@ export type CaducidadItemDTO = z.infer<typeof caducidadItemSchema>;
 /** `?loteId=` de `GET /api/admin/kits/candidatas` (M4b1). */
 export const loteIdQuerySchema = z.object({ loteId: z.uuid() });
 export type LoteIdQueryDTO = z.infer<typeof loteIdQuerySchema>;
+
+/**
+ * `?pagina=` de `GET /api/admin/kits/lotes/[id]/etiquetas` (R-M5.1.4): entero
+ * de 1 a 1000, 1 por defecto. El tope real de páginas lo impone
+ * `generarEtiquetasLote.use-case.ts` según `POR_PDF` y el nº de series del lote.
+ */
+export const etiquetasQuerySchema = z.object({
+  pagina: z.coerce.number().int().min(1).max(1000).default(1),
+});
+export type EtiquetasQueryDTO = z.infer<typeof etiquetasQuerySchema>;
