@@ -3,7 +3,9 @@ import type { Result } from '@/core/domain/entities/types';
 import type {
   ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput,
   LineaCandidata, KitSerie, KitRegistradoListado, ContactoKit, Paginado, CreateKitLoteInput, Pagina,
+  KitPublico,
 } from '@/core/domain/entities/kit-caducidad-types';
+import type { Caducidad } from '@/lib/kit-caducidad/estado';
 
 /**
  * Troceo de M4a2 (auto-chain, tasks.md): la estimación de ~390 líneas no
@@ -41,4 +43,12 @@ export interface IKitCaducidadRepository {
   findRegistrados(empresaId: string, pagina: Pagina): Promise<Result<Paginado<KitRegistradoListado>>>;
   /** R-M4.5.2: único método que devuelve el email/telefono completos de una fila. */
   findContacto(empresaId: string, serie: string): Promise<Result<ContactoKit | null>>;
+  /**
+   * kit-expiry-m2a (R-M2a.1.2/R-M2a.2.1): identifica el lote de una serie
+   * pública, SIN ningún dato personal — ni siquiera revela si la serie está
+   * registrada. `null` si la serie no existe en esta empresa.
+   */
+  findKitPublico(empresaId: string, serie: string): Promise<Result<KitPublico | null>>;
+  /** kit-expiry-m2a (R-M2a.2.3): filas de `kit_lote_caducidades_efectivas` del lote, sin orden garantizado (lo ordena el caso de uso). */
+  findCaducidadesEfectivas(empresaId: string, loteId: string): Promise<Result<Caducidad[]>>;
 }

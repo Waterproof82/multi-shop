@@ -7,9 +7,10 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import type {
   ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput, LineaCandidata, KitSerie,
-  KitRegistradoListado, ContactoKit, Paginado, CreateKitLoteInput, Pagina,
+  KitRegistradoListado, ContactoKit, Paginado, CreateKitLoteInput, Pagina, KitPublico,
 } from '@/core/domain/entities/kit-caducidad-types';
 import { enmascararEmail, enmascararTelefono } from '@/lib/kit-caducidad/pii';
+import type { Caducidad } from '@/lib/kit-caducidad/estado';
 
 /** DD11: tope del bloque de `.range()` al exportar todas las series de un lote. */
 const BLOQUE_EXPORTACION_SERIES = 1000;
@@ -27,23 +28,28 @@ interface PgErrorLike {
  *   23503/23514 → VALIDATION_ERROR (FK del trigger o CHECK `una_fuente`)
  *   23505       → CONFLICT (código de lote duplicado en la empresa)
  *   P0002       → KIT_LOTE_NOT_FOUND (RPC: el lote no existe para la empresa)
+ *
+ * `serie`, si se pasa (kit-expiry-m2a, R-M2a.5.1), se trunca a 8 caracteres
+ * en el mensaje — igual que en M5 — para que un log nunca lleve la serie
+ * completa de un cliente.
  */
-export function mapPgError(error: PgErrorLike, method: string): AppError {
+export function mapPgError(error: PgErrorLike, method: string, serie?: string): AppError {
+  const sufijo = serie ? ` (serie ${serie.slice(0, 8)}…)` : '';
   if (error.code === '23505') {
-    return { code: 'CONFLICT', message: 'Ya existe un lote con ese código', module: 'repository', method };
+    return { code: 'CONFLICT', message: `Ya existe un lote con ese código${sufijo}`, module: 'repository', method };
   }
   if (error.code === '23503' || error.code === '23514') {
     return {
       code: 'VALIDATION_ERROR',
-      message: 'La línea de albarán no es de este consumible o no tiene fecha, o cada consumible lleva una sola fuente de fecha',
+      message: `La línea de albarán no es de este consumible o no tiene fecha, o cada consumible lleva una sola fuente de fecha${sufijo}`,
       module: 'repository',
       method,
     };
   }
   if (error.code === 'P0002') {
-    return { code: 'KIT_LOTE_NOT_FOUND', message: 'Lote no encontrado', module: 'repository', method };
+    return { code: 'KIT_LOTE_NOT_FOUND', message: `Lote no encontrado${sufijo}`, module: 'repository', method };
   }
-  return { code: 'DB_ERROR', message: error.message ?? 'Error de base de datos', module: 'repository', method };
+  return { code: 'DB_ERROR', message: `${error.message ?? 'Error de base de datos'}${sufijo}`, module: 'repository', method };
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +118,17 @@ function mapContactoKit(row: Record<string, unknown>): ContactoKit {
     serie: row.serie as string,
     email: (row.email as string | null) ?? null,
     telefono: (row.telefono as string | null) ?? null,
+  };
+}
+
+// kit-expiry-m2a (R-M2a.2.3): fila de la vista `kit_lote_caducidades_efectivas`
+// — nunca lleva PII, solo lo que ya calcula la vista en SQL (DD6).
+export function mapCaducidadEfectiva(row: Record<string, unknown>): Caducidad {
+  return {
+    ingredienteId: row.ingrediente_id as string,
+    consumible: row.consumible as string,
+    parte: row.parte as string,
+    caducaEl: row.caduca_el as string,
   };
 }
 
@@ -468,6 +485,77 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
       return { success: true, data: data ? mapContactoKit(data as Record<string, unknown>) : null };
     } catch (e) {
       return { success: false, error: mapPgError(e as PgErrorLike, 'findContacto') };
+    }
+  }
+
+  // kit-expiry-m2a (R-M2a.1.2/R-M2a.2.1/DD6): DOS consultas, sin embed por la
+  // FK compuesta. El `select` de `kits_registrados` es SOLO `lote_id` — nunca
+  // email, telefono ni `*` — porque esta ruta es pública y no debe poder
+  // revelar ni un dato personal, ni siquiera por accidente de un select
+  // amplio. El mensaje de error solo lleva la serie truncada (R-M2a.5.1).
+  async findKitPublico(empresaId: string, serie: string): Promise<Result<KitPublico | null>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: registrado, error: registradoError } = await supabase
+        .from('kits_registrados')
+        .select('lote_id')
+        .eq('empresa_id', empresaId)
+        .eq('serie', serie)
+        .maybeSingle();
+
+      if (registradoError) {
+        return { success: false, error: mapPgError(registradoError, 'findKitPublico', serie) };
+      }
+      if (!registrado) {
+        return { success: true, data: null };
+      }
+
+      const loteId = (registrado as Record<string, unknown>).lote_id as string;
+      const { data: lote, error: loteError } = await supabase
+        .from('kit_lotes')
+        .select('productos(titulo_es, slug)')
+        .eq('empresa_id', empresaId)
+        .eq('id', loteId)
+        .maybeSingle();
+
+      if (loteError) {
+        return { success: false, error: mapPgError(loteError, 'findKitPublico', serie) };
+      }
+      if (!lote) {
+        return { success: true, data: null };
+      }
+
+      const producto = (lote as Record<string, unknown>).productos as Record<string, unknown> | null | undefined;
+      return {
+        success: true,
+        data: {
+          loteId,
+          kitNombre: (producto?.titulo_es as string) ?? '',
+          kitSlug: (producto?.slug as string | null) ?? null,
+        },
+      };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findKitPublico', serie) };
+    }
+  }
+
+  // kit-expiry-m2a (R-M2a.2.3): lee la vista `kit_lote_caducidades_efectivas`
+  // (DD6) — ya calcula en SQL la fecha efectiva (propia o del albarán).
+  async findCaducidadesEfectivas(empresaId: string, loteId: string): Promise<Result<Caducidad[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kit_lote_caducidades_efectivas')
+        .select('ingrediente_id, consumible, parte, caduca_el')
+        .eq('empresa_id', empresaId)
+        .eq('lote_id', loteId);
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'findCaducidadesEfectivas') };
+      }
+      return { success: true, data: (data as Record<string, unknown>[]).map(mapCaducidadEfectiva) };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findCaducidadesEfectivas') };
     }
   }
 }

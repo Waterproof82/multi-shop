@@ -2,6 +2,7 @@
 // kit-expiry-reminders M4a2 (sdd en kitemergenciacanarias,
 // docs/sdd/kit-expiry-reminders/m4/): dominio de lotes de kit, sus fechas de
 // caducidad reales y las líneas de albarán candidatas a ser su fuente.
+import type { EstadoElemento, EstadoGeneral } from '@/lib/kit-caducidad/estado';
 
 export interface ProductoKit {
   id: string;
@@ -137,4 +138,39 @@ export interface EtiquetasLote {
   muestra: boolean;
   pagina: number;
   totalPaginas: number;
+}
+
+// ---- Página pública del kit (kit-expiry-m2a) ----
+
+/**
+ * R-M2a.1.2/R-M2a.2.1: lo que identifica el lote de una serie pública, sin
+ * ningún dato personal de `kits_registrados` (ni email, ni teléfono, ni si
+ * está registrada). `kitSlug` puede ser `null` (producto sin slug todavía);
+ * en ese caso el enlace de recambio va sin `?kit=` (D-M2a-7).
+ */
+export interface KitPublico {
+  loteId: string;
+  kitNombre: string;
+  kitSlug: string | null;
+}
+
+/** R-M2a.2.3: una fila de `kit_lote_caducidades_efectivas` ya con su estado — sin `ingredienteId` (no se expone). */
+export interface ElementoKitPublico {
+  consumible: string;
+  parte: string;
+  caducaEl: string;
+  diasRestantes: number;
+  estado: EstadoElemento;
+}
+
+/**
+ * R-M2a.2.2/R-M2a.2.5: lo que pinta `/kit/{serie}`. `general === 'sin_datos'`
+ * cuando el lote no tiene ninguna caducidad efectiva todavía.
+ */
+export interface EstadoKitPublico {
+  serie: string;
+  kitNombre: string;
+  general: EstadoGeneral;
+  elementos: ElementoKitPublico[];
+  enlaces: { lista: string; recambio: string };
 }
