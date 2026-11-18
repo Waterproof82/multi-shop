@@ -16,7 +16,12 @@ export type AuditAction =
   | 'admin.stock.ajuste'
   // Kits (kit-expiry-reminders M4d, R-M4.5.3): el payload SOLO lleva `serie`,
   // nunca email/telefono — ver verContactoKit.use-case.ts.
-  | 'admin.kits.ver_contacto';
+  | 'admin.kits.ver_contacto'
+  // Kits (kit-expiry-m2b, DD9 de design.md): avisos de caducidad — el
+  // payload SOLO lleva `{ serie, version }` o `{ serie }`, nunca email ni
+  // token, aunque la baja borre la fila. `actorTipo: 'system'` (sin sesión).
+  | 'kit.avisos.confirmado'
+  | 'kit.avisos.baja';
 
 export type ActorTipo = 'admin' | 'empleado_tpv' | 'waiter' | 'system';
 
