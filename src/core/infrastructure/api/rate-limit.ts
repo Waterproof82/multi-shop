@@ -217,6 +217,76 @@ export async function kitPublicoDentroDeLimite(ip: string): Promise<boolean> {
 }
 
 /**
+ * sdd kit-expiry-m2b (docs/sdd/kit-expiry-reminders/m2b/), DD7 de design.md:
+ * 5 peticiones cada 10 min por IP para el alta y el enlace de gestión de
+ * avisos. Vive aquí (no en `proxy.ts`, congelado) por el mismo motivo que
+ * `kitPublicoDentroDeLimite` (M2a) — son rutas públicas sin sesión.
+ */
+let kitAvisosLimiter: Ratelimit | null = null;
+
+function getKitAvisosLimiter(): Ratelimit | null {
+  if (kitAvisosLimiter) return kitAvisosLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  kitAvisosLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(5, "10 m"),
+    prefix: "ratelimit:kit-avisos",
+  });
+  return kitAvisosLimiter;
+}
+
+/** DD7: fail-open — sin Redis, o si `limit()` lanza, deja pasar (mismo criterio que `kitPublicoDentroDeLimite`). */
+export async function kitAvisosDentroDeLimite(ip: string): Promise<boolean> {
+  const limiter = getKitAvisosLimiter();
+  if (!limiter) return true;
+
+  try {
+    const { success } = await limiter.limit(ip);
+    return success;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * sdd kit-expiry-m2b, DD7/R-M2b.2.7: tope de 3 emails cada 24 h por SERIE,
+ * sumando confirmación, "intento" y "solicitud" (todos comparten la misma
+ * clave). Evita que el alta o el enlace de gestión se usen para bombardear
+ * de emails a un titular.
+ */
+let kitAvisosEmailLimiter: Ratelimit | null = null;
+
+function getKitAvisosEmailLimiter(): Ratelimit | null {
+  if (kitAvisosEmailLimiter) return kitAvisosEmailLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  kitAvisosEmailLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(3, "24 h"),
+    prefix: "ratelimit:kit-avisos-email",
+  });
+  return kitAvisosEmailLimiter;
+}
+
+/** DD7: fail-open, igual que `kitAvisosDentroDeLimite`. */
+export async function kitAvisosEmailDentroDeLimite(serie: string): Promise<boolean> {
+  const limiter = getKitAvisosEmailLimiter();
+  if (!limiter) return true;
+
+  try {
+    const { success } = await limiter.limit(serie);
+    return success;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Apply rate limiting to login. Returns NextResponse 429 if exceeded, or null if passed.
  */
 export async function rateLimitLogin(request: Request): Promise<NextResponse | null> {
