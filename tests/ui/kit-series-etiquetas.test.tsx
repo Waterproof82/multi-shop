@@ -111,11 +111,12 @@ describe('SeriesLote — descarga de etiquetas PDF (R-M5.5)', () => {
     expect(createObjectURLMock).not.toHaveBeenCalled();
   });
 
-  it('mientras la bandera de publicacion sigue en false, avisa de que el PDF es una muestra', async () => {
+  it('con la bandera de publicacion ya en true (kit-expiry-m2a), no avisa de que el PDF es una muestra', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(serieList(10)));
 
     renderSeriesLote();
 
-    expect(await screen.findByText(/muestra/i)).toBeInTheDocument();
+    await screen.findByRole('button', { name: /Descargar etiquetas \(PDF\)/ });
+    expect(screen.queryByText(/muestra/i)).not.toBeInTheDocument();
   });
 });
