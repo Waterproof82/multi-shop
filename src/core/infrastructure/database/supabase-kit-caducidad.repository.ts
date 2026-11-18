@@ -7,8 +7,9 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import type {
   ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput, LineaCandidata, KitSerie,
-  Paginado, CreateKitLoteInput, Pagina,
+  KitRegistradoListado, ContactoKit, Paginado, CreateKitLoteInput, Pagina,
 } from '@/core/domain/entities/kit-caducidad-types';
+import { enmascararEmail, enmascararTelefono } from '@/lib/kit-caducidad/pii';
 
 /** DD11: tope del bloque de `.range()` al exportar todas las series de un lote. */
 const BLOQUE_EXPORTACION_SERIES = 1000;
@@ -88,6 +89,29 @@ function mapKitSerie(row: Record<string, unknown>): KitSerie {
     pedidoId: (row.pedido_id as string | null) ?? null,
     registradoAt: (row.registrado_at as string | null) ?? null,
     createdAt: row.created_at as string,
+  };
+}
+
+// R-M4.5.2/R-M4.5.3/DD12: el email/telefono SIEMPRE pasan por `pii.ts` antes
+// de salir de aquí — el valor completo solo lo devuelve `mapContactoKit`,
+// usado exclusivamente por `findContacto` (reveal explícito, nunca el listado).
+function mapKitRegistradoListado(row: Record<string, unknown>): KitRegistradoListado {
+  return {
+    serie: row.serie as string,
+    loteId: row.lote_id as string,
+    pedidoId: (row.pedido_id as string | null) ?? null,
+    emailMasked: enmascararEmail((row.email as string | null) ?? null),
+    telefonoMasked: enmascararTelefono((row.telefono as string | null) ?? null),
+    registradoAt: (row.registrado_at as string | null) ?? null,
+    createdAt: row.created_at as string,
+  };
+}
+
+function mapContactoKit(row: Record<string, unknown>): ContactoKit {
+  return {
+    serie: row.serie as string,
+    email: (row.email as string | null) ?? null,
+    telefono: (row.telefono as string | null) ?? null,
   };
 }
 
@@ -384,6 +408,61 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
       return { success: true, data: series };
     } catch (e) {
       return { success: false, error: mapPgError(e as PgErrorLike, 'findSeriesDeLote') };
+    }
+  }
+
+  // R-M4.5.1/DD11: paginación real con `count: 'exact'`; desempate por
+  // `serie` porque las filas de una misma tanda de generación comparten
+  // `created_at`. El email/telefono SIEMPRE se enmascaran aquí (DD12) —
+  // nunca salen completos de este método.
+  async findRegistrados(empresaId: string, pagina: Pagina): Promise<Result<Paginado<KitRegistradoListado>>> {
+    try {
+      const supabase = getSupabaseClient();
+      const desde = (pagina.page - 1) * pagina.pageSize;
+      const hasta = desde + pagina.pageSize - 1;
+      const { data, error, count } = await supabase
+        .from('kits_registrados')
+        .select('serie, lote_id, pedido_id, email, telefono, registrado_at, created_at', { count: 'exact' })
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false })
+        .order('serie', { ascending: true })
+        .range(desde, hasta);
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'findRegistrados') };
+      }
+      return {
+        success: true,
+        data: {
+          items: (data as Record<string, unknown>[]).map(mapKitRegistradoListado),
+          total: count ?? 0,
+          page: pagina.page,
+          pageSize: pagina.pageSize,
+        },
+      };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findRegistrados') };
+    }
+  }
+
+  // R-M4.5.2: único método del repositorio que devuelve el email/telefono
+  // completos — lo consume solo `verContactoKitUseCase` (reveal explícito).
+  async findContacto(empresaId: string, serie: string): Promise<Result<ContactoKit | null>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kits_registrados')
+        .select('serie, email, telefono')
+        .eq('empresa_id', empresaId)
+        .eq('serie', serie)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'findContacto') };
+      }
+      return { success: true, data: data ? mapContactoKit(data as Record<string, unknown>) : null };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findContacto') };
     }
   }
 }

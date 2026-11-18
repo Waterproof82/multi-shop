@@ -13,7 +13,10 @@ export type AuditAction =
   | 'waiter.pedido.validar'
   | 'waiter.pago.manual'
   // Admin
-  | 'admin.stock.ajuste';
+  | 'admin.stock.ajuste'
+  // Kits (kit-expiry-reminders M4d, R-M4.5.3): el payload SOLO lleva `serie`,
+  // nunca email/telefono — ver verContactoKit.use-case.ts.
+  | 'admin.kits.ver_contacto';
 
 export type ActorTipo = 'admin' | 'empleado_tpv' | 'waiter' | 'system';
 

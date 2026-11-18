@@ -74,6 +74,29 @@ export interface KitSerie {
   createdAt: string;
 }
 
+/**
+ * R-M4.5.2/R-M4.5.3/DD12: fila del listado de «kits registrados». El email y
+ * el teléfono SIEMPRE llegan ya enmascarados desde el mapper del repositorio
+ * (`src/lib/kit-caducidad/pii.ts`) — este tipo no tiene campos para el valor
+ * completo, así que no hay forma de que el listado los filtre por accidente.
+ */
+export interface KitRegistradoListado {
+  serie: string;
+  loteId: string;
+  pedidoId: string | null;
+  emailMasked: string | null;
+  telefonoMasked: string | null;
+  registradoAt: string | null;
+  createdAt: string;
+}
+
+/** R-M4.5.2: forma que devuelve `GET registrados/[serie]/contacto` — único sitio con el valor completo. */
+export interface ContactoKit {
+  serie: string;
+  email: string | null;
+  telefono: string | null;
+}
+
 export interface Paginado<T> {
   items: T[];
   total: number;

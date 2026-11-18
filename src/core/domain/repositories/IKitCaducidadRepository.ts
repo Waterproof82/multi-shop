@@ -2,7 +2,7 @@
 import type { Result } from '@/core/domain/entities/types';
 import type {
   ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput,
-  LineaCandidata, KitSerie, Paginado, CreateKitLoteInput, Pagina,
+  LineaCandidata, KitSerie, KitRegistradoListado, ContactoKit, Paginado, CreateKitLoteInput, Pagina,
 } from '@/core/domain/entities/kit-caducidad-types';
 
 /**
@@ -37,4 +37,8 @@ export interface IKitCaducidadRepository {
   insertSeriesIgnorandoDuplicados(empresaId: string, loteId: string, series: string[]): Promise<Result<string[]>>;
   /** R-M4.4.5/DD11: recorre `.range()` en bloques de 1000 hasta agotar, para exportar todas las series del lote. */
   findSeriesDeLote(empresaId: string, loteId: string): Promise<Result<KitSerie[]>>;
+  /** R-M4.5.1/DD11: paginado real (`.range()`, `count: 'exact'`), email/telefono ya enmascarados en el mapper (DD12). */
+  findRegistrados(empresaId: string, pagina: Pagina): Promise<Result<Paginado<KitRegistradoListado>>>;
+  /** R-M4.5.2: único método que devuelve el email/telefono completos de una fila. */
+  findContacto(empresaId: string, serie: string): Promise<Result<ContactoKit | null>>;
 }
