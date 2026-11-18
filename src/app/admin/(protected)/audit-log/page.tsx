@@ -22,6 +22,7 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'waiter.pedido.validar',
   'waiter.pago.manual',
   'admin.stock.ajuste',
+  'admin.kits.ver_contacto',
 ];
 
 // Etiqueta traducida de cada accion: claves `auditAction.<accion>` en translations.ts.

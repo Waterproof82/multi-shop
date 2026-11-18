@@ -10,7 +10,7 @@ import {
   UtensilsCrossed, MapPin, Star, Archive, BookOpen, History,
   ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt,
   FileText, TrendingUp, DollarSign, Grid2X2, CalendarDays,
-  ArrowLeftRight, ChevronDown, LayoutTemplate, Scale, Boxes, CalendarClock,
+  ArrowLeftRight, ChevronDown, LayoutTemplate, Scale, Boxes, CalendarClock, ScrollText,
 } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
@@ -179,6 +179,7 @@ const NAV_ENTRIES: NavEntry[] = [
       color: 'amber',
       items: [
         { href: '/admin/kits/lotes', labelKey: 'sidebarKitsLotes', icon: CalendarClock, requiresKits: true },
+        { href: '/admin/kits/registrados', labelKey: 'sidebarKitsRegistrados', icon: ScrollText, requiresKits: true },
       ],
     },
   },
