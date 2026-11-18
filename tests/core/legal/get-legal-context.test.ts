@@ -10,6 +10,7 @@ const datos: DatosEmpresaLegal = {
   telefono: '600000000', emailNotification: 'hola@latienda.test', tipo: 'tienda', moneda: 'EUR',
   tipoImpuesto: 'igic', deliveryHabilitado: false, envioDomicilioHabilitado: true,
   descuentoBienvenidaActivo: false, pagoTarjetaActivo: true, tpvHabilitado: false,
+  kitsCaducidadHabilitado: false,
 };
 
 const modalidad = (over: Partial<ModalidadEntrega>): ModalidadEntrega => ({
@@ -42,6 +43,13 @@ describe('EmpresaLegalUseCase.getContext', () => {
     expect(r.data.tipoImpuesto).toBe('igic');
     expect(r.data.flags.pagoTarjetaActivo).toBe(true);
     expect(r.data.flags.tpvHabilitado).toBe(false);
+    expect(r.data.flags.kitsCaducidadHabilitado).toBe(false);
+  });
+
+  it('con el módulo de kits activo en la empresa, lo refleja en flags', async () => {
+    const r = await repos({ legal: { findDatosEmpresa: vi.fn().mockResolvedValue({ success: true, data: { ...datos, kitsCaducidadHabilitado: true } }) } }).getContext('e1');
+    if (!r.success) throw new Error('esperaba éxito');
+    expect(r.data.flags.kitsCaducidadHabilitado).toBe(true);
   });
 
   it('los datos legales propios prevalecen sobre los de empresa', async () => {

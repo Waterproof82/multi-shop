@@ -39,6 +39,7 @@ function construirContexto(
       descuentoBienvenidaActivo: d.descuentoBienvenidaActivo,
       pagoTarjetaActivo: d.pagoTarjetaActivo,
       tpvHabilitado: d.tpvHabilitado,
+      kitsCaducidadHabilitado: d.kitsCaducidadHabilitado,
     },
     direccionDevoluciones: legal.direccionDevoluciones ?? d.direccion,
     legal,

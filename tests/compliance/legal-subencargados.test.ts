@@ -9,6 +9,7 @@ const nada: FlagsLegales = {
   descuentoBienvenidaActivo: false,
   pagoTarjetaActivo: false,
   tpvHabilitado: true,
+  kitsCaducidadHabilitado: false,
 };
 
 const proveedores = (f: FlagsLegales) => subencargadosDe(f).map((s) => s.proveedor);
@@ -43,6 +44,16 @@ describe('subencargadosDe', () => {
     const brevo = subencargadosDe({ ...nada, descuentoBienvenidaActivo: true }).find((s) => s.proveedor.startsWith('Brevo'));
     expect(brevo?.finalidad).toBe('Envío de emails de confirmación de pedidos y promociones');
   });
+
+  it('Brevo: añade avisos de caducidad de kits cuando el módulo está activo', () => {
+    const brevo = subencargadosDe({ ...nada, kitsCaducidadHabilitado: true }).find((s) => s.proveedor.startsWith('Brevo'));
+    expect(brevo?.finalidad).toBe('Envío de emails de confirmación de pedidos y avisos de caducidad de kits');
+  });
+
+  it('Brevo: sin el módulo de kits no menciona avisos de caducidad', () => {
+    const brevo = subencargadosDe(nada).find((s) => s.proveedor.startsWith('Brevo'));
+    expect(brevo?.finalidad).not.toMatch(/caducidad/);
+  });
 });
 
 describe('subencargadosDe — Sentry', () => {
@@ -66,5 +77,18 @@ describe('categoriasDatosDe', () => {
 
   it('siempre declara identificativos, contacto y económicos', () => {
     expect(titulos(nada)).toEqual(['Datos identificativos', 'Datos de contacto', 'Datos económicos']);
+  });
+
+  it('sin el módulo de kits no declara los datos de los avisos de caducidad', () => {
+    expect(titulos(nada)).not.toContain('Datos de avisos de caducidad del kit');
+  });
+
+  it('con el módulo de kits declara email, teléfono opcional, serie y consentimiento', () => {
+    const cat = categoriasDatosDe({ ...nada, kitsCaducidadHabilitado: true }).find((c) => c.titulo === 'Datos de avisos de caducidad del kit');
+    expect(cat).toBeDefined();
+    expect(cat?.descripcion).toMatch(/email/i);
+    expect(cat?.descripcion).toMatch(/teléfono/i);
+    expect(cat?.descripcion).toMatch(/serie del kit/i);
+    expect(cat?.descripcion).toMatch(/fecha y la versión/i);
   });
 });

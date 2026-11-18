@@ -57,6 +57,8 @@ export interface FlagsLegales {
   pagoTarjetaActivo: boolean;
   /** Con TPV las ventas son registros fiscales de este sistema (5 años); sin TPV, 3. */
   tpvHabilitado: boolean;
+  /** `empresas.kits_caducidad_habilitado` (M4). Activa la finalidad de avisos de caducidad del kit en /privacidad (M2b). */
+  kitsCaducidadHabilitado: boolean;
 }
 
 export interface ModalidadDomicilioLegal {

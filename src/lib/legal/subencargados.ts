@@ -22,6 +22,7 @@ function finalidadBrevo(f: FlagsLegales): string {
   const partes = ['confirmación de pedidos'];
   if (f.envioDomicilioHabilitado) partes.push('seguimiento de envíos');
   if (f.descuentoBienvenidaActivo) partes.push('promociones');
+  if (f.kitsCaducidadHabilitado) partes.push('avisos de caducidad de kits');
   return `Envío de emails de ${listaEnCastellano(partes)}`;
 }
 

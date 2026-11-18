@@ -18,6 +18,7 @@ export interface DatosEmpresaLegal {
   /** Derivado de `redsys_merchant_code IS NOT NULL`; el código nunca sale del repo. */
   pagoTarjetaActivo: boolean;
   tpvHabilitado: boolean;
+  kitsCaducidadHabilitado: boolean;
 }
 
 export interface IEmpresaLegalRepository {
