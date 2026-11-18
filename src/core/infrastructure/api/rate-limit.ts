@@ -146,24 +146,74 @@ function getAdminLimiter(): Ratelimit | null {
   return adminLimiter;
 }
 
-function getClientIp(request: Request): string {
-  // Cloudflare sets cf-connecting-ip to the real client IP.
-  // When this header is absent (e.g. Cloudflare DNS-only or direct Vercel),
-  // fall back to x-forwarded-for FIRST entry: Cloudflare rewrites the header
-  // so the real client IP is always first, then appends its own edge IP last.
-  // Taking the last entry would key rate limits on a rotating Cloudflare IP,
-  // allowing unlimited retries from the same client.
-  // NOTE: UPSTASH_REDIS_REST_URL is required in production for login rate limiting.
-  const cfIp = request.headers.get("cf-connecting-ip");
+/**
+ * sdd kit-expiry-m2a (docs/sdd/kit-expiry-reminders/m2a/), DD2 de design.md:
+ * extraída de `getClientIp` para poder leer la IP desde `headers()` de Next
+ * (RSC), que no es un `Request`. `Pick<Headers, 'get'>` acepta las dos
+ * formas sin forzar un cast. El comportamiento no cambia.
+ *
+ * Cloudflare sets cf-connecting-ip to the real client IP.
+ * When this header is absent (e.g. Cloudflare DNS-only or direct Vercel),
+ * fall back to x-forwarded-for FIRST entry: Cloudflare rewrites the header
+ * so the real client IP is always first, then appends its own edge IP last.
+ * Taking the last entry would key rate limits on a rotating Cloudflare IP,
+ * allowing unlimited retries from the same client.
+ */
+export function ipDeCabeceras(h: Pick<Headers, "get">): string {
+  const cfIp = h.get("cf-connecting-ip");
   if (cfIp) return cfIp.trim();
 
-  const forwarded = request.headers.get("x-forwarded-for");
+  const forwarded = h.get("x-forwarded-for");
   if (forwarded) {
     const ips = forwarded.split(",").map(ip => ip.trim());
     // First IP is the real client IP set by Cloudflare
     return ips[0];
   }
-  return request.headers.get("x-real-ip") || "unknown";
+  return h.get("x-real-ip") || "unknown";
+}
+
+// NOTE: UPSTASH_REDIS_REST_URL is required in production for login rate limiting.
+function getClientIp(request: Request): string {
+  return ipDeCabeceras(request.headers);
+}
+
+/**
+ * sdd kit-expiry-m2a (docs/sdd/kit-expiry-reminders/m2a/), R-M2a.1.5/DD1:
+ * 20 peticiones por minuto e IP para `/kit/{serie}`. Vive aquí (no en
+ * `proxy.ts`, congelado por `proxy-autorizacion.test.ts`) porque una RSC no
+ * puede devolver un 429 — el cargador lo traduce en el mismo 404 neutro.
+ */
+let kitPublicoLimiter: Ratelimit | null = null;
+
+function getKitPublicoLimiter(): Ratelimit | null {
+  if (kitPublicoLimiter) return kitPublicoLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  kitPublicoLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(20, "1 m"),
+    prefix: "ratelimit:kit-publico",
+  });
+  return kitPublicoLimiter;
+}
+
+/**
+ * DD12: fail-open. Sin Redis configurado, o si `limit()` lanza, deja pasar
+ * (mismo criterio que `rateLimitPublic`, D-M2a-2) — el límite no debe tumbar
+ * la página pública por un fallo de Upstash.
+ */
+export async function kitPublicoDentroDeLimite(ip: string): Promise<boolean> {
+  const limiter = getKitPublicoLimiter();
+  if (!limiter) return true;
+
+  try {
+    const { success } = await limiter.limit(ip);
+    return success;
+  } catch {
+    return true;
+  }
 }
 
 /**

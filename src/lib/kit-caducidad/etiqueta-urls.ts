@@ -17,3 +17,20 @@ export function urlEstadoKit(serie: string): string | null {
   if (!esSerieValida(serie)) return null;
   return `https://pedidos.kitemergenciacanarias.es/kit/${serie}`;
 }
+
+// sdd kit-expiry-m2a (docs/sdd/kit-expiry-reminders/m2a/), R-M2a.2.5.
+export const URL_PACK_RECAMBIO = 'https://kitemergenciacanarias.es/kits-de-emergencia/pack-recambio-consumibles';
+
+const SLUG_VALIDO = /^[a-z0-9-]{1,100}$/;
+
+/**
+ * URL del pack de recambio de consumibles. Con un `slug` de producto
+ * válido (`^[a-z0-9-]{1,100}$`), preselecciona el kit con `?kit=`; sin uno
+ * (null, vacío, fuera del patrón o más de 100 caracteres) va sin el
+ * parámetro — D-M2a-7: el enlace no se rompe, solo pierde el
+ * preseleccionado.
+ */
+export function urlPackRecambio(slug: string | null): string {
+  if (slug === null || !SLUG_VALIDO.test(slug)) return URL_PACK_RECAMBIO;
+  return `${URL_PACK_RECAMBIO}?kit=${slug}`;
+}
