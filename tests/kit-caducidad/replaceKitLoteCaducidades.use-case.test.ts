@@ -34,6 +34,8 @@ function fakeRepo(overrides: Partial<IKitCaducidadRepository> = {}): IKitCaducid
     replaceCaducidades: vi.fn().mockResolvedValue({ success: true, data: undefined }),
     findLineasCandidatas: vi.fn(),
     findPartesUsadas: vi.fn(),
+    insertSeriesIgnorandoDuplicados: vi.fn(),
+    findSeriesDeLote: vi.fn(),
     ...overrides,
   };
 }
