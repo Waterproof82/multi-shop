@@ -64,6 +64,16 @@ export interface CandidatasLote {
   partesUsadas: string[];
 }
 
+/** DD10: fila de `kits_registrados` sin PII — una serie generada para un lote (M4c). */
+export interface KitSerie {
+  serie: string;
+  loteId: string;
+  empresaId: string;
+  pedidoId: string | null;
+  registradoAt: string | null;
+  createdAt: string;
+}
+
 export interface Paginado<T> {
   items: T[];
   total: number;

@@ -6,9 +6,12 @@
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import type {
-  ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput, LineaCandidata,
+  ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput, LineaCandidata, KitSerie,
   Paginado, CreateKitLoteInput, Pagina,
 } from '@/core/domain/entities/kit-caducidad-types';
+
+/** DD11: tope del bloque de `.range()` al exportar todas las series de un lote. */
+const BLOQUE_EXPORTACION_SERIES = 1000;
 import type { Result, AppError } from '@/core/domain/entities/types';
 
 interface PgErrorLike {
@@ -74,6 +77,17 @@ function mapConsumibleKit(row: Record<string, unknown>): ConsumibleKit {
     ingredienteId: row.ingrediente_id as string,
     nombre: (ingrediente?.nombre as string) ?? '',
     esPerecedero: Boolean(ingrediente?.es_perecedero),
+  };
+}
+
+function mapKitSerie(row: Record<string, unknown>): KitSerie {
+  return {
+    serie: row.serie as string,
+    loteId: row.lote_id as string,
+    empresaId: row.empresa_id as string,
+    pedidoId: (row.pedido_id as string | null) ?? null,
+    registradoAt: (row.registrado_at as string | null) ?? null,
+    createdAt: row.created_at as string,
   };
 }
 
@@ -318,6 +332,58 @@ export class SupabaseKitCaducidadRepository implements IKitCaducidadRepository {
       return { success: true, data: Array.from(partes).sort() };
     } catch (e) {
       return { success: false, error: mapPgError(e as PgErrorLike, 'findPartesUsadas') };
+    }
+  }
+
+  // DD10: `ON CONFLICT DO NOTHING RETURNING` vía upsert — solo devuelve las
+  // series que realmente se insertaron; `pedido_id` queda NULL (el vínculo
+  // con pedidos queda fuera de M4, R-M4.4.4). El caso de uso reintenta lo
+  // que falte si una colisión descarta alguna fila.
+  async insertSeriesIgnorandoDuplicados(empresaId: string, loteId: string, series: string[]): Promise<Result<string[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const rows = series.map((serie) => ({ serie, empresa_id: empresaId, lote_id: loteId, pedido_id: null }));
+      const { data, error } = await supabase
+        .from('kits_registrados')
+        .upsert(rows, { onConflict: 'serie', ignoreDuplicates: true })
+        .select('serie');
+
+      if (error) {
+        return { success: false, error: mapPgError(error, 'insertSeriesIgnorandoDuplicados') };
+      }
+      return { success: true, data: (data as Record<string, unknown>[]).map((row) => row.serie as string) };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'insertSeriesIgnorandoDuplicados') };
+    }
+  }
+
+  // DD11: exportación completa de las series de un lote, sin tope de 1000 —
+  // recorre `.range()` en bloques hasta agotar, para que M5 la consuma.
+  async findSeriesDeLote(empresaId: string, loteId: string): Promise<Result<KitSerie[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const series: KitSerie[] = [];
+
+      for (let desde = 0; ; desde += BLOQUE_EXPORTACION_SERIES) {
+        const { data, error } = await supabase
+          .from('kits_registrados')
+          .select('serie, lote_id, empresa_id, pedido_id, registrado_at, created_at')
+          .eq('empresa_id', empresaId)
+          .eq('lote_id', loteId)
+          .order('created_at', { ascending: true })
+          .range(desde, desde + BLOQUE_EXPORTACION_SERIES - 1);
+
+        if (error) {
+          return { success: false, error: mapPgError(error, 'findSeriesDeLote') };
+        }
+        const filas = data as Record<string, unknown>[];
+        series.push(...filas.map(mapKitSerie));
+        if (filas.length < BLOQUE_EXPORTACION_SERIES) break;
+      }
+
+      return { success: true, data: series };
+    } catch (e) {
+      return { success: false, error: mapPgError(e as PgErrorLike, 'findSeriesDeLote') };
     }
   }
 }

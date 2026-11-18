@@ -2,7 +2,7 @@
 import type { Result } from '@/core/domain/entities/types';
 import type {
   ProductoKit, ConsumibleKit, KitLote, KitLoteCaducidad, CaducidadInput,
-  LineaCandidata, Paginado, CreateKitLoteInput, Pagina,
+  LineaCandidata, KitSerie, Paginado, CreateKitLoteInput, Pagina,
 } from '@/core/domain/entities/kit-caducidad-types';
 
 /**
@@ -28,4 +28,13 @@ export interface IKitCaducidadRepository {
   findLineasCandidatas(empresaId: string, ingredienteIds: string[], desde: string): Promise<Result<LineaCandidata[]>>;
   /** R-M4.3.5: valores `DISTINCT` de `parte` ya usados por la propia empresa. */
   findPartesUsadas(empresaId: string): Promise<Result<string[]>>;
+  /**
+   * DD10: `upsert(..., { onConflict: 'serie', ignoreDuplicates: true }).select('serie')`
+   * — `ON CONFLICT DO NOTHING RETURNING`. Devuelve solo las series que
+   * efectivamente se insertaron (`pedido_id` queda NULL); el caso de uso
+   * reintenta lo que falte.
+   */
+  insertSeriesIgnorandoDuplicados(empresaId: string, loteId: string, series: string[]): Promise<Result<string[]>>;
+  /** R-M4.4.5/DD11: recorre `.range()` en bloques de 1000 hasta agotar, para exportar todas las series del lote. */
+  findSeriesDeLote(empresaId: string, loteId: string): Promise<Result<KitSerie[]>>;
 }
