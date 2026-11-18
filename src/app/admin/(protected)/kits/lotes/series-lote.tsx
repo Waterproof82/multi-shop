@@ -3,23 +3,51 @@
 // kit-expiry-reminders M4c — generación y listado de series de un lote
 // (docs/sdd/kit-expiry-reminders/m4/, R-M4.4, DD10 de design.md), montada
 // debajo del editor de caducidades de M4b2b en la página del lote.
+//
+// M5c (docs/sdd/kit-expiry-reminders/m5/, R-M5.5) añade el botón de
+// descarga de etiquetas PDF por bloque de 500 series: `fetch` → `Blob` →
+// `URL.createObjectURL` (DD8), nunca un `<a download>` directo a la ruta,
+// para poder mostrar el error de la API en vez de "descargar" su JSON.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { KIT_ESTADO_PUBLICO_LIVE } from '@/lib/kit-caducidad/publico';
 import type { KitSerie } from '@/core/domain/entities/kit-caducidad-types';
 
 const CANTIDAD_MINIMA = 1;
 const CANTIDAD_MAXIMA = 500;
+const BLOQUE_ETIQUETAS = 500;
 
 /** R-M4.4.1/DD10: mismo rango 1-500 que `generarSeriesSchema` en Zod — backstop del 400, no el único guardián. */
 export function cantidadValida(cantidad: number): boolean {
   return Number.isInteger(cantidad) && cantidad >= CANTIDAD_MINIMA && cantidad <= CANTIDAD_MAXIMA;
+}
+
+/** R-M5.5.1: un botón por bloque de 500 series (normalmente uno); al menos 1 aunque no haya series (desactivado). */
+export function bloquesEtiquetas(totalSeries: number): number {
+  return Math.max(1, Math.ceil(totalSeries / BLOQUE_ETIQUETAS));
+}
+
+function rangoBloque(pagina: number, totalSeries: number): { inicio: number; fin: number } {
+  const inicio = (pagina - 1) * BLOQUE_ETIQUETAS + 1;
+  const fin = Math.min(pagina * BLOQUE_ETIQUETAS, totalSeries);
+  return { inicio, fin };
+}
+
+/** DD10: nombre de fichero de respaldo si la respuesta no trae `Content-Disposition` legible. */
+function nombreEtiquetasRespaldo(pagina: number): string {
+  return `etiquetas-${pagina}.pdf`;
+}
+
+function nombreDeDisposition(disposition: string, pagina: number): string {
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return match?.[1] ?? nombreEtiquetasRespaldo(pagina);
 }
 
 function withEmpresaId(url: string, overrideEmpresaId: string | undefined, empresaId: string | undefined): string {
@@ -42,6 +70,7 @@ export function SeriesLote({ loteId }: Readonly<SeriesLoteProps>) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [descargando, setDescargando] = useState<number | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -84,6 +113,34 @@ export function SeriesLote({ loteId }: Readonly<SeriesLoteProps>) {
     }
   };
 
+  /** R-M5.5/DD8: `fetch` → `Blob` → `URL.createObjectURL`, nunca un `<a download>` directo — un error de la API (403/400) nunca se "descarga" como PDF. */
+  const handleDescargarEtiquetas = async (pagina: number) => {
+    setDescargando(pagina);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch(withEmpresaId(`/api/admin/kits/lotes/${loteId}/etiquetas?pagina=${pagina}`, overrideEmpresaId, empresaId));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || t('kitsErrorEtiquetas', language));
+      }
+      const blob = await res.blob();
+      const nombre = nombreDeDisposition(res.headers.get('Content-Disposition') ?? '', pagina);
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = nombre;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('kitsErrorEtiquetas', language));
+    } finally {
+      setDescargando(null);
+    }
+  };
+
+  const bloques = bloquesEtiquetas(series.length);
+
   return (
     <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
       <div className="p-4 border-b border-white/10">
@@ -123,6 +180,40 @@ export function SeriesLote({ loteId }: Readonly<SeriesLoteProps>) {
             </>
           )}
         </Button>
+      </div>
+
+      <div className="p-4 flex flex-col gap-3 border-b border-white/10">
+        <div className="flex flex-wrap gap-3">
+          {Array.from({ length: bloques }, (_, i) => i + 1).map((pagina) => {
+            const { inicio, fin } = rangoBloque(pagina, series.length);
+            const etiquetaRango = bloques > 1 ? ` (${inicio}–${fin})` : '';
+            return (
+              <Button
+                key={pagina}
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                onClick={() => handleDescargarEtiquetas(pagina)}
+                disabled={series.length === 0 || descargando !== null}
+              >
+                {descargando === pagina ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    {t('kitsDescargandoEtiquetas', language)}
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    {t('kitsDescargarEtiquetas', language)}{etiquetaRango}
+                  </>
+                )}
+              </Button>
+            );
+          })}
+        </div>
+        {!KIT_ESTADO_PUBLICO_LIVE && (
+          <p className="text-xs text-amber-300">{t('kitsEtiquetasMuestraAviso', language)}</p>
+        )}
       </div>
 
       {loading ? (
