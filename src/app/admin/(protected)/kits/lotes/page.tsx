@@ -13,6 +13,7 @@ import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 import type { KitLote, Paginado, ProductoKit } from '@/core/domain/entities/kit-caducidad-types';
 import { LoteCaducidadesEditor } from './lote-caducidades-editor';
+import { SeriesLote } from './series-lote';
 
 function withEmpresaId(url: string, overrideEmpresaId: string | undefined, empresaId: string | undefined): string {
   const id = overrideEmpresaId || empresaId;
@@ -175,7 +176,10 @@ export default function KitsLotesPage() {
       </div>
 
       {loteAbiertoId && (
-        <LoteCaducidadesEditor loteId={loteAbiertoId} onSaved={cargar} />
+        <>
+          <LoteCaducidadesEditor loteId={loteAbiertoId} onSaved={cargar} />
+          <SeriesLote loteId={loteAbiertoId} />
+        </>
       )}
     </div>
   );
