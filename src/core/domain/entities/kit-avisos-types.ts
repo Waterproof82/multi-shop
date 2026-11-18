@@ -42,9 +42,22 @@ export interface GestionPorToken {
 // Los casos de uso NO conocen Next ni Brevo: reciben estos puertos ya
 // resueltos por la ruta, para poder probarse con dobles síncronos.
 
+/**
+ * kit-expiry-m3 (M3a/D-M3-6): cabeceras opcionales del envío (p. ej.
+ * `List-Unsubscribe` RFC 8058, `IdempotencyKey`). M2b no las usa — por eso
+ * son opcionales y `opciones` también lo es, para no romper sus llamadas.
+ */
+export interface OpcionesEnvioEmailAvisos {
+  cabeceras?: Record<string, string>;
+}
+
 /** Envío real de un email de avisos — lo implementa `email-kit-avisos.brevo.ts` (M2b6a). */
 export interface EmailKitAvisos {
-  enviar(to: string, contenido: { asunto: string; html: string; texto: string }): Promise<void>;
+  enviar(
+    to: string,
+    contenido: { asunto: string; html: string; texto: string },
+    opciones?: OpcionesEnvioEmailAvisos,
+  ): Promise<void>;
 }
 
 /** La ruta lo implementa con `after()` de `next/server` (DD5: responder 202 antes de enviar). */

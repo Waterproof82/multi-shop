@@ -15,9 +15,19 @@ export interface SendEmailParams {
   textContent?: string;
   senderName?: string;
   senderEmail?: string;
+  /**
+   * kit-expiry-m3 (M3a/D-M3-6): cabeceras personalizadas (`payload.headers`
+   * de Brevo). Confirmado en su doc oficial
+   * (https://developers.brevo.com/reference/sendtransacemail): admite un
+   * mapa `string -> string` de cabeceras no estándar (`List-Unsubscribe`,
+   * `List-Unsubscribe-Post`, `IdempotencyKey`...); Brevo advierte que las
+   * cabeceras SMTP estándar no se soportan por esta vía — se verifica en la
+   * prueba de *preview* (tasks.md, prerrequisito 4).
+   */
+  headers?: Record<string, string>;
 }
 
-export async function sendEmail({ to, subject, htmlContent, textContent, senderName = 'Pedidos', senderEmail }: SendEmailParams) {
+export async function sendEmail({ to, subject, htmlContent, textContent, senderName = 'Pedidos', senderEmail, headers }: SendEmailParams) {
   const apiKey = getBrevoApiKey();
 
   const resolvedSenderEmail = senderEmail || process.env.BREVO_DEFAULT_SENDER_EMAIL;
@@ -38,6 +48,10 @@ export async function sendEmail({ to, subject, htmlContent, textContent, senderN
 
   if (textContent) {
     payload.textContent = textContent;
+  }
+
+  if (headers) {
+    payload.headers = headers;
   }
 
   try {
