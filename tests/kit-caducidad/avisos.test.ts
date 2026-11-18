@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { avisosDebidos, claveAviso, type KitParaAvisos } from '@/lib/kit-caducidad/avisos';
+import {
+  avisosDebidos,
+  claveAviso,
+  clavesVigentes,
+  parsearClaveAviso,
+  type EnviadoAviso,
+  type KitParaAvisos,
+} from '@/lib/kit-caducidad/avisos';
 
 // sdd kit-expiry-reminders R4: avisos a 30 y 15 días, una sola vez por
 // (serie, ingrediente, parte, umbral), con recuperación de días perdidos.
@@ -91,5 +98,80 @@ describe('avisosDebidos', () => {
 
   it('ignora los kits sin avisos por email activos', () => {
     expect(avisosDebidos('2031-01-30', [kit(lote, { avisosEmail: false })], new Set())).toEqual([]);
+  });
+});
+
+// sdd kit-expiry-m3 (docs/sdd/kit-expiry-reminders/m3/), M3b/DD2:
+// `parsearClaveAviso` deshace `claveAviso` para el cron (leer
+// `kit_avisos_enviados` y escribir `marcarEnviados`). La `parte` puede
+// contener `|` (ej. "Antiséptico | caja"), así que la clave NO se puede
+// partir en 5 trozos fijos: solo el 1.º, el 2.º, el penúltimo y el último
+// tienen posición fija.
+describe('parsearClaveAviso', () => {
+  it('deshace claveAviso (ida y vuelta) con una parte vacía', () => {
+    const clave = claveAviso('KEC-AAAA-BBBB-C', PASTILLAS_ID, '', 30);
+
+    expect(parsearClaveAviso(clave)).toEqual({
+      serie: 'KEC-AAAA-BBBB-C',
+      ingredienteId: PASTILLAS_ID,
+      parte: '',
+      umbralDias: 30,
+    });
+  });
+
+  it('deshace claveAviso con una parte que contiene "|"', () => {
+    const clave = claveAviso('KEC-AAAA-BBBB-C', BOTIQUIN_ID, 'Antiséptico|caja', 15);
+
+    expect(parsearClaveAviso(clave)).toEqual({
+      serie: 'KEC-AAAA-BBBB-C',
+      ingredienteId: BOTIQUIN_ID,
+      parte: 'Antiséptico|caja',
+      umbralDias: 15,
+    });
+  });
+
+  it('devuelve null con menos de 5 trozos', () => {
+    expect(parsearClaveAviso('serie|ingrediente|30|email')).toBeNull();
+  });
+
+  it('devuelve null con un umbral distinto de 30/15', () => {
+    expect(parsearClaveAviso('serie|ingrediente||45|email')).toBeNull();
+  });
+
+  it('devuelve null con un canal distinto de "email"', () => {
+    expect(parsearClaveAviso('serie|ingrediente||30|whatsapp')).toBeNull();
+  });
+});
+
+// M3b/DD3: `clavesVigentes` descarta los avisos enviados a un titular
+// ANTERIOR al actual (el que se dio de baja y otro registró la serie) —
+// esos no cuentan como ya enviados, y el titular nuevo vuelve a recibirlos.
+describe('clavesVigentes', () => {
+  const FILA: EnviadoAviso = { serie: 'KEC-AAAA-BBBB-C', ingredienteId: PASTILLAS_ID, parte: '', umbralDias: 30, enviadoAt: '2031-01-30T08:00:00Z' };
+
+  it('una fila con enviadoAt anterior al registradoAt de su serie no entra', () => {
+    const registradoAt = new Map([['KEC-AAAA-BBBB-C', '2031-02-01T00:00:00Z']]);
+
+    expect(clavesVigentes([FILA], registradoAt)).toEqual(new Set());
+  });
+
+  it('una fila con enviadoAt igual al registradoAt de su serie entra', () => {
+    const registradoAt = new Map([['KEC-AAAA-BBBB-C', FILA.enviadoAt]]);
+
+    expect(clavesVigentes([FILA], registradoAt)).toEqual(
+      new Set([claveAviso(FILA.serie, FILA.ingredienteId, FILA.parte, FILA.umbralDias)]),
+    );
+  });
+
+  it('una fila con enviadoAt posterior al registradoAt de su serie entra', () => {
+    const registradoAt = new Map([['KEC-AAAA-BBBB-C', '2031-01-01T00:00:00Z']]);
+
+    expect(clavesVigentes([FILA], registradoAt)).toEqual(
+      new Set([claveAviso(FILA.serie, FILA.ingredienteId, FILA.parte, FILA.umbralDias)]),
+    );
+  });
+
+  it('una serie sin registradoAt no entra', () => {
+    expect(clavesVigentes([FILA], new Map())).toEqual(new Set());
   });
 });

@@ -30,6 +30,59 @@ export function claveAviso(serie: string, ingredienteId: string, parte: string, 
   return [serie, ingredienteId, parte, umbral, 'email'].join('|');
 }
 
+// sdd kit-expiry-m3 (docs/sdd/kit-expiry-reminders/m3/), M3b/DD2.
+// `FilaEnviado` y `EnviadoAviso` son los tipos del cron; M3d1 los reexporta
+// desde aquí para el contrato del repositorio — `avisos.ts` sigue siendo la
+// única fuente de verdad sobre la clave.
+export type FilaEnviado = { serie: string; ingredienteId: string; parte: string; umbralDias: UmbralAviso };
+export type EnviadoAviso = FilaEnviado & { enviadoAt: string };
+
+function esUmbralAviso(valor: string): boolean {
+  return (UMBRALES_AVISO_DIAS as readonly number[]).includes(Number(valor)) && String(Number(valor)) === valor;
+}
+
+/**
+ * Deshace `claveAviso`. La `parte` puede contener `|` (ej. partes del
+ * botiquín con el separador del DIN 13164 en su nombre), así que solo el
+ * 1.º trozo (serie), el 2.º (ingredienteId), el penúltimo (umbral) y el
+ * último (canal) tienen posición fija; `parte` es todo lo del medio,
+ * reunido con `|`. `null` si la clave no tiene al menos 5 trozos, el canal
+ * no es `email` o el umbral no es 30/15.
+ */
+export function parsearClaveAviso(clave: string): FilaEnviado | null {
+  const trozos = clave.split('|');
+  if (trozos.length < 5) return null;
+
+  const [serie, ingredienteId] = trozos;
+  const canal = trozos[trozos.length - 1];
+  const umbralTexto = trozos[trozos.length - 2];
+  const parte = trozos.slice(2, trozos.length - 2).join('|');
+
+  if (canal !== 'email' || !esUmbralAviso(umbralTexto)) return null;
+
+  return { serie, ingredienteId, parte, umbralDias: Number(umbralTexto) as UmbralAviso };
+}
+
+/**
+ * M3b/DD3 (R-M3.2.4): un aviso enviado a un titular ANTERIOR no cuenta como
+ * ya enviado — solo entran las filas con `enviadoAt >= registradoAt` de su
+ * serie. Una serie sin `registradoAt` (no en el mapa) no entra: no hay
+ * titular actual con el que comparar.
+ */
+export function clavesVigentes(
+  filas: readonly EnviadoAviso[],
+  registradoAt: ReadonlyMap<string, string>,
+): Set<string> {
+  const vigentes = new Set<string>();
+  for (const fila of filas) {
+    const registro = registradoAt.get(fila.serie);
+    if (registro === undefined) continue;
+    if (fila.enviadoAt < registro) continue;
+    vigentes.add(claveAviso(fila.serie, fila.ingredienteId, fila.parte, fila.umbralDias));
+  }
+  return vigentes;
+}
+
 // El umbral más cercano que ya se ha alcanzado, o null si aún falta.
 function umbralAlcanzado(diasRestantes: number): UmbralAviso | null {
   if (diasRestantes < 0) return null; // ya caducado: no se avisa

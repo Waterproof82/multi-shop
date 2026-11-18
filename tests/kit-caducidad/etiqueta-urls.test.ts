@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { urlEstadoKit, URL_LISTA_MOCHILA, urlPackRecambio, URL_PACK_RECAMBIO } from '@/lib/kit-caducidad/etiqueta-urls';
+import {
+  urlEstadoKit,
+  URL_LISTA_MOCHILA,
+  urlPackRecambio,
+  URL_PACK_RECAMBIO,
+  URL_TIENDA_KEC,
+  urlBajaUnClic,
+} from '@/lib/kit-caducidad/etiqueta-urls';
 import { generarSerie } from '@/lib/kit-caducidad/serie';
+import { generarTokenGestion } from '@/lib/kit-caducidad/token-gestion';
 
 // sdd kit-expiry-m5 R-M5.2.2/DD9: las URL de la etiqueta salen de funciones
 // puras; la del QR 1 exige `esSerieValida(serie)` — sin normalizar, porque
@@ -77,5 +85,25 @@ describe('urlPackRecambio', () => {
 describe('URL_PACK_RECAMBIO', () => {
   it('es la URL fija del pack de recambio de consumibles', () => {
     expect(URL_PACK_RECAMBIO).toBe('https://kitemergenciacanarias.es/kits-de-emergencia/pack-recambio-consumibles');
+  });
+});
+
+// sdd kit-expiry-m3 (docs/sdd/kit-expiry-reminders/m3/), M3b/DD6/DD7: la
+// baja de un clic (RFC 8058) la recibe la tienda, no la web de marketing.
+describe('URL_TIENDA_KEC', () => {
+  it('es la URL fija de la tienda', () => {
+    expect(URL_TIENDA_KEC).toBe('https://pedidos.kitemergenciacanarias.es');
+  });
+});
+
+describe('urlBajaUnClic', () => {
+  it('construye la URL de baja de un clic a partir de un token de gestión válido', () => {
+    const token = generarTokenGestion();
+
+    expect(urlBajaUnClic(token)).toBe(`https://pedidos.kitemergenciacanarias.es/api/kit-avisos/baja/${token}`);
+  });
+
+  it('lanza con un token que no cumple esTokenGestion', () => {
+    expect(() => urlBajaUnClic('no-es-un-token-valido')).toThrow();
   });
 });
