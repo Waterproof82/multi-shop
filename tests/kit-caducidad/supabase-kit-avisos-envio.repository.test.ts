@@ -268,3 +268,48 @@ describe('SupabaseKitAvisosEnvioRepository.findKitsConAvisos', () => {
     }
   });
 });
+
+describe('SupabaseKitAvisosEnvioRepository.findLotesKit', () => {
+  it('kit_lotes.select("id, productos(titulo_es, slug)").eq(empresa_id).in(id, loteIds)', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.findLotesKit(EMPRESA_ID, ['lote-1', 'lote-2']);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kit_lotes');
+    expect(llamada.select).toBe('id, productos(titulo_es, slug)');
+    expect(llamada.filtros).toEqual({ empresa_id: EMPRESA_ID });
+    expect(llamada.ins).toEqual({ id: ['lote-1', 'lote-2'] });
+  });
+
+  it('mapea loteId, kitNombre y kitSlug (null si el producto no tiene slug)', async () => {
+    const fake = crearClienteFake({
+      data: [{ id: 'lote-1', productos: { titulo_es: 'Kit básico', slug: 'kit-basico' } }, { id: 'lote-2', productos: { titulo_es: 'Kit pro', slug: null } }],
+      error: null,
+    });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findLotesKit(EMPRESA_ID, ['lote-1', 'lote-2']);
+
+    expect(result).toEqual({
+      success: true,
+      data: [
+        { loteId: 'lote-1', kitNombre: 'Kit básico', kitSlug: 'kit-basico' },
+        { loteId: 'lote-2', kitNombre: 'Kit pro', kitSlug: null },
+      ],
+    });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findLotesKit(EMPRESA_ID, ['lote-1']);
+
+    expect(result.success).toBe(false);
+  });
+});
