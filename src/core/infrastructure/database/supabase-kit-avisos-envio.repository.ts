@@ -25,6 +25,9 @@ import type {
 } from '@/core/domain/entities/kit-avisos-envio-types';
 import type { Result, AppError } from '@/core/domain/entities/types';
 
+/** M3d3/DD4: tope del bloque de `.range()` al recorrer la vista de caducidades y los enviados. */
+const BLOQUE_LECTURA = 1000;
+
 interface PgErrorLike {
   code?: string;
   message?: string;
@@ -60,6 +63,38 @@ function mapLoteKit(row: Record<string, unknown>): LoteKit {
     loteId: row.id as string,
     kitNombre: (producto?.titulo_es as string) ?? '',
     kitSlug: (producto?.slug as string | null) ?? null,
+  };
+}
+
+function mapCaducidadDeLote(row: Record<string, unknown>): CaducidadDeLote {
+  return {
+    loteId: row.lote_id as string,
+    ingredienteId: row.ingrediente_id as string,
+    consumible: row.consumible as string,
+    parte: row.parte as string,
+    caducaEl: row.caduca_el as string,
+  };
+}
+
+function mapEnviadoAviso(row: Record<string, unknown>): EnviadoAviso {
+  return {
+    serie: row.serie as string,
+    ingredienteId: row.ingrediente_id as string,
+    parte: row.parte as string,
+    umbralDias: row.umbral_dias as 30 | 15,
+    enviadoAt: row.enviado_at as string,
+  };
+}
+
+function filaMarcarEnviado(empresaId: string, fila: FilaEnviado, ahora: string): Record<string, unknown> {
+  return {
+    serie: fila.serie,
+    empresa_id: empresaId,
+    ingrediente_id: fila.ingredienteId,
+    parte: fila.parte,
+    umbral_dias: fila.umbralDias,
+    canal: 'email',
+    enviado_at: ahora,
   };
 }
 
@@ -150,19 +185,90 @@ export class SupabaseKitAvisosEnvioRepository implements IKitAvisosEnvioReposito
     }
   }
 
-  // M3d3
-  findCaducidades(_empresaId: string, _loteIds: readonly string[]): Promise<Result<CaducidadDeLote[]>> {
-    return Promise.resolve({ success: false, error: noImplementado('findCaducidades') });
+  // R-M3.2.3/DD4: caducidades efectivas de los lotes del bloque, recorriendo
+  // `.range()` en bloques de `BLOQUE_LECTURA` hasta agotar (patrón de
+  // `findSeriesDeLote`, M2a).
+  async findCaducidades(empresaId: string, loteIds: readonly string[]): Promise<Result<CaducidadDeLote[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const caducidades: CaducidadDeLote[] = [];
+
+      for (let desde = 0; ; desde += BLOQUE_LECTURA) {
+        const { data, error } = await supabase
+          .from('kit_lote_caducidades_efectivas')
+          .select('lote_id, ingrediente_id, consumible, parte, caduca_el')
+          .eq('empresa_id', empresaId)
+          .in('lote_id', loteIds as string[])
+          .range(desde, desde + BLOQUE_LECTURA - 1);
+
+        if (error) {
+          return { success: false, error: mapErrorEnvioAvisos(error, 'findCaducidades') };
+        }
+        const filas = (data ?? []) as Record<string, unknown>[];
+        caducidades.push(...filas.map(mapCaducidadDeLote));
+        if (filas.length < BLOQUE_LECTURA) break;
+      }
+
+      return { success: true, data: caducidades };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'findCaducidades') };
+    }
   }
 
-  // M3d3
-  findEnviados(_empresaId: string, _series: readonly string[]): Promise<Result<EnviadoAviso[]>> {
-    return Promise.resolve({ success: false, error: noImplementado('findEnviados') });
+  // R-M3.2.4/DD4: avisos ya enviados por email de las series del bloque,
+  // recorriendo `.range()` hasta agotar.
+  async findEnviados(empresaId: string, series: readonly string[]): Promise<Result<EnviadoAviso[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const enviados: EnviadoAviso[] = [];
+
+      for (let desde = 0; ; desde += BLOQUE_LECTURA) {
+        const { data, error } = await supabase
+          .from('kit_avisos_enviados')
+          .select('serie, ingrediente_id, parte, umbral_dias, enviado_at')
+          .eq('empresa_id', empresaId)
+          .eq('canal', 'email')
+          .in('serie', series as string[])
+          .range(desde, desde + BLOQUE_LECTURA - 1);
+
+        if (error) {
+          return { success: false, error: mapErrorEnvioAvisos(error, 'findEnviados') };
+        }
+        const filas = (data ?? []) as Record<string, unknown>[];
+        enviados.push(...filas.map(mapEnviadoAviso));
+        if (filas.length < BLOQUE_LECTURA) break;
+      }
+
+      return { success: true, data: enviados };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'findEnviados') };
+    }
   }
 
-  // M3d3
-  marcarEnviados(_empresaId: string, _filas: readonly FilaEnviado[]): Promise<Result<void>> {
-    return Promise.resolve({ success: false, error: noImplementado('marcarEnviados') });
+  // R-M3.3.1/DD3: `upsert` sobre la PK de `kit_avisos_enviados` — una
+  // repetición del mismo aviso solo actualiza `enviado_at`. Lista vacía no
+  // llama a la BD (el caso de uso puede no tener nada que marcar hoy).
+  async marcarEnviados(empresaId: string, filas: readonly FilaEnviado[]): Promise<Result<void>> {
+    if (filas.length === 0) {
+      return { success: true, data: undefined };
+    }
+    try {
+      const supabase = getSupabaseClient();
+      const ahora = new Date().toISOString();
+      const { error } = await supabase
+        .from('kit_avisos_enviados')
+        .upsert(
+          filas.map((fila) => filaMarcarEnviado(empresaId, fila, ahora)),
+          { onConflict: 'serie,ingrediente_id,parte,umbral_dias,canal' },
+        );
+
+      if (error) {
+        return { success: false, error: mapErrorEnvioAvisos(error, 'marcarEnviados') };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'marcarEnviados') };
+    }
   }
 
   // M3d4
