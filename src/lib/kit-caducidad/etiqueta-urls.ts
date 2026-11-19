@@ -5,8 +5,27 @@
 // solo tiene KEC. Si otro tenant lo activa, se revisará (pregunta abierta
 // de design.md).
 import { esSerieValida } from './serie';
+import { esTokenGestion } from './token-gestion';
 
 export const URL_LISTA_MOCHILA = 'https://kitemergenciacanarias.es/lista-mochila-emergencia';
+
+// sdd kit-expiry-m3 (docs/sdd/kit-expiry-reminders/m3/), M3b/DD7: dominio de
+// la tienda — el mismo que `urlEstadoKit`, fijo por el mismo motivo (D-M5).
+export const URL_TIENDA_KEC = 'https://pedidos.kitemergenciacanarias.es';
+
+/**
+ * M3b/DD6: URL de baja de un clic (RFC 8058) que recibe el `POST` del
+ * gestor de correo. `token` debe tener la forma de un token de gestión
+ * (`esTokenGestion`) — si no, lanza: construir esta URL con un valor que no
+ * puede ser un token real es un error de quien llama, no un caso a
+ * silenciar.
+ */
+export function urlBajaUnClic(token: string): string {
+  if (!esTokenGestion(token)) {
+    throw new Error('urlBajaUnClic: token con forma inválida');
+  }
+  return `${URL_TIENDA_KEC}/api/kit-avisos/baja/${token}`;
+}
 
 /**
  * URL del QR 1 («Estado y avisos»). `serie` debe llegar ya en forma
