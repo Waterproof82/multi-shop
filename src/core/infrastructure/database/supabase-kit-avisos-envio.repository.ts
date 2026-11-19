@@ -44,6 +44,16 @@ function mapEmpresaConAvisos(row: Record<string, unknown>, pausadas: ReadonlySet
   return { id, nombre: row.nombre as string, pausada: pausadas.has(id) };
 }
 
+function mapKitConContacto(row: Record<string, unknown>): KitConContacto {
+  return {
+    serie: row.serie as string,
+    loteId: row.lote_id as string,
+    email: row.email as string,
+    token: row.baja_token as string,
+    registradoAt: row.registrado_at as string,
+  };
+}
+
 export class SupabaseKitAvisosEnvioRepository implements IKitAvisosEnvioRepository {
   // R-M3.2.1: `kits_caducidad_habilitado = true`; una empresa sin fila en
   // `kit_avisos_config` no está pausada (DEFAULT false de la tabla, pero
@@ -85,9 +95,30 @@ export class SupabaseKitAvisosEnvioRepository implements IKitAvisosEnvioReposito
     }
   }
 
-  // M3d2b
-  findKitsConAvisos(_empresaId: string, _desde: number, _hasta: number): Promise<Result<KitConContacto[]>> {
-    return Promise.resolve({ success: false, error: noImplementado('findKitsConAvisos') });
+  // R-M3.2.2/DD4: bloque de `desde`/`hasta` (200 kits) ordenado por `serie`
+  // para que la paginación entre llamadas del caso de uso sea estable.
+  // `select` exacto — nunca `telefono` ni `*` — esta lectura solo necesita
+  // email para enviar y token para el enlace de baja.
+  async findKitsConAvisos(empresaId: string, desde: number, hasta: number): Promise<Result<KitConContacto[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kits_registrados')
+        .select('serie, lote_id, email, baja_token, registrado_at')
+        .eq('empresa_id', empresaId)
+        .not('registrado_at', 'is', null)
+        .not('consiente_email_at', 'is', null)
+        .not('email', 'is', null)
+        .order('serie')
+        .range(desde, hasta);
+
+      if (error) {
+        return { success: false, error: mapErrorEnvioAvisos(error, 'findKitsConAvisos') };
+      }
+      return { success: true, data: ((data ?? []) as Record<string, unknown>[]).map(mapKitConContacto) };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'findKitsConAvisos') };
+    }
   }
 
   // M3d2c
