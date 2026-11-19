@@ -54,6 +54,15 @@ function mapKitConContacto(row: Record<string, unknown>): KitConContacto {
   };
 }
 
+function mapLoteKit(row: Record<string, unknown>): LoteKit {
+  const producto = row.productos as Record<string, unknown> | null | undefined;
+  return {
+    loteId: row.id as string,
+    kitNombre: (producto?.titulo_es as string) ?? '',
+    kitSlug: (producto?.slug as string | null) ?? null,
+  };
+}
+
 export class SupabaseKitAvisosEnvioRepository implements IKitAvisosEnvioRepository {
   // R-M3.2.1: `kits_caducidad_habilitado = true`; una empresa sin fila en
   // `kit_avisos_config` no está pausada (DEFAULT false de la tabla, pero
@@ -121,9 +130,24 @@ export class SupabaseKitAvisosEnvioRepository implements IKitAvisosEnvioReposito
     }
   }
 
-  // M3d2c
-  findLotesKit(_empresaId: string, _loteIds: readonly string[]): Promise<Result<LoteKit[]>> {
-    return Promise.resolve({ success: false, error: noImplementado('findLotesKit') });
+  // R-M3.2.3: nombre y slug del kit de cada lote del bloque leído por
+  // `findKitsConAvisos`.
+  async findLotesKit(empresaId: string, loteIds: readonly string[]): Promise<Result<LoteKit[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kit_lotes')
+        .select('id, productos(titulo_es, slug)')
+        .eq('empresa_id', empresaId)
+        .in('id', loteIds as string[]);
+
+      if (error) {
+        return { success: false, error: mapErrorEnvioAvisos(error, 'findLotesKit') };
+      }
+      return { success: true, data: ((data ?? []) as Record<string, unknown>[]).map(mapLoteKit) };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'findLotesKit') };
+    }
   }
 
   // M3d3
