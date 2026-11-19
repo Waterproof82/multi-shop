@@ -3,12 +3,12 @@
 // M3h/R-M3.1/DD13: cron diario — autentica con `verifyCronSecret` (igual que
 // `rgpd-purge`), compone los puertos de los dos casos de uso ya probados
 // (M3e, M3f) y suma recuentos. `titularDe` resuelve el titular legal por
-// empresa (`getEmpresaLegalUseCase().getContext`) y, con ese mismo nombre,
-// recrea el puerto de email de Brevo (R-M3.4.1: el remitente de Brevo debe
-// coincidir con el nombre que firma el pie legal del email) — "por
-// empresa", porque el cron recorre varias en una sola ejecución (R-M3.2.1)
-// y `enviarAvisosCaducidadUseCase` (M3e) solo recibe UN puerto de email
-// para toda la ejecución.
+// empresa (`getEmpresaLegalUseCase().getContext`); R-M3.4.1 (el remitente de
+// Brevo debe coincidir con el nombre que firma el pie legal del email) ya no
+// depende de recrear el puerto de email por empresa (ver W1 de
+// `verify-report.md`): el caso de uso (M3e) pasa `remitenteNombre` en cada
+// `enviar`, así que esta ruta usa UN SOLO puerto, fijo, para toda la
+// ejecución, sin estado mutable ligado al orden del bucle de empresas.
 //
 // R-M3.1.3: el envío va antes que la purga; un fallo de uno no impide el
 // otro, y la respuesta lleva los recuentos de lo que sí terminó bien.
@@ -28,7 +28,6 @@ import {
 } from '@/core/application/use-cases/kits/enviarAvisosCaducidad.use-case';
 import { purgarDatosAvisosUseCase } from '@/core/application/use-cases/kits/purgarDatosAvisos.use-case';
 import type { ResumenAvisos, ResumenPurga } from '@/core/domain/entities/kit-avisos-envio-types';
-import type { EmailKitAvisos } from '@/core/domain/entities/kit-avisos-types';
 import type { AppError } from '@/core/domain/entities/types';
 
 export const dynamic = 'force-dynamic';
@@ -36,30 +35,13 @@ export const maxDuration = 300;
 
 const METODO = 'GET /api/cron/kit-avisos';
 
-// DD8/M3h: un solo puerto de email para toda la ejecución, pero con el
-// remitente de Brevo renovado antes de procesar cada empresa (ver
-// `crearTitularDe`) — así `enviarAvisosCaducidadUseCase` no necesita
-// conocer el concepto de "empresa actual".
-function crearPuertoEmailPorEmpresa(): {
-  email: EmailKitAvisos;
-  actualizarRemitente: (nombre: string) => void;
-} {
-  let puertoActual = crearEmailKitAvisosBrevo('');
-  return {
-    actualizarRemitente(nombre: string) {
-      puertoActual = crearEmailKitAvisosBrevo(nombre);
-    },
-    email: {
-      enviar: (to, contenido, opciones) => puertoActual.enviar(to, contenido, opciones),
-    },
-  };
-}
-
-function crearTitularDe(actualizarRemitente: (nombre: string) => void) {
+// W1/DD8: `senderName` de construcción no se usa — el caso de uso (M3e)
+// pasa `remitenteNombre` en cada `enviar` (`enviarUno`), así que este puerto
+// es el mismo para todas las empresas de la ejecución.
+function crearTitularDe(): (empresaId: string) => Promise<TitularLegal | null> {
   return async (empresaId: string): Promise<TitularLegal | null> => {
     const contexto = await getEmpresaLegalUseCase().getContext(empresaId);
     if (!contexto.success) return null;
-    actualizarRemitente(contexto.data.titular.nombre);
     return contexto.data.titular;
   };
 }
@@ -75,10 +57,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const simular = req.nextUrl.searchParams.get('simular') === '1';
   const hoy = hoyEnCanarias();
-  const { email, actualizarRemitente } = crearPuertoEmailPorEmpresa();
+  const email = crearEmailKitAvisosBrevo('');
 
   const avisosResult = await enviarAvisosCaducidadUseCase(
-    { repo: getKitAvisosEnvioRepository(), email, titularDe: crearTitularDe(actualizarRemitente) },
+    { repo: getKitAvisosEnvioRepository(), email, titularDe: crearTitularDe() },
     { hoy, simular },
   );
   if (!avisosResult.success) registrarError(avisosResult.error);

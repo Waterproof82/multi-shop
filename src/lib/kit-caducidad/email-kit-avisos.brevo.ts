@@ -7,6 +7,12 @@
 // kit-expiry-m3 (M3a/D-M3-6): `opciones.cabeceras` pasa a `sendEmail` como
 // `headers` (RFC 8058 `List-Unsubscribe`, `IdempotencyKey`...). Opcional:
 // M2b sigue llamando a `enviar(to, contenido)` sin tercer argumento.
+//
+// kit-expiry-m3 (W1 de verify-report.md): `opciones.remitenteNombre`
+// sobrescribe el `senderName` de construcción para ESE envío. M2b sigue
+// pasando el nombre al construir el puerto y nunca `remitenteNombre`, así
+// que su comportamiento no cambia; el cron (M3h) usa `remitenteNombre` en
+// cada `enviar` porque recorre varias empresas con un único puerto.
 import { sendEmail } from '@/lib/brevo-email';
 import type { EmailKitAvisos } from '@/core/domain/entities/kit-avisos-types';
 
@@ -18,7 +24,7 @@ export function crearEmailKitAvisosBrevo(senderName: string): EmailKitAvisos {
         subject: contenido.asunto,
         htmlContent: contenido.html,
         textContent: contenido.texto,
-        senderName,
+        senderName: opciones?.remitenteNombre ?? senderName,
         ...(opciones?.cabeceras ? { headers: opciones.cabeceras } : {}),
       });
     },

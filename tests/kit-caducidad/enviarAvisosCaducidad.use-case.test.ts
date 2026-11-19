@@ -318,6 +318,47 @@ describe('enviarAvisosCaducidadUseCase — envío, marcado y cabeceras', () => {
   });
 });
 
+// W1 (verify-report.md m3): antes, el remitente de Brevo dependía de un
+// estado mutable en la ruta (`crearPuertoEmailPorEmpresa`, M3h), correcto
+// solo porque el bucle de empresas es secuencial — invariante no declarado
+// en ningún tipo ni test. Ahora cada llamada a `enviar` lleva su propio
+// `remitenteNombre` explícito (ver `enviarUno`), así que es trivial probarlo
+// con dos empresas sin depender del orden del bucle.
+describe('enviarAvisosCaducidadUseCase — remitente por empresa (W1)', () => {
+  it('con dos empresas, cada email lleva el remitenteNombre de SU titular', async () => {
+    const empresaA: EmpresaConAvisos = { id: 'empresa-a', nombre: 'A', pausada: false };
+    const empresaB: EmpresaConAvisos = { id: 'empresa-b', nombre: 'B', pausada: false };
+    const titularA = { ...TITULAR_OK, nombre: 'Empresa A SL' };
+    const titularB = { ...TITULAR_OK, nombre: 'Empresa B SL' };
+    const kitA = kit({ serie: 'KEC-AAAA-AAAA-A', loteId: 'lote-a' });
+    const kitB = kit({ serie: 'KEC-BBBB-BBBB-B', loteId: 'lote-b' });
+
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([empresaA, empresaB])),
+      findKitsConAvisos: vi.fn().mockResolvedValueOnce(ok([kitA])).mockResolvedValueOnce(ok([kitB])),
+      findLotesKit: vi
+        .fn()
+        .mockResolvedValueOnce(ok([lote({ loteId: 'lote-a' })]))
+        .mockResolvedValueOnce(ok([lote({ loteId: 'lote-b' })])),
+      findCaducidades: vi
+        .fn()
+        .mockResolvedValueOnce(ok([caducidad({ loteId: 'lote-a' })]))
+        .mockResolvedValueOnce(ok([caducidad({ loteId: 'lote-b' })])),
+    });
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValueOnce(titularA).mockResolvedValueOnce(titularB);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success && result.data.enviados).toBe(2);
+    expect(email.enviar).toHaveBeenCalledTimes(2);
+    const [, , opcionesA] = email.enviar.mock.calls[0];
+    const [, , opcionesB] = email.enviar.mock.calls[1];
+    expect(opcionesA.remitenteNombre).toBe('Empresa A SL');
+    expect(opcionesB.remitenteNombre).toBe('Empresa B SL');
+  });
+});
+
 describe('enviarAvisosCaducidadUseCase — tope y simular', () => {
   it('con tope 1 y 3 avisos debidos, envía 1 y aplaza 2', async () => {
     const kits = [
