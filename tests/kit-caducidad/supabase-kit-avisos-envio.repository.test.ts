@@ -215,3 +215,56 @@ describe('SupabaseKitAvisosEnvioRepository.findEmpresasConAvisos', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('SupabaseKitAvisosEnvioRepository.findKitsConAvisos', () => {
+  it('select exacto, eq(empresa_id), not(...) x3, order(serie), range(desde, hasta)', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.findKitsConAvisos(EMPRESA_ID, 0, 199);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kits_registrados');
+    expect(llamada.select).toBe('serie, lote_id, email, baja_token, registrado_at');
+    expect(llamada.select).not.toContain('telefono');
+    expect(llamada.select).not.toContain('*');
+    expect(llamada.filtros).toEqual({ empresa_id: EMPRESA_ID });
+    expect(llamada.nots).toEqual([
+      { col: 'registrado_at', op: 'is', val: null },
+      { col: 'consiente_email_at', op: 'is', val: null },
+      { col: 'email', op: 'is', val: null },
+    ]);
+    expect(llamada.orders).toEqual([{ col: 'serie', opts: undefined }]);
+    expect(llamada.range).toEqual({ desde: 0, hasta: 199 });
+  });
+
+  it('mapea serie, loteId, email, token (de baja_token) y registradoAt', async () => {
+    const fake = crearClienteFake({
+      data: [{ serie: 'KEC-1', lote_id: 'lote-1', email: 'ana@ejemplo.com', baja_token: 'tok-1', registrado_at: '2026-11-01T00:00:00.000Z' }],
+      error: null,
+    });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findKitsConAvisos(EMPRESA_ID, 0, 199);
+
+    expect(result).toEqual({
+      success: true,
+      data: [{ serie: 'KEC-1', loteId: 'lote-1', email: 'ana@ejemplo.com', token: 'tok-1', registradoAt: '2026-11-01T00:00:00.000Z' }],
+    });
+  });
+
+  it('un error de Supabase devuelve success:false sin email ni token en el mensaje', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findKitsConAvisos(EMPRESA_ID, 0, 199);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.message).not.toContain('@');
+    }
+  });
+});
