@@ -34,6 +34,7 @@ import {
 import { emailAvisoCaducidad, cabecerasBajaUnClic, claveIdempotencia } from '@/lib/kit-caducidad/email-aviso-caducidad';
 import { remitenteDe, type Remitente } from '@/lib/kit-caducidad/emails-avisos';
 import { URL_TIENDA_KEC, urlBajaUnClic } from '@/lib/kit-caducidad/etiqueta-urls';
+import { logger } from '@/core/infrastructure/logging/logger';
 
 /** DD4: tamaño del bloque de kits por lectura (cabe de sobra en la URL del `.in()`). */
 const BLOQUE_KITS = 200;
@@ -89,7 +90,17 @@ interface DatosEnvio {
 }
 
 function nuevoResumen(empresas: number): ResumenAvisos {
-  return { empresas, pausadas: 0, sinRemitente: 0, kits: 0, enviados: 0, fallidos: 0, sinMarcar: 0, aplazados: 0 };
+  return {
+    empresas,
+    pausadas: 0,
+    sinRemitente: 0,
+    kits: 0,
+    enviados: 0,
+    fallidos: 0,
+    sinMarcar: 0,
+    aplazados: 0,
+    empresasConError: 0,
+  };
 }
 
 function agruparCaducidadesPorLote(filas: readonly CaducidadDeLote[]): Map<string, Caducidad[]> {
@@ -264,9 +275,24 @@ export async function enviarAvisosCaducidadUseCase(
   const resumen = nuevoResumen(empresasResult.data.length);
   const estado: EstadoTope = { restantes: opciones.tope ?? TOPE_ENVIOS };
 
+  // W2 (verify-report.md m3): un fallo de LECTURA de una empresa (p. ej.
+  // `findKitsConAvisos`/`findLotesKit`/`findCaducidades`/`findEnviados`) ya
+  // no aborta las empresas siguientes — se registra sin PII (solo
+  // `empresa.id`, nunca email/teléfono/token) y se cuenta en
+  // `empresasConError`; el cron sigue con la empresa siguiente.
   for (const empresa of empresasResult.data) {
     const result = await procesarEmpresa(puertos, opciones, empresa, resumen, estado);
-    if (!result.success) return result;
+    if (!result.success) {
+      resumen.empresasConError += 1;
+      logger.logError({
+        codigo: result.error.code,
+        mensaje: result.error.message,
+        modulo: 'use-case',
+        metodo: 'enviarAvisosCaducidadUseCase.procesarEmpresa',
+        empresaId: empresa.id,
+      });
+      continue;
+    }
   }
 
   return { success: true, data: resumen };

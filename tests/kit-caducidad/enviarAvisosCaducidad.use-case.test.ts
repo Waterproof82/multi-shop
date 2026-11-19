@@ -80,7 +80,17 @@ describe('enviarAvisosCaducidadUseCase — empresas', () => {
 
     expect(result).toEqual({
       success: true,
-      data: { empresas: 1, pausadas: 1, sinRemitente: 0, kits: 0, enviados: 0, fallidos: 0, sinMarcar: 0, aplazados: 0 },
+      data: {
+        empresas: 1,
+        pausadas: 1,
+        sinRemitente: 0,
+        kits: 0,
+        enviados: 0,
+        fallidos: 0,
+        sinMarcar: 0,
+        aplazados: 0,
+        empresasConError: 0,
+      },
     });
     expect(titularDe).not.toHaveBeenCalled();
     expect(repo.findKitsConAvisos).not.toHaveBeenCalled();
@@ -356,6 +366,53 @@ describe('enviarAvisosCaducidadUseCase — remitente por empresa (W1)', () => {
     const [, , opcionesB] = email.enviar.mock.calls[1];
     expect(opcionesA.remitenteNombre).toBe('Empresa A SL');
     expect(opcionesB.remitenteNombre).toBe('Empresa B SL');
+  });
+});
+
+// W2 (verify-report.md m3): un fallo de lectura en UNA empresa (por ejemplo
+// `findKitsConAvisos`) ya no aborta el resto de la ejecución — se cuenta en
+// `empresasConError` y el cron sigue con las siguientes empresas.
+describe('enviarAvisosCaducidadUseCase — resiliencia entre empresas (W2)', () => {
+  it('si falla la lectura de la empresa 1, la empresa 2 se procesa igual', async () => {
+    const empresaA: EmpresaConAvisos = { id: 'empresa-a', nombre: 'A', pausada: false };
+    const empresaB: EmpresaConAvisos = { id: 'empresa-b', nombre: 'B', pausada: false };
+    const kitB = kit({ serie: 'KEC-BBBB-BBBB-B', loteId: 'lote-b' });
+
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([empresaA, empresaB])),
+      findKitsConAvisos: vi
+        .fn()
+        .mockResolvedValueOnce({ success: false, error: { code: 'DB_ERROR', message: 'x', module: 'repository' } })
+        .mockResolvedValueOnce(ok([kitB]))
+        .mockResolvedValueOnce(ok([])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote({ loteId: 'lote-b' })])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad({ loteId: 'lote-b' })])),
+    });
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success && result.data.empresasConError).toBe(1);
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(email.enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('con TODAS las empresas fallando, success:true y empresasConError = empresas', async () => {
+    const empresaA: EmpresaConAvisos = { id: 'empresa-a', nombre: 'A', pausada: false };
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([empresaA])),
+      findKitsConAvisos: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: { code: 'DB_ERROR', message: 'x', module: 'repository' } }),
+    });
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.empresasConError).toBe(1);
   });
 });
 

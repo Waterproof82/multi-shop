@@ -45,6 +45,7 @@ vi.mock('@/core/infrastructure/logging/logger', () => ({
 
 const RESUMEN_AVISOS_OK = {
   empresas: 3, pausadas: 1, sinRemitente: 0, kits: 12, enviados: 2, fallidos: 0, sinMarcar: 0, aplazados: 0,
+  empresasConError: 0,
 };
 const RESUMEN_PURGA_OK = { pendientesPurgados: 4, inactivosPurgados: 1, lotesSinFechas: 0 };
 
