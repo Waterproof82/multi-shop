@@ -36,6 +36,10 @@ function lote(overrides: Partial<LoteKit> = {}): LoteKit {
   return { loteId: 'lote-1', kitNombre: 'Kit estándar', kitSlug: 'kit-estandar-72h', ...overrides };
 }
 
+function caducidad(overrides: Partial<CaducidadDeLote> = {}): CaducidadDeLote {
+  return { loteId: 'lote-1', ingredienteId: 'ing-1', consumible: 'Pastillas potabilizadoras', parte: '', caducaEl: '2031-03-01', ...overrides };
+}
+
 type RepoFake = IKitAvisosEnvioRepository & { [K in keyof IKitAvisosEnvioRepository]: ReturnType<typeof vi.fn> };
 
 function ok<T>(data: T): Result<T> {
@@ -60,6 +64,10 @@ function crearRepoFake(overrides: Partial<RepoFake> = {}): RepoFake {
 
 function crearEmailFake() {
   return { enviar: vi.fn().mockResolvedValue(undefined) };
+}
+
+function unBloqueDeKits(repo: RepoFake, kits: KitConContacto[]) {
+  repo.findKitsConAvisos.mockResolvedValueOnce(ok(kits)).mockResolvedValueOnce(ok([]));
 }
 
 describe('enviarAvisosCaducidadUseCase — empresas', () => {
@@ -134,20 +142,221 @@ describe('enviarAvisosCaducidadUseCase — bloques y caché por lote', () => {
     expect(repo.findCaducidades).toHaveBeenCalledTimes(1);
   });
 
-  it('sin avisos debidos, el stub de envío aplaza en vez de enviar (lo sustituye M3eb)', async () => {
+});
+
+describe('enviarAvisosCaducidadUseCase — R4 (treinta y quince días, sin repetir)', () => {
+  it('envía el aviso de 30 días el día que faltan 30', async () => {
     const repo = crearRepoFake({
       findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
-      findKitsConAvisos: vi.fn().mockResolvedValueOnce(ok([kit()])).mockResolvedValueOnce(ok([])),
       findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
-      findCaducidades: vi.fn().mockResolvedValue(ok([{ loteId: 'lote-1', ingredienteId: 'ing-1', consumible: 'Pastillas', parte: '', caducaEl: '2031-03-01' }])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
     });
+    unBloqueDeKits(repo, [kit()]);
     const email = crearEmailFake();
     const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
 
     const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
 
-    expect(result.success && result.data.aplazados).toBe(1);
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(email.enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('no envía nada el día anterior (faltan 31)', async () => {
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-29' });
+
     expect(result.success && result.data.enviados).toBe(0);
     expect(email.enviar).not.toHaveBeenCalled();
+  });
+
+  it('envía el aviso de 15 días si el de 30 ya se envió', async () => {
+    const enviados: EnviadoAviso[] = [{ serie: SERIE, ingredienteId: 'ing-1', parte: '', umbralDias: 30, enviadoAt: '2031-01-30T08:00:00.000Z' }];
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+      findEnviados: vi.fn().mockResolvedValue(ok(enviados)),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-02-14' });
+
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(email.enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('no repite ningún aviso tras enviar el de 30 y el de 15', async () => {
+    const enviados: EnviadoAviso[] = [
+      { serie: SERIE, ingredienteId: 'ing-1', parte: '', umbralDias: 30, enviadoAt: '2031-01-30T08:00:00.000Z' },
+      { serie: SERIE, ingredienteId: 'ing-1', parte: '', umbralDias: 15, enviadoAt: '2031-02-14T08:00:00.000Z' },
+    ];
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+      findEnviados: vi.fn().mockResolvedValue(ok(enviados)),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-02-20' });
+
+    expect(result.success && result.data.enviados).toBe(0);
+    expect(email.enviar).not.toHaveBeenCalled();
+  });
+
+  it('un aviso enviado a un titular anterior (enviadoAt < registradoAt) se vuelve a enviar', async () => {
+    const enviados: EnviadoAviso[] = [{ serie: SERIE, ingredienteId: 'ing-1', parte: '', umbralDias: 30, enviadoAt: '2025-01-01T00:00:00.000Z' }];
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+      findEnviados: vi.fn().mockResolvedValue(ok(enviados)),
+    });
+    unBloqueDeKits(repo, [kit({ registradoAt: '2026-06-01T00:00:00.000Z' })]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(email.enviar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('enviarAvisosCaducidadUseCase — un email por kit', () => {
+  it('dos elementos debidos del mismo kit generan un único email', async () => {
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(
+        ok([caducidad(), caducidad({ ingredienteId: 'ing-2', consumible: 'Botiquín', parte: 'gasas' })]),
+      ),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(email.enviar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('enviarAvisosCaducidadUseCase — envío, marcado y cabeceras', () => {
+  it('un envío correcto marca las claves de `marcar` y pasa cabeceras RFC 8058 + IdempotencyKey', async () => {
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(repo.marcarEnviados).toHaveBeenCalledTimes(1);
+    const [empresaId, filas] = repo.marcarEnviados.mock.calls[0];
+    expect(empresaId).toBe(EMPRESA.id);
+    expect(filas).toEqual([{ serie: SERIE, ingredienteId: 'ing-1', parte: '', umbralDias: 30 }]);
+
+    const [, , opciones] = email.enviar.mock.calls[0];
+    expect(opciones.cabeceras['List-Unsubscribe']).toContain('baja');
+    expect(opciones.cabeceras['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+    expect(opciones.cabeceras.IdempotencyKey).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('si `enviar` lanza, no marca, cuenta fallidos y sigue con el siguiente kit', async () => {
+    const kitA = kit({ serie: 'KEC-AAAA-BBBB-C', loteId: 'lote-1' });
+    const kitB = kit({ serie: 'KEC-DDDD-EEEE-F', loteId: 'lote-2' });
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote(), lote({ loteId: 'lote-2' })])),
+      findCaducidades: vi.fn().mockResolvedValue(
+        ok([caducidad(), caducidad({ loteId: 'lote-2', ingredienteId: 'ing-2' })]),
+      ),
+    });
+    unBloqueDeKits(repo, [kitA, kitB]);
+    const email = { enviar: vi.fn().mockRejectedValueOnce(new Error('brevo caído')).mockResolvedValueOnce(undefined) };
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success && result.data.fallidos).toBe(1);
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(repo.marcarEnviados).toHaveBeenCalledTimes(1);
+  });
+
+  it('si `marcarEnviados` falla, cuenta sinMarcar y el envío sigue contando como enviado', async () => {
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+      marcarEnviados: vi.fn().mockResolvedValue({ success: false, error: { code: 'DB_ERROR', message: 'x', module: 'repository' } }),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30' });
+
+    expect(result.success && result.data.sinMarcar).toBe(1);
+    expect(result.success && result.data.enviados).toBe(1);
+  });
+});
+
+describe('enviarAvisosCaducidadUseCase — tope y simular', () => {
+  it('con tope 1 y 3 avisos debidos, envía 1 y aplaza 2', async () => {
+    const kits = [
+      kit({ serie: 'KEC-AAAA-AAAA-A', loteId: 'lote-1' }),
+      kit({ serie: 'KEC-BBBB-BBBB-B', loteId: 'lote-2' }),
+      kit({ serie: 'KEC-CCCC-CCCC-C', loteId: 'lote-3' }),
+    ];
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote(), lote({ loteId: 'lote-2' }), lote({ loteId: 'lote-3' })])),
+      findCaducidades: vi.fn().mockResolvedValue(
+        ok([caducidad(), caducidad({ loteId: 'lote-2' }), caducidad({ loteId: 'lote-3' })]),
+      ),
+    });
+    unBloqueDeKits(repo, kits);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30', tope: 1 });
+
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(result.success && result.data.aplazados).toBe(2);
+    expect(email.enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('con `simular`, no llama a enviar ni a marcarEnviados pero calcula los recuentos', async () => {
+    const repo = crearRepoFake({
+      findEmpresasConAvisos: vi.fn().mockResolvedValue(ok([EMPRESA])),
+      findLotesKit: vi.fn().mockResolvedValue(ok([lote()])),
+      findCaducidades: vi.fn().mockResolvedValue(ok([caducidad()])),
+    });
+    unBloqueDeKits(repo, [kit()]);
+    const email = crearEmailFake();
+    const titularDe = vi.fn().mockResolvedValue(TITULAR_OK);
+
+    const result = await enviarAvisosCaducidadUseCase({ repo, email, titularDe }, { hoy: '2031-01-30', simular: true });
+
+    expect(result.success && result.data.enviados).toBe(1);
+    expect(email.enviar).not.toHaveBeenCalled();
+    expect(repo.marcarEnviados).not.toHaveBeenCalled();
   });
 });

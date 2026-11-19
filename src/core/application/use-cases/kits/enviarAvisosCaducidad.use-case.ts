@@ -7,9 +7,10 @@
 // `procesarEmpresa` → `procesarBloque` → `enviarUno` (DD12, complejidad
 // ≤ 15 cada uno).
 //
-// M3e se partió en 2 PR (>400 líneas, tasks.md): M3ea (bucle de empresas y
-// bloques, caché por lote) deja `enviarUno` en un stub que solo aplaza;
-// M3eb lo sustituye por el envío real (cabeceras, marcado, tope, `simular`).
+// M3e se partió en 2 PR (>400 líneas, tasks.md): M3ea añadió el bucle de
+// empresas y bloques con caché por lote (`enviarUno` solo aplazaba); M3eb
+// (este commit) añade el envío real: cabeceras RFC 8058 + `IdempotencyKey`,
+// marcado, tope y `simular`.
 import type { IKitAvisosEnvioRepository } from '@/core/domain/repositories/IKitAvisosEnvioRepository';
 import type {
   CaducidadDeLote,
@@ -21,9 +22,18 @@ import type {
 import type { EmailKitAvisos } from '@/core/domain/entities/kit-avisos-types';
 import type { Result } from '@/core/domain/entities/types';
 import type { Caducidad } from '@/lib/kit-caducidad/estado';
-import { avisosDebidos, clavesVigentes, type AvisoDebido, type KitParaAvisos } from '@/lib/kit-caducidad/avisos';
+import { estadoDelKit } from '@/lib/kit-caducidad/estado';
+import {
+  avisosDebidos,
+  clavesVigentes,
+  parsearClaveAviso,
+  type AvisoDebido,
+  type FilaEnviado,
+  type KitParaAvisos,
+} from '@/lib/kit-caducidad/avisos';
+import { emailAvisoCaducidad, cabecerasBajaUnClic, claveIdempotencia } from '@/lib/kit-caducidad/email-aviso-caducidad';
 import { remitenteDe, type Remitente } from '@/lib/kit-caducidad/emails-avisos';
-import { URL_TIENDA_KEC } from '@/lib/kit-caducidad/etiqueta-urls';
+import { URL_TIENDA_KEC, urlBajaUnClic } from '@/lib/kit-caducidad/etiqueta-urls';
 
 /** DD4: tamaño del bloque de kits por lectura (cabe de sobra en la URL del `.in()`). */
 const BLOQUE_KITS = 200;
@@ -121,11 +131,52 @@ function construirKitParaAvisos(kit: KitConContacto, cache: CacheLote): KitParaA
   };
 }
 
-// M3eb reemplaza este stub por el envío real (cabeceras RFC 8058 +
-// `IdempotencyKey`, `email.enviar`, `marcarEnviados`, tope y `simular`).
-function enviarUno(_ctx: ContextoEmpresa, _datos: DatosEnvio, _aviso: AvisoDebido, resumen: ResumenAvisos, _estado: EstadoTope): Promise<void> {
-  resumen.aplazados += 1;
-  return Promise.resolve();
+// R-M3.3/R-M3.4/DD11: un email por aviso debido (ya agrupado por kit en
+// `avisosDebidos`). El tope se consume aquí, ANTES de intentar nada —
+// agotado, el resto de la ejecución se aplaza (D-M3-12), tanto si `simular`
+// como si no (los recuentos deben coincidir en los dos modos).
+async function enviarUno(ctx: ContextoEmpresa, datos: DatosEnvio, aviso: AvisoDebido, resumen: ResumenAvisos, estado: EstadoTope): Promise<void> {
+  if (estado.restantes <= 0) {
+    resumen.aplazados += 1;
+    return;
+  }
+  estado.restantes -= 1;
+
+  const { elementos } = estadoDelKit(ctx.hoy, aviso.elementos);
+  const contenido = emailAvisoCaducidad({
+    serie: aviso.serie,
+    kitNombre: datos.kitNombre,
+    kitSlug: aviso.kitSlug || null,
+    elementos,
+    remitente: ctx.remitente,
+    baseUrl: ctx.baseUrl,
+    token: datos.token,
+  });
+  const cabeceras = {
+    ...cabecerasBajaUnClic(urlBajaUnClic(datos.token), ctx.remitente.email),
+    IdempotencyKey: claveIdempotencia(aviso.marcar),
+  };
+
+  // R-M3.1.3: `simular` calcula los mismos recuentos que un envío real,
+  // sin llamar a Brevo ni escribir `kit_avisos_enviados`.
+  if (ctx.simular) {
+    resumen.enviados += 1;
+    return;
+  }
+
+  try {
+    await ctx.email.enviar(datos.kitEmail, contenido, { cabeceras });
+  } catch {
+    resumen.fallidos += 1;
+    return;
+  }
+
+  resumen.enviados += 1;
+  const filas = aviso.marcar.map(parsearClaveAviso).filter((f): f is FilaEnviado => f !== null);
+  const marcarResult = await ctx.repo.marcarEnviados(ctx.empresaId, filas);
+  if (!marcarResult.success) {
+    resumen.sinMarcar += 1;
+  }
 }
 
 async function procesarBloque(ctx: ContextoEmpresa, kits: readonly KitConContacto[], resumen: ResumenAvisos, estado: EstadoTope): Promise<Result<void>> {
