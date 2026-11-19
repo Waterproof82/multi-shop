@@ -42,6 +42,13 @@ export interface ResumenAvisos {
   fallidos: number;
   sinMarcar: number;
   aplazados: number;
+  /**
+   * kit-expiry-m3 (W2 de verify-report.md): un fallo de lectura (p. ej.
+   * `findKitsConAvisos`, `findLotesKit`, `findCaducidades` o `findEnviados`)
+   * para ESTA empresa ya no aborta el resto del cron — se cuenta aquí y se
+   * sigue con la siguiente empresa.
+   */
+  empresasConError: number;
 }
 
 /** R-M3.7.1: recuentos de la purga. */
