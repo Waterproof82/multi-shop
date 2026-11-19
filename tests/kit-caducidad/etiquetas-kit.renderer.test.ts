@@ -80,6 +80,11 @@ describe('construirDocumentoEtiquetas', () => {
 });
 
 describe('renderEtiquetasKitPdf', () => {
+  // S1 (verify-report.md m3): este test hace trabajo real de CPU (QR +
+  // `renderToStream` de react-pdf); con el timeout por defecto de Vitest
+  // (5000 ms) se observó un flake bajo la contención de la suite completa
+  // en paralelo (M3h/M3i). 20000 ms da margen sin enmascarar una regresión
+  // real de rendimiento (sigue fallando si de verdad tarda muchísimo más).
   it('devuelve un PDF real (cabecera %PDF-) con QR reales', async () => {
     const stream = await renderEtiquetasKitPdf(loteDePrueba(etiquetasDePrueba(2), true));
     const chunks: Buffer[] = [];
@@ -87,5 +92,5 @@ describe('renderEtiquetasKitPdf', () => {
     const buffer = Buffer.concat(chunks);
 
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  });
+  }, 20000);
 });
