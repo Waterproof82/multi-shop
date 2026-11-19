@@ -25,6 +25,7 @@ export function crearEmailKitAvisosBrevo(senderName: string): EmailKitAvisos {
         htmlContent: contenido.html,
         textContent: contenido.texto,
         senderName: opciones?.remitenteNombre ?? senderName,
+        ...(opciones?.remitenteEmail ? { senderEmail: opciones.remitenteEmail } : {}),
         ...(opciones?.cabeceras ? { headers: opciones.cabeceras } : {}),
       });
     },

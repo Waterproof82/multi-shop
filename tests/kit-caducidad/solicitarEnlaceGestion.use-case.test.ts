@@ -89,6 +89,7 @@ describe('solicitarEnlaceGestionUseCase', () => {
     await tareas[0]();
     expect(enviar).toHaveBeenCalledTimes(1);
     expect(enviar.mock.calls[0][0]).toBe('titular-actual@example.com');
+    expect(enviar.mock.calls[0][2]).toEqual({ remitenteEmail: 'contacto@kitemergenciacanarias.es' });
   });
 
   it('con un email que no coincide, no programa ninguna tarea pero sigue siendo ok', async () => {

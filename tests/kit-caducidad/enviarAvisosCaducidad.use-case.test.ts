@@ -338,8 +338,8 @@ describe('enviarAvisosCaducidadUseCase — remitente por empresa (W1)', () => {
   it('con dos empresas, cada email lleva el remitenteNombre de SU titular', async () => {
     const empresaA: EmpresaConAvisos = { id: 'empresa-a', nombre: 'A', pausada: false };
     const empresaB: EmpresaConAvisos = { id: 'empresa-b', nombre: 'B', pausada: false };
-    const titularA = { ...TITULAR_OK, nombre: 'Empresa A SL' };
-    const titularB = { ...TITULAR_OK, nombre: 'Empresa B SL' };
+    const titularA = { ...TITULAR_OK, nombre: 'Empresa A SL', email: 'avisos@empresa-a.test' };
+    const titularB = { ...TITULAR_OK, nombre: 'Empresa B SL', email: 'avisos@empresa-b.test' };
     const kitA = kit({ serie: 'KEC-AAAA-AAAA-A', loteId: 'lote-a' });
     const kitB = kit({ serie: 'KEC-BBBB-BBBB-B', loteId: 'lote-b' });
 
@@ -366,6 +366,10 @@ describe('enviarAvisosCaducidadUseCase — remitente por empresa (W1)', () => {
     const [, , opcionesB] = email.enviar.mock.calls[1];
     expect(opcionesA.remitenteNombre).toBe('Empresa A SL');
     expect(opcionesB.remitenteNombre).toBe('Empresa B SL');
+    // Sin remitente explícito, Brevo depende de BREVO_DEFAULT_SENDER_EMAIL y
+    // sendEmail lanza en after() sin dejar rastro (prueba en producción 2026-11-19).
+    expect(opcionesA.remitenteEmail).toBe('avisos@empresa-a.test');
+    expect(opcionesB.remitenteEmail).toBe('avisos@empresa-b.test');
   });
 });
 
