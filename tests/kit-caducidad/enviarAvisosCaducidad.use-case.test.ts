@@ -335,7 +335,7 @@ describe('enviarAvisosCaducidadUseCase — envío, marcado y cabeceras', () => {
 // `remitenteNombre` explícito (ver `enviarUno`), así que es trivial probarlo
 // con dos empresas sin depender del orden del bucle.
 describe('enviarAvisosCaducidadUseCase — remitente por empresa (W1)', () => {
-  it('con dos empresas, cada email lleva el remitenteNombre de SU titular', async () => {
+  it('con dos empresas, cada email lleva el nombre de SU marca y el email de SU titular', async () => {
     const empresaA: EmpresaConAvisos = { id: 'empresa-a', nombre: 'A', pausada: false };
     const empresaB: EmpresaConAvisos = { id: 'empresa-b', nombre: 'B', pausada: false };
     const titularA = { ...TITULAR_OK, nombre: 'Empresa A SL', email: 'avisos@empresa-a.test' };
@@ -364,8 +364,10 @@ describe('enviarAvisosCaducidadUseCase — remitente por empresa (W1)', () => {
     expect(email.enviar).toHaveBeenCalledTimes(2);
     const [, , opcionesA] = email.enviar.mock.calls[0];
     const [, , opcionesB] = email.enviar.mock.calls[1];
-    expect(opcionesA.remitenteNombre).toBe('Empresa A SL');
-    expect(opcionesB.remitenteNombre).toBe('Empresa B SL');
+    // El nombre visible del remitente es la marca (empresa.nombre), igual que en
+    // la confirmación; la identidad legal (razón social + NIF) va en el cuerpo.
+    expect(opcionesA.remitenteNombre).toBe('A');
+    expect(opcionesB.remitenteNombre).toBe('B');
     // Sin remitente explícito, Brevo depende de BREVO_DEFAULT_SENDER_EMAIL y
     // sendEmail lanza en after() sin dejar rastro (prueba en producción 2026-11-19).
     expect(opcionesA.remitenteEmail).toBe('avisos@empresa-a.test');

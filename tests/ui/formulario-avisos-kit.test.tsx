@@ -32,6 +32,12 @@ beforeEach(() => {
 });
 
 describe('FormularioAvisosKit', () => {
+  it('la casilla de privacidad tiene como nombre accesible el texto completo, enlace incluido', () => {
+    abrirFormulario();
+
+    expect(screen.getByRole('checkbox', { name: TEXTOS_CONSENTIMIENTO[0] })).toBeInTheDocument();
+  });
+
   it('el botón despliega el formulario', () => {
     render(<FormularioAvisosKit serie="KEC-ABCD-1234-5" />);
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();

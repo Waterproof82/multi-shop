@@ -177,7 +177,9 @@ export default function KitsLotesPage() {
 
       {loteAbiertoId && (
         <>
-          <LoteCaducidadesEditor loteId={loteAbiertoId} onSaved={cargar} />
+          {/* Sin onSaved: guardar caducidades no cambia la lista de lotes, y recargarla
+              desmontaba el editor (spinner de página) y borraba su mensaje de guardado. */}
+          <LoteCaducidadesEditor loteId={loteAbiertoId} />
           <SeriesLote loteId={loteAbiertoId} />
         </>
       )}
