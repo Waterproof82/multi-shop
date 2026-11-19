@@ -44,7 +44,7 @@ export async function solicitarEnlaceGestionUseCase(
   const { email: emailActual, token } = contacto.data;
   programar(async () => {
     const contenido = emailGestion({ serie: cmd.serie, token, baseUrl: cmd.baseUrl, remitente }, 'solicitud');
-    await email.enviar(emailActual, contenido);
+    await email.enviar(emailActual, contenido, { remitenteEmail: remitente.email });
   });
   return ok();
 }

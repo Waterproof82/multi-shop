@@ -74,7 +74,7 @@ export async function solicitarAltaAvisosUseCase(
     if (!(await kitAvisosEmailDentroDeLimite(cmd.serie))) return ok();
     programar(async () => {
       const contenido = emailConfirmacion({ serie: cmd.serie, token, baseUrl: cmd.baseUrl, remitente });
-      await email.enviar(cmd.email, contenido);
+      await email.enviar(cmd.email, contenido, { remitenteEmail: remitente.email });
     });
     return ok();
   }
@@ -87,7 +87,7 @@ export async function solicitarAltaAvisosUseCase(
   const { email: emailActual, token: tokenActual } = contacto.data;
   programar(async () => {
     const contenido = emailGestion({ serie: cmd.serie, token: tokenActual, baseUrl: cmd.baseUrl, remitente }, 'intento');
-    await email.enviar(emailActual, contenido);
+    await email.enviar(emailActual, contenido, { remitenteEmail: remitente.email });
   });
   return ok();
 }

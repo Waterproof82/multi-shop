@@ -58,6 +58,13 @@ export interface OpcionesEnvioEmailAvisos {
    * llamada a `enviar` lleva su propio remitente explícito, sin estado.
    */
   remitenteNombre?: string;
+  /**
+   * Email remitente de Brevo para ESTE envío (el del titular legal, dominio
+   * autenticado). Sin él, `sendEmail` depende de BREVO_DEFAULT_SENDER_EMAIL y,
+   * si falta, lanza dentro de `after()` sin llegar a Brevo (prueba en
+   * producción del 2026-11-19).
+   */
+  remitenteEmail?: string;
 }
 
 /** Envío real de un email de avisos — lo implementa `email-kit-avisos.brevo.ts` (M2b6a). */

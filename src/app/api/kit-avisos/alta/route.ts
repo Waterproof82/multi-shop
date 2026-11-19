@@ -17,6 +17,8 @@ import { getKitAvisosRepository, getEmpresaLegalUseCase } from '@/core/infrastru
 import { altaAvisosSchema } from '@/core/application/dtos/kit-avisos.dto';
 import { solicitarAltaAvisosUseCase } from '@/core/application/use-cases/kits/solicitarAltaAvisos.use-case';
 import { crearEmailKitAvisosBrevo } from '@/lib/kit-caducidad/email-kit-avisos.brevo';
+import { programarConRegistro } from '@/lib/kit-caducidad/programar-con-registro';
+import { logger } from '@/core/infrastructure/logging/logger';
 
 const NO_DISPONIBLE = { error: 'No disponible' };
 const ERROR_GENERICO = { error: 'Ahora no podemos completar el alta' };
@@ -67,7 +69,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const resultado = await solicitarAltaAvisosUseCase(
     getKitAvisosRepository(),
     crearEmailKitAvisosBrevo(empresa.nombre),
-    (tarea) => after(tarea),
+    programarConRegistro((tarea) => after(tarea), (e) => { void logger.logError(e); }, 'POST /api/kit-avisos/alta'),
     {
       empresaId: empresa.id,
       serie,

@@ -47,6 +47,20 @@ describe('crearEmailKitAvisosBrevo', () => {
     expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({ senderName: 'Empresa B SL' }));
   });
 
+  it('con opciones.remitenteEmail, lo pasa a sendEmail como senderEmail', async () => {
+    const email = crearEmailKitAvisosBrevo('Kit Emergencia Canarias');
+
+    await email.enviar(
+      'titular@example.com',
+      { asunto: 'Asunto', html: '<p>Hola</p>', texto: 'Hola' },
+      { remitenteEmail: 'contacto@kitemergenciacanarias.es' },
+    );
+
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ senderEmail: 'contacto@kitemergenciacanarias.es' }),
+    );
+  });
+
   it('sin opciones.remitenteNombre, usa el nombre de construcción (compatibilidad con M2b)', async () => {
     const email = crearEmailKitAvisosBrevo('Kit Emergencia Canarias');
 

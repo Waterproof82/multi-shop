@@ -16,6 +16,8 @@ import { getKitAvisosRepository, getEmpresaLegalUseCase } from '@/core/infrastru
 import { enlaceGestionSchema } from '@/core/application/dtos/kit-avisos.dto';
 import { solicitarEnlaceGestionUseCase, type SolicitarEnlaceGestionCommand } from '@/core/application/use-cases/kits/solicitarEnlaceGestion.use-case';
 import { crearEmailKitAvisosBrevo } from '@/lib/kit-caducidad/email-kit-avisos.brevo';
+import { programarConRegistro } from '@/lib/kit-caducidad/programar-con-registro';
+import { logger } from '@/core/infrastructure/logging/logger';
 
 const NO_DISPONIBLE = { error: 'No disponible' };
 const TITULAR_SIN_DATOS: SolicitarEnlaceGestionCommand['titular'] = {
@@ -73,7 +75,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   await solicitarEnlaceGestionUseCase(
     getKitAvisosRepository(),
     crearEmailKitAvisosBrevo(empresa.nombre),
-    (tarea) => after(tarea),
+    programarConRegistro((tarea) => after(tarea), (e) => { void logger.logError(e); }, 'POST /api/kit-avisos/enlace'),
     {
       empresaId: empresa.id,
       serie: parsed.data.serie,

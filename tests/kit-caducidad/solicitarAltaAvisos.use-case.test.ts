@@ -132,6 +132,7 @@ describe('solicitarAltaAvisosUseCase', () => {
     await tareas[0]();
     expect(enviar).toHaveBeenCalledTimes(1);
     expect(enviar.mock.calls[0][0]).toBe('nuevo@example.com');
+    expect(enviar.mock.calls[0][2]).toEqual({ remitenteEmail: 'contacto@kitemergenciacanarias.es' });
   });
 
   it('`pendienteCaducaAntesDe` es `ahora - 48h`', async () => {
@@ -167,6 +168,7 @@ describe('solicitarAltaAvisosUseCase', () => {
     expect(enviar).toHaveBeenCalledTimes(1);
     expect(enviar.mock.calls[0][0]).toBe('titular-actual@example.com');
     expect(enviar.mock.calls[0][0]).not.toBe('nuevo@example.com');
+    expect(enviar.mock.calls[0][2]).toEqual({ remitenteEmail: 'contacto@kitemergenciacanarias.es' });
   });
 
   it.each(['pendiente', null])('reservarAlta false y findContacto %s: no programa ninguna tarea', async (estadoOValor) => {

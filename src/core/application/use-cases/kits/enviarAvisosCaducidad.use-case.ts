@@ -180,7 +180,7 @@ async function enviarUno(ctx: ContextoEmpresa, datos: DatosEnvio, aviso: AvisoDe
     // el puerto `ctx.email` es compartido entre empresas (M3h), así que el
     // remitente de Brevo no puede depender de un estado mutable fuera de
     // esta llamada.
-    await ctx.email.enviar(datos.kitEmail, contenido, { cabeceras, remitenteNombre: ctx.remitente.nombre });
+    await ctx.email.enviar(datos.kitEmail, contenido, { cabeceras, remitenteNombre: ctx.remitente.nombre, remitenteEmail: ctx.remitente.email });
   } catch {
     resumen.fallidos += 1;
     return;
