@@ -76,6 +76,8 @@ interface ContextoEmpresa {
   repo: IKitAvisosEnvioRepository;
   email: EmailKitAvisos;
   empresaId: string;
+  /** Nombre visible del remitente: la marca (como la confirmación de M2b); la identidad legal va en el cuerpo. */
+  nombreMarca: string;
   remitente: Remitente;
   hoy: string;
   simular: boolean;
@@ -180,7 +182,7 @@ async function enviarUno(ctx: ContextoEmpresa, datos: DatosEnvio, aviso: AvisoDe
     // el puerto `ctx.email` es compartido entre empresas (M3h), así que el
     // remitente de Brevo no puede depender de un estado mutable fuera de
     // esta llamada.
-    await ctx.email.enviar(datos.kitEmail, contenido, { cabeceras, remitenteNombre: ctx.remitente.nombre, remitenteEmail: ctx.remitente.email });
+    await ctx.email.enviar(datos.kitEmail, contenido, { cabeceras, remitenteNombre: ctx.nombreMarca, remitenteEmail: ctx.remitente.email });
   } catch {
     resumen.fallidos += 1;
     return;
@@ -242,6 +244,7 @@ async function procesarEmpresa(
     repo: puertos.repo,
     email: puertos.email,
     empresaId: empresa.id,
+    nombreMarca: empresa.nombre,
     remitente,
     hoy: opciones.hoy,
     simular: Boolean(opciones.simular),
