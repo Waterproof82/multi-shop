@@ -196,6 +196,9 @@ describe('qué rutas exigen autenticación (sin credenciales)', () => {
     // de correo hace el POST, protegida por rateLimitPublic, nunca por una
     // bandera ni por el módulo (D-M2b-8, igual que /gestion).
     '/api/kit-avisos/baja/abc',
+    // kit-expiry-m3 (M3h), R-M3.1.1: el cron de avisos valida CRON_SECRET
+    // dentro de la propia ruta (verifyCronSecret), igual que rgpd-purge.
+    '/api/cron/kit-avisos',
   ];
 
   it.each(PUBLICAS)('%s deja pasar sin credenciales', async (ruta) => {

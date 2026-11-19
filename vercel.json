@@ -12,6 +12,10 @@
     {
       "path": "/api/laborcontrol/cron/partition",
       "schedule": "0 1 25 * *"
+    },
+    {
+      "path": "/api/cron/kit-avisos",
+      "schedule": "0 8 * * *"
     }
   ]
 }
