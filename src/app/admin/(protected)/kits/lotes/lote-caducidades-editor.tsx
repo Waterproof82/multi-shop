@@ -50,8 +50,9 @@ export function formularioValido(rows: FilaCaducidadForm[]): boolean {
   return rows.every(filaTieneFuenteValida);
 }
 
-function tipoFuenteDe(row: FilaCaducidadForm): TipoFuente {
-  return row.caducaEl ? 'manual' : 'albaran';
+/** `caducaEl: ''` = «Fecha manual» elegida pero aún sin fecha: sigue siendo manual. */
+export function tipoFuenteDe(row: FilaCaducidadForm): TipoFuente {
+  return row.caducaEl === null ? 'albaran' : 'manual';
 }
 
 function withEmpresaId(url: string, overrideEmpresaId: string | undefined, empresaId: string | undefined): string {
