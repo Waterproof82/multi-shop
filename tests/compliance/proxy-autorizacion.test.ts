@@ -192,6 +192,10 @@ describe('qué rutas exigen autenticación (sin credenciales)', () => {
     '/api/kit-avisos/alta',
     '/api/kit-avisos/gestion',
     '/api/kit-avisos/enlace',
+    // kit-expiry-m3 (M3g), R-M3.6.5: baja de un clic RFC 8058 — el servidor
+    // de correo hace el POST, protegida por rateLimitPublic, nunca por una
+    // bandera ni por el módulo (D-M2b-8, igual que /gestion).
+    '/api/kit-avisos/baja/abc',
   ];
 
   it.each(PUBLICAS)('%s deja pasar sin credenciales', async (ruta) => {
