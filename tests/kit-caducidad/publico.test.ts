@@ -12,12 +12,13 @@ describe('KIT_ESTADO_PUBLICO_LIVE', () => {
   });
 });
 
-// sdd kit-expiry-m2b (docs/sdd/kit-expiry-reminders/m2b/), D-M2b-8/R-M2b.8.1:
-// mientras no exista el cron de M3, el alta de avisos no puede prometer
-// nada — la bandera sigue en `false` durante todo M2b. La pone a `true` el
-// último commit de M3, junto con su propio test.
+// sdd kit-expiry-m3 (docs/sdd/kit-expiry-reminders/m3/), M3i/R-M3.8.1:
+// mientras no existía el cron de M3, el alta de avisos no podía prometer
+// nada — la bandera estuvo en `false` durante M2b y M3a-M3h. El último
+// commit de M3 (M3i, tras la prueba en *preview* del prerrequisito 4 de
+// tasks.md) la pone a `true`, en este mismo commit.
 describe('KIT_AVISOS_ALTA_LIVE', () => {
-  it('es false: M3 (el cron de avisos) todavía no existe', () => {
-    expect(KIT_AVISOS_ALTA_LIVE).toBe(false);
+  it('es true: M3 (el cron de avisos) ya existe y se probó en preview', () => {
+    expect(KIT_AVISOS_ALTA_LIVE).toBe(true);
   });
 });
