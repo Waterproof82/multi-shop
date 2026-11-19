@@ -476,3 +476,212 @@ describe('SupabaseKitAvisosEnvioRepository.marcarEnviados', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('SupabaseKitAvisosEnvioRepository.purgarPendientes', () => {
+  it('pone a NULL las 6 columnas de contacto, sin tocar registrado_at', async () => {
+    const fake = crearClienteFake({ data: [{ serie: 'KEC-1' }], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.purgarPendientes('2026-11-17T12:00:00.000Z');
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kits_registrados');
+    expect(llamada.payload).toEqual({
+      email: null,
+      telefono: null,
+      consiente_email_at: null,
+      consiente_whatsapp_at: null,
+      texto_consentimiento_version: null,
+      baja_token: null,
+    });
+    expect(llamada.payload).not.toHaveProperty('registrado_at');
+  });
+
+  it('is(registrado_at, null), not(email, is, null), or() con el límite entre comillas, sin eq(empresa_id) — DD10', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.purgarPendientes('2026-11-17T12:00:00.000Z');
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.is).toEqual({ registrado_at: null });
+    expect(llamada.nots).toEqual([{ col: 'email', op: 'is', val: null }]);
+    expect(llamada.or).toBe('consiente_email_at.is.null,consiente_email_at.lt."2026-11-17T12:00:00.000Z"');
+    expect(llamada.filtros).toEqual({});
+  });
+
+  it('devuelve el recuento de filas afectadas', async () => {
+    const fake = crearClienteFake({ data: [{ serie: 'KEC-1' }, { serie: 'KEC-2' }], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.purgarPendientes('2026-11-17T12:00:00.000Z');
+
+    expect(result).toEqual({ success: true, data: 2 });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.purgarPendientes('2026-11-17T12:00:00.000Z');
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SupabaseKitAvisosEnvioRepository.findLotesConContacto', () => {
+  it('select("lote_id"), not(email, is, null), range() hasta agotar', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.findLotesConContacto();
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kits_registrados');
+    expect(llamada.select).toBe('lote_id');
+    expect(llamada.nots).toEqual([{ col: 'email', op: 'is', val: null }]);
+    expect(llamada.range).toEqual({ desde: 0, hasta: 999 });
+  });
+
+  it('recorre .range() en bloques de 1000 hasta agotar (1000+1 filas -> 2 llamadas)', async () => {
+    const pagina1 = Array.from({ length: 1000 }, (_, i) => ({ lote_id: `lote-${i}` }));
+    const pagina2 = [{ lote_id: 'lote-x' }];
+    const fake = crearClienteFake([
+      { data: pagina1, error: null },
+      { data: pagina2, error: null },
+    ]);
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findLotesConContacto();
+
+    expect(fake.llamadas).toHaveLength(2);
+    expect(result.success && result.data.length).toBe(1001);
+  });
+
+  it('sin duplicados', async () => {
+    const fake = crearClienteFake({ data: [{ lote_id: 'lote-1' }, { lote_id: 'lote-1' }, { lote_id: 'lote-2' }], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findLotesConContacto();
+
+    expect(result).toEqual({ success: true, data: ['lote-1', 'lote-2'] });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findLotesConContacto();
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SupabaseKitAvisosEnvioRepository.findUltimasCaducidades', () => {
+  it('vista kit_lote_caducidades_efectivas, select("lote_id, caduca_el"), in(lote_id), range()', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.findUltimasCaducidades(['lote-1', 'lote-2']);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kit_lote_caducidades_efectivas');
+    expect(llamada.select).toBe('lote_id, caduca_el');
+    expect(llamada.ins).toEqual({ lote_id: ['lote-1', 'lote-2'] });
+    expect(llamada.range).toEqual({ desde: 0, hasta: 999 });
+  });
+
+  it('mapea loteId y caducaEl', async () => {
+    const fake = crearClienteFake({ data: [{ lote_id: 'lote-1', caduca_el: '2027-01-01' }], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findUltimasCaducidades(['lote-1']);
+
+    expect(result).toEqual({ success: true, data: [{ loteId: 'lote-1', caducaEl: '2027-01-01' }] });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findUltimasCaducidades(['lote-1']);
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SupabaseKitAvisosEnvioRepository.purgarContactoDeLotes', () => {
+  it('pone a NULL las 6 columnas de contacto Y registrado_at', async () => {
+    const fake = crearClienteFake({ data: [{ serie: 'KEC-1' }], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.purgarContactoDeLotes(['lote-1']);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kits_registrados');
+    expect(llamada.payload).toEqual({
+      email: null,
+      telefono: null,
+      consiente_email_at: null,
+      consiente_whatsapp_at: null,
+      texto_consentimiento_version: null,
+      baja_token: null,
+      registrado_at: null,
+    });
+  });
+
+  it('in(lote_id), not(email, is, null)', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.purgarContactoDeLotes(['lote-1', 'lote-2']);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.ins).toEqual({ lote_id: ['lote-1', 'lote-2'] });
+    expect(llamada.nots).toEqual([{ col: 'email', op: 'is', val: null }]);
+  });
+
+  it('devuelve el recuento de filas afectadas', async () => {
+    const fake = crearClienteFake({ data: [{ serie: 'KEC-1' }, { serie: 'KEC-2' }], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.purgarContactoDeLotes(['lote-1']);
+
+    expect(result).toEqual({ success: true, data: 2 });
+  });
+
+  it('lista vacía devuelve 0 sin llamar a la BD', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.purgarContactoDeLotes([]);
+
+    expect(fake.llamadas).toHaveLength(0);
+    expect(result).toEqual({ success: true, data: 0 });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.purgarContactoDeLotes(['lote-1']);
+
+    expect(result.success).toBe(false);
+  });
+});
