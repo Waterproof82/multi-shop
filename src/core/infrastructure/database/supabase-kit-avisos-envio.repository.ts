@@ -9,9 +9,8 @@
 //
 // M3d2 se partió en 3 PR (un método por PR, por el presupuesto de 400
 // líneas, tasks.md): M3d2a `findEmpresasConAvisos`, M3d2b
-// `findKitsConAvisos`, M3d2c `findLotesKit`. M3d3 añade
-// caducidades/enviados/marcado; M3d4 añade las purgas. Hasta entonces, cada
-// método devuelve `NOT_IMPLEMENTED`.
+// `findKitsConAvisos`, M3d2c `findLotesKit`. M3d3 añadió
+// caducidades/enviados/marcado; M3d4 añade las purgas (este commit).
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import type { IKitAvisosEnvioRepository } from '@/core/domain/repositories/IKitAvisosEnvioRepository';
 import type {
@@ -36,10 +35,6 @@ interface PgErrorLike {
 /** R-M3.7.1: el mensaje nunca lleva email, teléfono ni token — solo recuentos o nada. */
 function mapErrorEnvioAvisos(error: PgErrorLike, method: string): AppError {
   return { code: 'DB_ERROR', message: error.message ?? 'Error de base de datos', module: 'repository', method };
-}
-
-function noImplementado(method: string): AppError {
-  return { code: 'NOT_IMPLEMENTED', message: `${method} aún no está implementado`, module: 'repository', method };
 }
 
 function mapEmpresaConAvisos(row: Record<string, unknown>, pausadas: ReadonlySet<string>): EmpresaConAvisos {
@@ -271,23 +266,126 @@ export class SupabaseKitAvisosEnvioRepository implements IKitAvisosEnvioReposito
     }
   }
 
-  // M3d4
-  purgarPendientes(_antesDe: string): Promise<Result<number>> {
-    return Promise.resolve({ success: false, error: noImplementado('purgarPendientes') });
+  // R-M3.5.1/DD10: purga GLOBAL (sin `eq('empresa_id')`, excepción
+  // documentada igual que `rgpd-purge`: la conservación de datos no puede
+  // depender de qué empresa generó el registro) de pendientes cuya reserva
+  // caducó. Solo las 6 columnas de contacto — `registrado_at` ya es `null`
+  // en un pendiente, no se toca.
+  async purgarPendientes(antesDe: string): Promise<Result<number>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kits_registrados')
+        .update({
+          email: null,
+          telefono: null,
+          consiente_email_at: null,
+          consiente_whatsapp_at: null,
+          texto_consentimiento_version: null,
+          baja_token: null,
+        })
+        .is('registrado_at', null)
+        .not('email', 'is', null)
+        .or(`consiente_email_at.is.null,consiente_email_at.lt."${antesDe}"`)
+        .select('serie');
+
+      if (error) {
+        return { success: false, error: mapErrorEnvioAvisos(error, 'purgarPendientes') };
+      }
+      return { success: true, data: ((data ?? []) as unknown[]).length };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'purgarPendientes') };
+    }
   }
 
-  // M3d4
-  findLotesConContacto(): Promise<Result<string[]>> {
-    return Promise.resolve({ success: false, error: noImplementado('findLotesConContacto') });
+  // R-M3.5.2/DD9: `lote_id` distintos con contacto, de TODAS las empresas
+  // (misma excepción DD10), recorriendo `.range()` hasta agotar.
+  async findLotesConContacto(): Promise<Result<string[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const lotes = new Set<string>();
+
+      for (let desde = 0; ; desde += BLOQUE_LECTURA) {
+        const { data, error } = await supabase
+          .from('kits_registrados')
+          .select('lote_id')
+          .not('email', 'is', null)
+          .range(desde, desde + BLOQUE_LECTURA - 1);
+
+        if (error) {
+          return { success: false, error: mapErrorEnvioAvisos(error, 'findLotesConContacto') };
+        }
+        const filas = (data ?? []) as Record<string, unknown>[];
+        for (const fila of filas) lotes.add(fila.lote_id as string);
+        if (filas.length < BLOQUE_LECTURA) break;
+      }
+
+      return { success: true, data: Array.from(lotes) };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'findLotesConContacto') };
+    }
   }
 
-  // M3d4
-  findUltimasCaducidades(_loteIds: readonly string[]): Promise<Result<CaducidadDeLoteMinima[]>> {
-    return Promise.resolve({ success: false, error: noImplementado('findUltimasCaducidades') });
+  // R-M3.5.2/DD9: caducidad más tardía de cada lote con contacto, de todas
+  // las empresas. Recorre `.range()` hasta agotar, igual que las otras
+  // lecturas de la vista (`findCaducidades`) — el número de filas depende
+  // del número de consumibles por lote y puede superar 1000 con muchos lotes.
+  async findUltimasCaducidades(loteIds: readonly string[]): Promise<Result<CaducidadDeLoteMinima[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const filas: CaducidadDeLoteMinima[] = [];
+
+      for (let desde = 0; ; desde += BLOQUE_LECTURA) {
+        const { data, error } = await supabase
+          .from('kit_lote_caducidades_efectivas')
+          .select('lote_id, caduca_el')
+          .in('lote_id', loteIds as string[])
+          .range(desde, desde + BLOQUE_LECTURA - 1);
+
+        if (error) {
+          return { success: false, error: mapErrorEnvioAvisos(error, 'findUltimasCaducidades') };
+        }
+        const pagina = (data ?? []) as Record<string, unknown>[];
+        filas.push(...pagina.map((row) => ({ loteId: row.lote_id as string, caducaEl: row.caduca_el as string })));
+        if (pagina.length < BLOQUE_LECTURA) break;
+      }
+
+      return { success: true, data: filas };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'findUltimasCaducidades') };
+    }
   }
 
-  // M3d4
-  purgarContactoDeLotes(_loteIds: readonly string[]): Promise<Result<number>> {
-    return Promise.resolve({ success: false, error: noImplementado('purgarContactoDeLotes') });
+  // R-M3.5.2/DD9/DD10: purga GLOBAL de los lotes inactivos — las 6
+  // columnas de contacto Y `registrado_at` (el kit vuelve a estar libre).
+  // Lista vacía no llama a la BD.
+  async purgarContactoDeLotes(loteIds: readonly string[]): Promise<Result<number>> {
+    if (loteIds.length === 0) {
+      return { success: true, data: 0 };
+    }
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('kits_registrados')
+        .update({
+          email: null,
+          telefono: null,
+          consiente_email_at: null,
+          consiente_whatsapp_at: null,
+          texto_consentimiento_version: null,
+          baja_token: null,
+          registrado_at: null,
+        })
+        .in('lote_id', loteIds as string[])
+        .not('email', 'is', null)
+        .select('serie');
+
+      if (error) {
+        return { success: false, error: mapErrorEnvioAvisos(error, 'purgarContactoDeLotes') };
+      }
+      return { success: true, data: ((data ?? []) as unknown[]).length };
+    } catch (e) {
+      return { success: false, error: mapErrorEnvioAvisos(e as PgErrorLike, 'purgarContactoDeLotes') };
+    }
   }
 }
