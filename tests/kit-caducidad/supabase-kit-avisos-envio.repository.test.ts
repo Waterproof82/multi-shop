@@ -313,3 +313,166 @@ describe('SupabaseKitAvisosEnvioRepository.findLotesKit', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('SupabaseKitAvisosEnvioRepository.findCaducidades', () => {
+  it('vista kit_lote_caducidades_efectivas, eq(empresa_id), in(lote_id), range() hasta agotar (1000+3 filas -> 2 llamadas)', async () => {
+    const pagina1 = Array.from({ length: 1000 }, (_, i) => ({
+      lote_id: 'lote-1',
+      ingrediente_id: `ing-${i}`,
+      consumible: 'Agua',
+      parte: '',
+      caduca_el: '2027-01-01',
+    }));
+    const pagina2 = [
+      { lote_id: 'lote-1', ingrediente_id: 'ing-1000', consumible: 'Agua', parte: '', caduca_el: '2027-01-01' },
+      { lote_id: 'lote-1', ingrediente_id: 'ing-1001', consumible: 'Agua', parte: '', caduca_el: '2027-01-01' },
+      { lote_id: 'lote-1', ingrediente_id: 'ing-1002', consumible: 'Agua', parte: '', caduca_el: '2027-01-01' },
+    ];
+    const fake = crearClienteFake([
+      { data: pagina1, error: null },
+      { data: pagina2, error: null },
+    ]);
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findCaducidades(EMPRESA_ID, ['lote-1']);
+
+    expect(fake.llamadas).toHaveLength(2);
+    expect(fake.llamadas[0].tabla).toBe('kit_lote_caducidades_efectivas');
+    expect(fake.llamadas[0].filtros).toEqual({ empresa_id: EMPRESA_ID });
+    expect(fake.llamadas[0].ins).toEqual({ lote_id: ['lote-1'] });
+    expect(fake.llamadas[0].range).toEqual({ desde: 0, hasta: 999 });
+    expect(fake.llamadas[1].range).toEqual({ desde: 1000, hasta: 1999 });
+    expect(result.success && result.data.length).toBe(1003);
+  });
+
+  it('mapea loteId, ingredienteId, consumible, parte y caducaEl', async () => {
+    const fake = crearClienteFake({
+      data: [{ lote_id: 'lote-1', ingrediente_id: 'ing-1', consumible: 'Agua', parte: '', caduca_el: '2027-01-01' }],
+      error: null,
+    });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findCaducidades(EMPRESA_ID, ['lote-1']);
+
+    expect(result).toEqual({
+      success: true,
+      data: [{ loteId: 'lote-1', ingredienteId: 'ing-1', consumible: 'Agua', parte: '', caducaEl: '2027-01-01' }],
+    });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findCaducidades(EMPRESA_ID, ['lote-1']);
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SupabaseKitAvisosEnvioRepository.findEnviados', () => {
+  it('eq(empresa_id), eq(canal, email), in(serie), range() hasta agotar', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.findEnviados(EMPRESA_ID, ['KEC-1', 'KEC-2']);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kit_avisos_enviados');
+    expect(llamada.select).toBe('serie, ingrediente_id, parte, umbral_dias, enviado_at');
+    expect(llamada.filtros).toEqual({ empresa_id: EMPRESA_ID, canal: 'email' });
+    expect(llamada.ins).toEqual({ serie: ['KEC-1', 'KEC-2'] });
+    expect(llamada.range).toEqual({ desde: 0, hasta: 999 });
+  });
+
+  it('recorre .range() en bloques de 1000 hasta agotar', async () => {
+    const pagina1 = Array.from({ length: 1000 }, (_, i) => ({
+      serie: `KEC-${i}`,
+      ingrediente_id: 'ing-1',
+      parte: '',
+      umbral_dias: 30,
+      enviado_at: '2026-01-01T00:00:00.000Z',
+    }));
+    const pagina2 = [{ serie: 'KEC-x', ingrediente_id: 'ing-1', parte: '', umbral_dias: 30, enviado_at: '2026-01-01T00:00:00.000Z' }];
+    const fake = crearClienteFake([
+      { data: pagina1, error: null },
+      { data: pagina2, error: null },
+    ]);
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findEnviados(EMPRESA_ID, ['KEC-1']);
+
+    expect(fake.llamadas).toHaveLength(2);
+    expect(result.success && result.data.length).toBe(1001);
+  });
+
+  it('mapea serie, ingredienteId, parte, umbralDias y enviadoAt', async () => {
+    const fake = crearClienteFake({
+      data: [{ serie: 'KEC-1', ingrediente_id: 'ing-1', parte: '', umbral_dias: 30, enviado_at: '2026-01-01T00:00:00.000Z' }],
+      error: null,
+    });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findEnviados(EMPRESA_ID, ['KEC-1']);
+
+    expect(result).toEqual({
+      success: true,
+      data: [{ serie: 'KEC-1', ingredienteId: 'ing-1', parte: '', umbralDias: 30, enviadoAt: '2026-01-01T00:00:00.000Z' }],
+    });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.findEnviados(EMPRESA_ID, ['KEC-1']);
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SupabaseKitAvisosEnvioRepository.marcarEnviados', () => {
+  it('upsert con empresa_id, canal email, enviado_at y onConflict de la PK', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    await repo.marcarEnviados(EMPRESA_ID, [{ serie: 'KEC-1', ingredienteId: 'ing-1', parte: '', umbralDias: 30 }]);
+
+    const llamada = fake.llamadas[0];
+    expect(llamada.tabla).toBe('kit_avisos_enviados');
+    expect(llamada.metodo).toBe('upsert');
+    expect(llamada.payload).toEqual([
+      { serie: 'KEC-1', empresa_id: EMPRESA_ID, ingrediente_id: 'ing-1', parte: '', umbral_dias: 30, canal: 'email', enviado_at: expect.any(String) },
+    ]);
+    expect(llamada.upsertOptions).toEqual({ onConflict: 'serie,ingrediente_id,parte,umbral_dias,canal' });
+  });
+
+  it('lista vacía no llama a la BD', async () => {
+    const fake = crearClienteFake({ data: [], error: null });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.marcarEnviados(EMPRESA_ID, []);
+
+    expect(fake.llamadas).toHaveLength(0);
+    expect(result).toEqual({ success: true, data: undefined });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ data: null, error: { message: 'conexión perdida', code: 'DB_ERROR' } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabaseKitAvisosEnvioRepository();
+
+    const result = await repo.marcarEnviados(EMPRESA_ID, [{ serie: 'KEC-1', ingredienteId: 'ing-1', parte: '', umbralDias: 30 }]);
+
+    expect(result.success).toBe(false);
+  });
+});
