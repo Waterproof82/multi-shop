@@ -49,6 +49,15 @@ export interface GestionPorToken {
  */
 export interface OpcionesEnvioEmailAvisos {
   cabeceras?: Record<string, string>;
+  /**
+   * kit-expiry-m3 (W1 de verify-report.md): remitente de Brevo para ESTE
+   * envío. El cron recorre varias empresas con un único puerto `EmailKitAvisos`
+   * (R-M3.2.1); sin esto, el remitente dependía de un estado mutable
+   * (`crearPuertoEmailPorEmpresa`, M3h) ligado al orden secuencial del bucle
+   * — frágil ante una futura paralelización. Con `remitenteNombre` cada
+   * llamada a `enviar` lleva su propio remitente explícito, sin estado.
+   */
+  remitenteNombre?: string;
 }
 
 /** Envío real de un email de avisos — lo implementa `email-kit-avisos.brevo.ts` (M2b6a). */
