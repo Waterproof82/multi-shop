@@ -16,6 +16,13 @@ export interface IPetChapaAdminRepository {
    */
   findLotes(empresaId: string, pagina: Pagina): Promise<Result<Paginado<PetChapaLote>>>;
   /**
+   * Fase 8 (etiquetas PDF y CSV): todos los códigos del lote, en orden
+   * estable (`created_at` ascendente), para que el PDF y el CSV siempre
+   * repartan/listen en el mismo orden. `select` SOLO `codigo` — nunca un
+   * campo de perfil (email, nombre, foto...), calco de `countPorEstado`.
+   */
+  findCodigosDeLote(empresaId: string, loteId: string): Promise<Result<string[]>>;
+  /**
    * DD10 de M4c, reutilizado aquí: `upsert(..., { onConflict: 'codigo',
    * ignoreDuplicates: true }).select('codigo')` — `ON CONFLICT DO NOTHING
    * RETURNING`. Devuelve solo los códigos que se insertaron de verdad; el

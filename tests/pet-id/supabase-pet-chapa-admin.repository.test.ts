@@ -361,6 +361,34 @@ describe('SupabasePetChapaAdminRepository.findLotes', () => {
   });
 });
 
+describe('SupabasePetChapaAdminRepository.findCodigosDeLote', () => {
+  it('filtra por empresa_id/lote_id, ordena por created_at ascendente y selecciona solo codigo', async () => {
+    const fake = crearClienteFake({
+      pet_chapas: { data: [{ codigo: 'M-AAAA-1111-X' }, { codigo: 'M-BBBB-2222-Y' }], error: null },
+    });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabasePetChapaAdminRepository();
+
+    const result = await repo.findCodigosDeLote(EMPRESA_ID, LOTE_ID);
+
+    const llamada = fake.llamadas.find((l) => l.tabla === 'pet_chapas');
+    expect(llamada?.filtros).toEqual({ empresa_id: EMPRESA_ID, lote_id: LOTE_ID });
+    expect(llamada?.orden).toEqual({ col: 'created_at', ascending: true });
+    expect(llamada?.select).toBe('codigo');
+    expect(result).toEqual({ success: true, data: ['M-AAAA-1111-X', 'M-BBBB-2222-Y'] });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ pet_chapas: { data: null, error: { message: 'conexión perdida' } } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabasePetChapaAdminRepository();
+
+    const result = await repo.findCodigosDeLote(EMPRESA_ID, LOTE_ID);
+
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('mapPetChapaPgError', () => {
   it('código desconocido cae en DB_ERROR', () => {
     const error = mapPetChapaPgError({ message: 'algo raro' }, 'test');

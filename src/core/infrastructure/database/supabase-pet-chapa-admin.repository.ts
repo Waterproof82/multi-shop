@@ -117,6 +117,27 @@ export class SupabasePetChapaAdminRepository implements IPetChapaAdminRepository
     }
   }
 
+  // Fase 8 (etiquetas PDF y CSV): todos los códigos del lote, orden estable
+  // por created_at. `select` solo `codigo` — nunca un campo de perfil.
+  async findCodigosDeLote(empresaId: string, loteId: string): Promise<Result<string[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('pet_chapas')
+        .select('codigo')
+        .eq('empresa_id', empresaId)
+        .eq('lote_id', loteId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        return { success: false, error: mapPetChapaPgError(error, 'findCodigosDeLote') };
+      }
+      return { success: true, data: (data as Record<string, unknown>[]).map((row) => row.codigo as string) };
+    } catch (e) {
+      return { success: false, error: mapPetChapaPgError(e as PgErrorLike, 'findCodigosDeLote') };
+    }
+  }
+
   // R-QR.1.1/DD7: nunca `*` — inserta solo codigo/empresa_id/lote_id; las
   // chapas quedan "libre" (cumple el CHECK pet_chapas_libre_sin_datos, ningún
   // otro campo tiene valor). `ON CONFLICT DO NOTHING RETURNING` vía upsert:
