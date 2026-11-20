@@ -18,6 +18,8 @@ interface LlamadaFake {
   upsertado?: unknown;
   upsertOpciones?: Record<string, unknown>;
   actualizado?: Record<string, unknown>;
+  orden?: Record<string, unknown>;
+  rango?: { desde: number; hasta: number };
 }
 
 interface RespuestaFake {
@@ -64,6 +66,14 @@ function crearClienteFake(respuestasPorTabla: Record<string, RespuestaFake>) {
       },
       not(col: string, _op: string, val: unknown) {
         if (val === null) registro.noNulos[col] = true;
+        return builder;
+      },
+      order(col: string, opciones?: Record<string, unknown>) {
+        registro.orden = { col, ...opciones };
+        return builder;
+      },
+      range(desde: number, hasta: number) {
+        registro.rango = { desde, hasta };
         return builder;
       },
       async maybeSingle() {
@@ -294,6 +304,58 @@ describe('SupabasePetChapaAdminRepository.borrarDatos', () => {
     const repo = new SupabasePetChapaAdminRepository();
 
     const result = await repo.borrarDatos(EMPRESA_ID, CODIGO);
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SupabasePetChapaAdminRepository.findLotes', () => {
+  it('pagina por empresa_id, ordena por created_at desc y nunca selecciona *', async () => {
+    const fake = crearClienteFake({
+      pet_chapa_lotes: {
+        data: [{ id: LOTE_ID, empresa_id: EMPRESA_ID, producto_id: 'producto-1', codigo: 'L01', created_at: '2026-11-20T00:00:00Z', productos: { titulo_es: 'Chapa QR' } }],
+        error: null,
+        count: 1,
+      },
+    });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabasePetChapaAdminRepository();
+
+    const result = await repo.findLotes(EMPRESA_ID, { page: 1, pageSize: 50 });
+
+    const llamada = fake.llamadas.find((l) => l.tabla === 'pet_chapa_lotes');
+    expect(llamada?.filtros).toEqual({ empresa_id: EMPRESA_ID });
+    expect(llamada?.orden).toEqual({ col: 'created_at', ascending: false });
+    expect(llamada?.rango).toEqual({ desde: 0, hasta: 49 });
+    expect(llamada?.select ?? '').not.toMatch(/(^|[^a-z_])\*/);
+    expect(result).toEqual({
+      success: true,
+      data: {
+        items: [{ id: LOTE_ID, empresaId: EMPRESA_ID, productoId: 'producto-1', codigo: 'L01', createdAt: '2026-11-20T00:00:00Z', productoNombre: 'Chapa QR' }],
+        total: 1,
+        page: 1,
+        pageSize: 50,
+      },
+    });
+  });
+
+  it('calcula el rango de la segunda página', async () => {
+    const fake = crearClienteFake({ pet_chapa_lotes: { data: [], error: null, count: 0 } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabasePetChapaAdminRepository();
+
+    await repo.findLotes(EMPRESA_ID, { page: 2, pageSize: 20 });
+
+    const llamada = fake.llamadas.find((l) => l.tabla === 'pet_chapa_lotes');
+    expect(llamada?.rango).toEqual({ desde: 20, hasta: 39 });
+  });
+
+  it('un error de Supabase devuelve success:false', async () => {
+    const fake = crearClienteFake({ pet_chapa_lotes: { data: null, error: { message: 'conexión perdida' } } });
+    getSupabaseClientMock.mockReturnValue(fake);
+    const repo = new SupabasePetChapaAdminRepository();
+
+    const result = await repo.findLotes(EMPRESA_ID, { page: 1, pageSize: 50 });
 
     expect(result.success).toBe(false);
   });

@@ -4,11 +4,17 @@
 // tiene ningún GRANT — el admin nunca ve PII, solo recuentos y códigos vía
 // casos de uso con `service_role`.
 import type { Result } from '@/core/domain/entities/types';
-import type { PetChapaLote, CreatePetChapaLoteInput, RecuentoPorEstado } from '@/core/domain/entities/pet-chapa-types';
+import type { PetChapaLote, CreatePetChapaLoteInput, RecuentoPorEstado, Paginado, Pagina } from '@/core/domain/entities/pet-chapa-types';
 
 export interface IPetChapaAdminRepository {
   createLote(empresaId: string, input: CreatePetChapaLoteInput): Promise<Result<PetChapaLote>>;
   findLoteById(empresaId: string, loteId: string): Promise<Result<PetChapaLote | null>>;
+  /**
+   * Fase 7 (admin UI, PR7): listado paginado de lotes de la empresa, con el
+   * nombre del producto (join de solo lectura, sin PII) para la tabla y el
+   * selector — calco de `IKitCaducidadRepository.findLotes`.
+   */
+  findLotes(empresaId: string, pagina: Pagina): Promise<Result<Paginado<PetChapaLote>>>;
   /**
    * DD10 de M4c, reutilizado aquí: `upsert(..., { onConflict: 'codigo',
    * ignoreDuplicates: true }).select('codigo')` — `ON CONFLICT DO NOTHING
