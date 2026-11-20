@@ -326,6 +326,13 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Si el email sale pero falla guardar `seguimiento_email_enviado_at`, el POST responde exito** — devolver error provoca reintento y email duplicado al cliente.
 - **Rellenar columnas de `pedidos` con UPDATE masivo es seguro** respecto a `notify_waiter_order_validated`/`push_on_pedido_validated` (saltan en todo UPDATE pero solo actuan si cambia `estado`). Verificar de nuevo si se anade otro trigger `AFTER UPDATE` sin columnas.
 
+## Emails (Brevo) — Trampas Criticas
+
+- **`BREVO_DEFAULT_SENDER_EMAIL` NO está configurada en Vercel.** `sendEmail` sin `senderEmail` lanza «Sender email not configured» antes de su try/catch. Pasa siempre `senderEmail` (`empresa.emailNotification` o el email del titular legal).
+- **Un envío dentro de `after()` que lanza no deja rastro** (ni Brevo ni `log_errors`). Envuélvelo con `programarConRegistro` (`src/lib/kit-caducidad/programar-con-registro.ts`).
+- **Seguimiento de aperturas y clics desactivado en la cuenta de Brevo** (2026-11-19, RGPD/ePrivacy). No lo reactives sin consentimiento.
+- Avisos de caducidad de kits: ver `docs/kit-caducidad-RETOMAR.md`.
+
 ## Páginas Legales por Tenant — Trampas Criticas
 
 > Ver doc completo: `docs/context/paginas-legales.md`
