@@ -217,6 +217,46 @@ export async function kitPublicoDentroDeLimite(ip: string): Promise<boolean> {
 }
 
 /**
+ * sdd pet-id-qr-profile (docs/sdd/pet-id-qr-profile/, kitemergenciacanarias),
+ * Fase 9: 20 peticiones por minuto e IP para `GET /m/{codigo}` — calco
+ * exacto de `kitPublicoLimiter` (M2a), mismo prefijo/ventana que la tabla de
+ * rutas de design.md. Vive aquí (no en `proxy.ts`, congelado) por el mismo
+ * motivo: una RSC no puede devolver un 429.
+ */
+let mascotaPublicoLimiter: Ratelimit | null = null;
+
+function getMascotaPublicoLimiter(): Ratelimit | null {
+  if (mascotaPublicoLimiter) return mascotaPublicoLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mascotaPublicoLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(20, "1 m"),
+    prefix: "ratelimit:mascota-publico",
+  });
+  return mascotaPublicoLimiter;
+}
+
+/**
+ * R7 de tasks.md: fail-open (mismo criterio que `kitPublicoDentroDeLimite`).
+ * El cargador (`cargar-perfil-publico.ts`) traduce un `false` en el mismo
+ * 404 neutro que desconocido/libre/pendiente/flag apagado — nunca un 429.
+ */
+export async function mascotaPublicoDentroDeLimite(ip: string): Promise<boolean> {
+  const limiter = getMascotaPublicoLimiter();
+  if (!limiter) return true;
+
+  try {
+    const { success } = await limiter.limit(ip);
+    return success;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * sdd kit-expiry-m2b (docs/sdd/kit-expiry-reminders/m2b/), DD7 de design.md:
  * 5 peticiones cada 10 min por IP para el alta y el enlace de gestión de
  * avisos. Vive aquí (no en `proxy.ts`, congelado) por el mismo motivo que
