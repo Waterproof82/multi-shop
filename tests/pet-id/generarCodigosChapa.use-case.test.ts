@@ -23,6 +23,7 @@ function fakeRepo(overrides: Partial<IPetChapaAdminRepository> = {}): IPetChapaA
     createLote: vi.fn(),
     findLoteById: vi.fn().mockResolvedValue({ success: true, data: loteEjemplo }),
     findLotes: vi.fn(),
+    findCodigosDeLote: vi.fn(),
     insertCodigosIgnorandoDuplicados: vi.fn(),
     borrarDatos: vi.fn(),
     countPorEstado: vi.fn(),

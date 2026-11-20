@@ -49,3 +49,31 @@ export interface Pagina {
   page: number;
   pageSize: number;
 }
+
+// ---- Etiquetas PDF y CSV con QR (Fase 8) ----
+
+/** R-QR.14.2: una fila de la hoja/CSV: su código y la URL de su perfil — nunca teléfono ni otro dato de contacto. */
+export interface EtiquetaChapa {
+  codigo: string;
+  url: string;
+}
+
+/**
+ * Página del PDF de etiquetas de un lote (R-QR.14.1/R-QR.14.4). Solo lleva
+ * `codigo`/`url` por etiqueta — ningún campo de perfil de `pet_chapas`
+ * (email, nombre, foto...) llega aquí, igual que `EtiquetasLote` de
+ * `kit-caducidad-types.ts`.
+ */
+export interface EtiquetasLotePet {
+  codigoLote: string;
+  etiquetas: EtiquetaChapa[];
+  muestra: boolean;
+  pagina: number;
+  totalPaginas: number;
+}
+
+/** R-QR.14.3: todos los códigos/URLs del lote de una vez, para el CSV del proveedor (sin paginar). */
+export interface CsvLotePet {
+  codigoLote: string;
+  etiquetas: EtiquetaChapa[];
+}
