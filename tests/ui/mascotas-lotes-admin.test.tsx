@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { loteChapaFormValido } from '@/app/admin/(protected)/mascotas/lotes/page';
-import { cantidadCodigosChapaValida } from '@/app/admin/(protected)/mascotas/lotes/lote-chapas-panel';
+import { cantidadCodigosChapaValida, bloquesEtiquetasChapa } from '@/app/admin/(protected)/mascotas/lotes/lote-chapas-panel';
 import { codigoBorrarValido } from '@/app/admin/(protected)/mascotas/lotes/borrar-datos-chapa';
 
 // sdd pet-id-qr-profile, Fase 7 (admin UI) — reglas puras extraídas de los
@@ -38,6 +38,25 @@ describe('cantidadCodigosChapaValida — generación de códigos (R-QR.1.1)', ()
   it('acepta 1 y 500', () => {
     expect(cantidadCodigosChapaValida(1)).toBe(true);
     expect(cantidadCodigosChapaValida(500)).toBe(true);
+  });
+});
+
+describe('bloquesEtiquetasChapa — descarga de etiquetas PDF (Fase 8)', () => {
+  it('sin chapas, igualmente devuelve 1 bloque (desactivado en la UI, no en el cálculo)', () => {
+    expect(bloquesEtiquetasChapa(0)).toBe(1);
+  });
+
+  it('con menos de 500 chapas, 1 bloque', () => {
+    expect(bloquesEtiquetasChapa(1)).toBe(1);
+    expect(bloquesEtiquetasChapa(500)).toBe(1);
+  });
+
+  it('con 501 chapas, 2 bloques', () => {
+    expect(bloquesEtiquetasChapa(501)).toBe(2);
+  });
+
+  it('con 1200 chapas, 3 bloques', () => {
+    expect(bloquesEtiquetasChapa(1200)).toBe(3);
   });
 });
 
