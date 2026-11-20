@@ -54,6 +54,8 @@ import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCad
 import { SupabaseKitCaducidadRepository } from './supabase-kit-caducidad.repository';
 import type { IPetChapaAdminRepository } from '@/core/domain/repositories/IPetChapaAdminRepository';
 import { SupabasePetChapaAdminRepository } from './supabase-pet-chapa-admin.repository';
+import type { IPetPerfilRepository } from '@/core/domain/repositories/IPetPerfilRepository';
+import { SupabasePetChapaPerfilRepository } from './supabase-pet-chapa-perfil.repository';
 import type { IKitAvisosRepository } from '@/core/domain/repositories/IKitAvisosRepository';
 import { SupabaseKitAvisosRepository } from './supabase-kit-avisos.repository';
 import type { IKitAvisosEnvioRepository } from '@/core/domain/repositories/IKitAvisosEnvioRepository';
@@ -347,6 +349,15 @@ let _petChapaAdminRepository: IPetChapaAdminRepository | undefined;
 export function getPetChapaAdminRepository(): IPetChapaAdminRepository {
   _petChapaAdminRepository ??= new SupabasePetChapaAdminRepository();
   return _petChapaAdminRepository;
+}
+
+// pet-id-qr-profile Fase 9 (DD1): repositorio del perfil público,
+// independiente del de admin — el perfil público nunca ve `email` ni
+// `gestion_token` (DD1), el admin nunca ve PII (DD7).
+let _petChapaPerfilRepository: IPetPerfilRepository | undefined;
+export function getPetChapaPerfilRepository(): IPetPerfilRepository {
+  _petChapaPerfilRepository ??= new SupabasePetChapaPerfilRepository();
+  return _petChapaPerfilRepository;
 }
 
 // kit-expiry-m2b (M2b3), DD1: repositorio nuevo, independiente de IKitCaducidadRepository.

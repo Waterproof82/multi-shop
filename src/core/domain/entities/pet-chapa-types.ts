@@ -77,3 +77,21 @@ export interface CsvLotePet {
   codigoLote: string;
   etiquetas: EtiquetaChapa[];
 }
+
+// ---- Perfil público (Fase 9+) ----
+
+/**
+ * R-QR.6.1/DD1: lo único que ve el perfil público de una chapa activa.
+ * Nunca domicilio, historial clínico ni ningún dato del dueño salvo el
+ * teléfono con consentimiento expreso (R-QR.7) — nunca `email` ni
+ * `gestion_token`, que son del `IPetPerfilRepository` pero jamás llegan a
+ * este tipo (lo aplica el repositorio, no el componente que lo pinta).
+ */
+export interface PerfilPublico {
+  nombre: string;
+  especie: 'perro' | 'gato';
+  notas: string | null;
+  fotoUrl: string | null;
+  /** R-QR.7.1: `null` salvo que `telefono_consentido_at` esté marcado — lo decide el repositorio. */
+  telefono: string | null;
+}
