@@ -35,6 +35,7 @@ const EMPRESA_BASE = {
   },
   landingHabilitada: true,
   tpvHabilitado: false,
+  petIdQrHabilitado: false,
   verifactuMode: null,
   esPrueba: false,
 };
