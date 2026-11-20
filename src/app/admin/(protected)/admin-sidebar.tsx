@@ -10,7 +10,7 @@ import {
   UtensilsCrossed, MapPin, Star, Archive, BookOpen, History,
   ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt,
   FileText, TrendingUp, DollarSign, Grid2X2, CalendarDays,
-  ArrowLeftRight, ChevronDown, LayoutTemplate, Scale, Boxes, CalendarClock, ScrollText,
+  ArrowLeftRight, ChevronDown, LayoutTemplate, Scale, Boxes, CalendarClock, ScrollText, PawPrint,
 } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
@@ -35,6 +35,7 @@ interface NavItemDef {
   requiresLanding?: boolean;
   requiresTpv?: boolean;
   requiresKits?: boolean;
+  requiresMascotas?: boolean;
 }
 
 interface NavGroupDef {
@@ -56,6 +57,7 @@ interface FilterCtx {
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
   kitsHabilitado: boolean;
+  mascotasHabilitado: boolean;
 }
 
 // ── Color config (must use complete Tailwind class strings) ───────────────────
@@ -183,6 +185,7 @@ const NAV_ENTRIES: NavEntry[] = [
       ],
     },
   },
+  { type: 'item', def: { href: '/admin/mascotas/lotes', labelKey: 'sidebarMascotas', icon: PawPrint, requiresMascotas: true } },
   { type: 'item', def: { href: '/admin/empleados-tpv', labelKey: 'sidebarEmpleadosTpv', icon: Users, requiresTpv: true } },
   { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresTpv: true } },
   { type: 'item', def: { href: '/admin/landing', labelKey: 'sidebarLanding', icon: LayoutTemplate, requiresLanding: true } },
@@ -213,6 +216,9 @@ export function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
   // R-M4.1.3: el grupo «Kits» no aparece si el tenant no tiene el módulo
   // contratado (empresas.kits_caducidad_habilitado).
   if (item.requiresKits && !ctx.kitsHabilitado) return false;
+  // R-QR.13.1: el enlace «Mascotas» no aparece si el tenant no tiene el
+  // módulo de chapas QR contratado (empresas.pet_id_qr_habilitado).
+  if (item.requiresMascotas && !ctx.mascotasHabilitado) return false;
   return true;
 }
 
@@ -398,6 +404,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     landingHabilitada,
     tpvHabilitado,
     kitsHabilitado,
+    mascotasHabilitado,
   } = useAdmin();
   const { language } = useLanguage();
 
@@ -423,6 +430,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     landingHabilitada,
     tpvHabilitado,
     kitsHabilitado,
+    mascotasHabilitado,
   };
 
   const visibleEntries = NAV_ENTRIES

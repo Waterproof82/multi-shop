@@ -14,6 +14,7 @@ interface AdminContextType {
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
   kitsHabilitado: boolean;
+  mascotasHabilitado: boolean;
   overrideEmpresaId?: string;
   isSuperAdmin: boolean;
 }
@@ -30,6 +31,7 @@ const AdminContext = createContext<AdminContextType>({
   landingHabilitada: true,
   tpvHabilitado: false,
   kitsHabilitado: false,
+  mascotasHabilitado: false,
   isSuperAdmin: false,
 });
 
@@ -50,11 +52,12 @@ interface AdminProviderProps {
   readonly landingHabilitada: boolean;
   readonly tpvHabilitado: boolean;
   readonly kitsHabilitado: boolean;
+  readonly mascotasHabilitado: boolean;
   readonly overrideEmpresaId?: string;
   readonly isSuperAdmin: boolean;
 }
 
-export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, tpvHabilitado, kitsHabilitado, overrideEmpresaId, isSuperAdmin }: Readonly<AdminProviderProps>) {
+export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, tpvHabilitado, kitsHabilitado, mascotasHabilitado, overrideEmpresaId, isSuperAdmin }: Readonly<AdminProviderProps>) {
   const empresaSlug = empresaNombre
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
@@ -74,9 +77,10 @@ export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo,
     landingHabilitada,
     tpvHabilitado,
     kitsHabilitado,
+    mascotasHabilitado,
     overrideEmpresaId,
     isSuperAdmin
-  }), [effectiveEmpresaId, empresaSlug, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, tpvHabilitado, kitsHabilitado, overrideEmpresaId, isSuperAdmin]);
+  }), [effectiveEmpresaId, empresaSlug, empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas, deliveryHabilitado, landingHabilitada, tpvHabilitado, kitsHabilitado, mascotasHabilitado, overrideEmpresaId, isSuperAdmin]);
 
   return (
     <AdminContext.Provider value={value}>

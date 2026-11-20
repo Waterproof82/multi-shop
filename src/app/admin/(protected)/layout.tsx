@@ -11,6 +11,7 @@ import { SuperadminBanner } from '@/components/superadmin-banner';
 import { TextoTraducido } from '@/components/texto-traducido';
 import { tpvHabilitadoParaEmpresa } from '@/lib/tpv/tpv-habilitado';
 import { kitsCaducidadHabilitadoParaEmpresa } from '@/lib/kit-caducidad/kits-habilitado';
+import { flagModuloHabilitado } from '@/lib/empresa/flag-modulo';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +93,15 @@ export default async function AdminProtectedLayout({
     kitsHabilitado = false;
   }
 
+  // Mismo fail-closed que `kitsHabilitado` (R-QR.13.1): un fallo al comprobar
+  // el flag solo oculta el grupo «Mascotas», no tira el layout entero.
+  let mascotasHabilitado = false;
+  try {
+    mascotasHabilitado = await flagModuloHabilitado(empresaId, 'pet_id_qr_habilitado');
+  } catch {
+    mascotasHabilitado = false;
+  }
+
   return (
     <LanguageProvider>
     <AdminThemeProvider>
@@ -107,6 +117,7 @@ export default async function AdminProtectedLayout({
         landingHabilitada={landingHabilitada}
         tpvHabilitado={tpvHabilitado}
         kitsHabilitado={kitsHabilitado}
+        mascotasHabilitado={mascotasHabilitado}
         overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
         isSuperAdmin={isSuperAdminView}
       >
