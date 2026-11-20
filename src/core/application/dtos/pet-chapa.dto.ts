@@ -15,3 +15,10 @@ export const generarCodigosChapaSchema = z.object({
   cantidad: z.number().int().min(1).max(500),
 });
 export type GenerarCodigosChapaDTO = z.infer<typeof generarCodigosChapaSchema>;
+
+/** Fase 7 (admin UI): mismos límites que `paginaSchema` de `kit-caducidad.dto.ts`. */
+export const paginaLotesChapaSchema = z.object({
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type PaginaLotesChapaDTO = z.infer<typeof paginaLotesChapaSchema>;

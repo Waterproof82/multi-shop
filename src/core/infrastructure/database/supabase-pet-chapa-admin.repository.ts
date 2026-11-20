@@ -5,7 +5,7 @@
 // compuesta (lote_id, empresa_id) de la migración 20261120000001_pet_chapas.sql.
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import type { IPetChapaAdminRepository } from '@/core/domain/repositories/IPetChapaAdminRepository';
-import type { PetChapaLote, CreatePetChapaLoteInput, RecuentoPorEstado } from '@/core/domain/entities/pet-chapa-types';
+import type { PetChapaLote, CreatePetChapaLoteInput, RecuentoPorEstado, Paginado, Pagina } from '@/core/domain/entities/pet-chapa-types';
 import type { Result, AppError } from '@/core/domain/entities/types';
 
 interface PgErrorLike {
@@ -36,12 +36,14 @@ export function mapPetChapaPgError(error: PgErrorLike, method: string): AppError
 }
 
 function mapPetChapaLote(row: Record<string, unknown>): PetChapaLote {
+  const producto = row.productos as Record<string, unknown> | null | undefined;
   return {
     id: row.id as string,
     empresaId: row.empresa_id as string,
     productoId: row.producto_id as string,
     codigo: row.codigo as string,
     createdAt: row.created_at as string,
+    productoNombre: producto?.titulo_es as string | undefined,
   };
 }
 
@@ -80,6 +82,38 @@ export class SupabasePetChapaAdminRepository implements IPetChapaAdminRepository
       return { success: true, data: data ? mapPetChapaLote(data as Record<string, unknown>) : null };
     } catch (e) {
       return { success: false, error: mapPetChapaPgError(e as PgErrorLike, 'findLoteById') };
+    }
+  }
+
+  // Fase 7 (admin UI): listado paginado por empresa, con el nombre del
+  // producto (join de solo lectura, sin PII) — calco de
+  // `SupabaseKitCaducidadRepository.findLotes`.
+  async findLotes(empresaId: string, pagina: Pagina): Promise<Result<Paginado<PetChapaLote>>> {
+    try {
+      const supabase = getSupabaseClient();
+      const desde = (pagina.page - 1) * pagina.pageSize;
+      const hasta = desde + pagina.pageSize - 1;
+      const { data, error, count } = await supabase
+        .from('pet_chapa_lotes')
+        .select('id, empresa_id, producto_id, codigo, created_at, productos(titulo_es)', { count: 'exact' })
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false })
+        .range(desde, hasta);
+
+      if (error) {
+        return { success: false, error: mapPetChapaPgError(error, 'findLotes') };
+      }
+      return {
+        success: true,
+        data: {
+          items: (data as Record<string, unknown>[]).map(mapPetChapaLote),
+          total: count ?? 0,
+          page: pagina.page,
+          pageSize: pagina.pageSize,
+        },
+      };
+    } catch (e) {
+      return { success: false, error: mapPetChapaPgError(e as PgErrorLike, 'findLotes') };
     }
   }
 

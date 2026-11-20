@@ -23,7 +23,12 @@ vi.mock('@/core/application/use-cases/mascotas/crearLoteChapas.use-case', () => 
   crearLoteChapasUseCase: (...a: unknown[]) => crearLoteChapasUseCaseMock(...(a as [])),
 }));
 
-const { POST } = await import('@/app/api/admin/mascotas/lotes/route');
+const listarLotesChapaUseCaseMock = vi.fn();
+vi.mock('@/core/application/use-cases/mascotas/listarLotesChapa.use-case', () => ({
+  listarLotesChapaUseCase: (...a: unknown[]) => listarLotesChapaUseCaseMock(...(a as [])),
+}));
+
+const { GET, POST } = await import('@/app/api/admin/mascotas/lotes/route');
 
 const EMPRESA_ID = 'empresa-1';
 
@@ -43,10 +48,49 @@ function peticion(body: unknown): NextRequest {
   });
 }
 
+const paginaOk = { items: [loteOk], total: 1, page: 1, pageSize: 50 };
+
 beforeEach(() => {
   vi.clearAllMocks();
   resolveMascotasAdminContextMock.mockResolvedValue({ empresaId: EMPRESA_ID, isSuperAdmin: false, error: null });
   crearLoteChapasUseCaseMock.mockResolvedValue({ success: true, data: loteOk });
+  listarLotesChapaUseCaseMock.mockResolvedValue({ success: true, data: paginaOk });
+});
+
+function peticionGet(query = ''): NextRequest {
+  return new NextRequest(`https://admin.local/api/admin/mascotas/lotes${query}`, {
+    headers: new Headers({ 'x-empresa-id': EMPRESA_ID, 'x-admin-rol': 'admin' }),
+  });
+}
+
+describe('GET /api/admin/mascotas/lotes', () => {
+  it('propaga el error de resolveMascotasAdminContext sin llamar al caso de uso (403/503)', async () => {
+    const forbidden = NextResponse.json({ error: 'Módulo no disponible' }, { status: 403 });
+    resolveMascotasAdminContextMock.mockResolvedValue({ empresaId: null, isSuperAdmin: false, error: forbidden });
+
+    const res = await GET(peticionGet());
+
+    expect(res.status).toBe(403);
+    expect(listarLotesChapaUseCaseMock).not.toHaveBeenCalled();
+  });
+
+  it('200 con la página de lotes, pasa page/pageSize de la query', async () => {
+    const res = await GET(peticionGet('?page=2&pageSize=10'));
+
+    expect(res.status).toBe(200);
+    expect(listarLotesChapaUseCaseMock).toHaveBeenCalledWith(
+      expect.anything(), EMPRESA_ID, { page: '2', pageSize: '10' },
+    );
+    expect(await res.json()).toEqual(paginaOk);
+  });
+
+  it('sin query, pasa page/pageSize undefined (el caso de uso aplica sus valores por defecto)', async () => {
+    await GET(peticionGet());
+
+    expect(listarLotesChapaUseCaseMock).toHaveBeenCalledWith(
+      expect.anything(), EMPRESA_ID, { page: undefined, pageSize: undefined },
+    );
+  });
 });
 
 describe('POST /api/admin/mascotas/lotes', () => {

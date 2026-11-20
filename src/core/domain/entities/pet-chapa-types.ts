@@ -16,6 +16,8 @@ export interface PetChapaLote {
   productoId: string;
   codigo: string;
   createdAt: string;
+  // Joined (solo el nombre del producto, nunca un dato de la mascota).
+  productoNombre?: string;
 }
 
 export interface CreatePetChapaLoteInput {
@@ -28,4 +30,22 @@ export interface RecuentoPorEstado {
   libre: number;
   pendiente: number;
   activa: number;
+}
+
+/**
+ * Paginación del listado de lotes (Fase 7, UI admin). Tipo propio en vez de
+ * reutilizar `Paginado`/`Pagina` de `kit-caducidad-types.ts` (DD1: dos
+ * módulos independientes, sin acoplar `mascotas` a `kits` por un contenedor
+ * genérico que no lleva ningún dato del dominio).
+ */
+export interface Paginado<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface Pagina {
+  page: number;
+  pageSize: number;
 }
