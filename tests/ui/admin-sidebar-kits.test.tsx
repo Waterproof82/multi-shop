@@ -12,7 +12,7 @@ const ITEM_KITS_LOTES = {
 
 const BASE_CTX = {
   mostrarPromociones: false, mostrarTgtg: false, isRestaurant: false, deliveryHabilitado: false,
-  isTienda: true, landingHabilitada: true, tpvHabilitado: false,
+  isTienda: true, landingHabilitada: true, tpvHabilitado: false, mascotasHabilitado: false,
 };
 
 describe('isItemVisible — items de Kits', () => {
