@@ -49,13 +49,14 @@ interface EmpresaRow {
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
   kitsCaducidadHabilitado: boolean;
+  petIdQrHabilitado: boolean;
   verifactuMode: string | null;
   esPrueba: boolean;
 }
 
 interface ModuloSwitchProps {
   readonly empresaId: string;
-  readonly field: 'mostrar_promociones' | 'mostrar_tgtg' | 'pagos_mesa_habilitados' | 'pagos_pickup_habilitados' | 'mesas_habilitadas' | 'validacion_pedidos_habilitada' | 'delivery_habilitado' | 'kits_caducidad_habilitado';
+  readonly field: 'mostrar_promociones' | 'mostrar_tgtg' | 'pagos_mesa_habilitados' | 'pagos_pickup_habilitados' | 'mesas_habilitadas' | 'validacion_pedidos_habilitada' | 'delivery_habilitado' | 'kits_caducidad_habilitado' | 'pet_id_qr_habilitado';
   readonly checked: boolean;
   readonly label: string;
 }
@@ -430,6 +431,14 @@ function EmpresaTableRow({ empresa, tipo, onTipoChange, mostrarColumnasRestauran
           label={`Activar kits de caducidad para ${empresa.nombre}`}
         />
       </td>
+      <td className="px-4 py-4 text-center">
+        <ModuloSwitch
+          empresaId={empresa.id}
+          field="pet_id_qr_habilitado"
+          checked={empresa.petIdQrHabilitado}
+          label={`Activar chapa QR de mascotas para ${empresa.nombre}`}
+        />
+      </td>
       <td className="px-4 py-4">
         <div className="flex flex-col items-center gap-1">
           <span className="text-sm font-medium text-violet-300">
@@ -533,6 +542,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               </th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">TPV</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Kits</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Chapa QR</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
                   <span>Promos</span>

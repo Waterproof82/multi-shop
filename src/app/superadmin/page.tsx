@@ -35,6 +35,7 @@ interface Empresa {
   landingHabilitada: boolean;
   tpvHabilitado: boolean;
   kitsCaducidadHabilitado: boolean;
+  petIdQrHabilitado: boolean;
   verifactuMode: string | null;
   esPrueba: boolean;
   googleReviewsUrl: string | null;
@@ -276,6 +277,7 @@ export default async function SuperAdminPage() {
               landingHabilitada: e.landingHabilitada,
               tpvHabilitado: e.tpvHabilitado,
               kitsCaducidadHabilitado: e.kitsCaducidadHabilitado,
+              petIdQrHabilitado: e.petIdQrHabilitado,
               verifactuMode: e.verifactuMode,
               esPrueba: e.esPrueba,
             }))}

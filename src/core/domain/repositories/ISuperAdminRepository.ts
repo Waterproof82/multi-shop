@@ -89,6 +89,8 @@ export interface EmpresaWithStats {
   tpvHabilitado: boolean;
   /** Módulo de kits de emergencia con caducidad real (kit-expiry-reminders M4). Solo superadmin. */
   kitsCaducidadHabilitado: boolean;
+  /** Módulo de chapa QR y perfil público de mascota (pet-id-qr-profile). Solo superadmin. */
+  petIdQrHabilitado: boolean;
   verifactuMode: string | null;
   /** Solo lectura: se fija al crear la empresa y es inmutable en BD. Nunca en un DTO. */
   esPrueba: boolean;
