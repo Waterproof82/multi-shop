@@ -3,25 +3,48 @@
 // sdd pet-id-qr-profile, Fase 7 (admin UI, PR7) — recuento del lote
 // (R-QR.1.2, nunca PII) y generación de códigos (R-QR.1.1), sobre
 // `GET`/`POST /api/admin/mascotas/lotes/{id}/chapas` (PR5b). Calco de
-// `series-lote.tsx` del módulo de kits, sin el bloque de etiquetas PDF (eso
-// es la Fase 8).
+// `series-lote.tsx` del módulo de kits.
+//
+// Fase 8 (PR8, R-QR.14) añade los botones de descarga de etiquetas PDF por
+// bloque de `POR_PDF` (500) chapas y del CSV del lote completo: `fetch` →
+// `Blob` → `URL.createObjectURL` (igual que `handleDescargarEtiquetas` de
+// `series-lote.tsx`), nunca un `<a download>` directo a la ruta, para poder
+// mostrar el error de la API en vez de "descargar" su JSON.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Download, FileSpreadsheet } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { PET_PERFIL_PUBLICO_LIVE } from '@/lib/pet-id/publico';
 import type { RecuentoPorEstado } from '@/core/domain/entities/pet-chapa-types';
 
 const CANTIDAD_MINIMA = 1;
 const CANTIDAD_MAXIMA = 500;
+const BLOQUE_ETIQUETAS = 500;
 
 /** R-QR.1.1: mismo rango 1-500 que `generarCodigosChapaSchema` en Zod — backstop del 400, no el único guardián. */
 export function cantidadCodigosChapaValida(cantidad: number): boolean {
   return Number.isInteger(cantidad) && cantidad >= CANTIDAD_MINIMA && cantidad <= CANTIDAD_MAXIMA;
+}
+
+/** Fase 8/R-QR.14.1: un botón por bloque de 500 chapas (normalmente uno); al menos 1 aunque no haya chapas (desactivado). */
+export function bloquesEtiquetasChapa(totalCodigos: number): number {
+  return Math.max(1, Math.ceil(totalCodigos / BLOQUE_ETIQUETAS));
+}
+
+function rangoBloque(pagina: number, totalCodigos: number): { inicio: number; fin: number } {
+  const inicio = (pagina - 1) * BLOQUE_ETIQUETAS + 1;
+  const fin = Math.min(pagina * BLOQUE_ETIQUETAS, totalCodigos);
+  return { inicio, fin };
+}
+
+function nombreDeDisposition(disposition: string, respaldo: string): string {
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return match?.[1] ?? respaldo;
 }
 
 function withEmpresaId(url: string, overrideEmpresaId: string | undefined, empresaId: string | undefined): string {
@@ -44,6 +67,8 @@ export function LoteChapasPanel({ loteId }: Readonly<LoteChapasPanelProps>) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [descargandoEtiquetas, setDescargandoEtiquetas] = useState<number | null>(null);
+  const [descargandoCsv, setDescargandoCsv] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -85,6 +110,59 @@ export function LoteChapasPanel({ loteId }: Readonly<LoteChapasPanelProps>) {
       setGenerating(false);
     }
   };
+
+  /** R-QR.14.1: `fetch` → `Blob` → `URL.createObjectURL`, nunca un `<a download>` directo — un error de la API (403/400) nunca se "descarga" como PDF. */
+  const handleDescargarEtiquetas = async (pagina: number) => {
+    setDescargandoEtiquetas(pagina);
+    setError('');
+    try {
+      const res = await fetch(withEmpresaId(`/api/admin/mascotas/lotes/${loteId}/etiquetas?pagina=${pagina}`, overrideEmpresaId, empresaId));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || t('mascotasErrorEtiquetas', language));
+      }
+      const blob = await res.blob();
+      const nombre = nombreDeDisposition(res.headers.get('Content-Disposition') ?? '', `etiquetas-${pagina}.pdf`);
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = nombre;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mascotasErrorEtiquetas', language));
+    } finally {
+      setDescargandoEtiquetas(null);
+    }
+  };
+
+  /** R-QR.14.3: mismo patrón que `handleDescargarEtiquetas`, sin paginar (el lote completo). */
+  const handleDescargarCsv = async () => {
+    setDescargandoCsv(true);
+    setError('');
+    try {
+      const res = await fetch(withEmpresaId(`/api/admin/mascotas/lotes/${loteId}/csv`, overrideEmpresaId, empresaId));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || t('mascotasErrorCsv', language));
+      }
+      const blob = await res.blob();
+      const nombre = nombreDeDisposition(res.headers.get('Content-Disposition') ?? '', 'chapas.csv');
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = nombre;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('mascotasErrorCsv', language));
+    } finally {
+      setDescargandoCsv(false);
+    }
+  };
+
+  const totalCodigos = recuento ? recuento.libre + recuento.pendiente + recuento.activa : 0;
+  const bloques = bloquesEtiquetasChapa(totalCodigos);
 
   return (
     <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
@@ -155,6 +233,59 @@ export function LoteChapasPanel({ loteId }: Readonly<LoteChapasPanelProps>) {
           </ul>
         </div>
       )}
+
+      <div className="p-4 flex flex-col gap-3 border-t border-white/10">
+        <div className="flex flex-wrap gap-3">
+          {Array.from({ length: bloques }, (_, i) => i + 1).map((pagina) => {
+            const { inicio, fin } = rangoBloque(pagina, totalCodigos);
+            const etiquetaRango = bloques > 1 ? ` (${inicio}–${fin})` : '';
+            return (
+              <Button
+                key={pagina}
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                onClick={() => handleDescargarEtiquetas(pagina)}
+                disabled={totalCodigos === 0 || descargandoEtiquetas !== null || descargandoCsv}
+              >
+                {descargandoEtiquetas === pagina ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    {t('mascotasDescargandoEtiquetas', language)}
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    {t('mascotasDescargarEtiquetas', language)}{etiquetaRango}
+                  </>
+                )}
+              </Button>
+            );
+          })}
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11"
+            onClick={handleDescargarCsv}
+            disabled={totalCodigos === 0 || descargandoEtiquetas !== null || descargandoCsv}
+          >
+            {descargandoCsv ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                {t('mascotasDescargandoCsv', language)}
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                {t('mascotasDescargarCsv', language)}
+              </>
+            )}
+          </Button>
+        </div>
+        {!PET_PERFIL_PUBLICO_LIVE && (
+          <p className="text-xs text-amber-300">{t('mascotasEtiquetasMuestraAviso', language)}</p>
+        )}
+      </div>
     </div>
   );
 }
