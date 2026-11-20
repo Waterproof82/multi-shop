@@ -15,6 +15,8 @@ export interface EmpresaParaEmail {
   primaryForeground: string;
   dominio: string | null;
   emailNotification: string | null;
+  /** Módulo «Kits» (avisos de caducidad) activo: el email recuerda escanear la etiqueta QR. */
+  kitsCaducidadHabilitado?: boolean;
 }
 
 export interface DepsConfirmacion {
@@ -57,6 +59,7 @@ function componer(pedido: Pedido, empresa: EmpresaParaEmail, entrada: EntradaCon
     items: itemsParaEmail(pedido.detalle_pedido ?? []),
     gastosEnvioCents: pedido.modalidad_entrega_precio_cents ?? pedido.delivery_fee_cents ?? null,
     total: Number(pedido.total),
+    avisoEtiquetaKit: empresa.kitsCaducidadHabilitado === true,
   });
 }
 

@@ -67,6 +67,31 @@ describe('enviarConfirmacionPedido', () => {
     expect(enviado.senderName).toBe('Mermelada');
   });
 
+  // Kit expiry reminders: la tienda con el módulo «Kits» activo recuerda en
+  // la confirmación que el kit trae una etiqueta QR que hay que escanear.
+  it('con el módulo Kits activo, el email recuerda escanear la etiqueta QR del kit', async () => {
+    const d = deps({
+      buscarEmpresa: vi.fn(async () => ({
+        nombre: 'KEC', logoUrl: '', primaryColor: '#000', primaryForeground: '#fff', dominio: 'tienda.es', emailNotification: null, kitsCaducidadHabilitado: true,
+      })),
+    });
+
+    await crearEnviarConfirmacionPedido(d)(ENTRADA);
+
+    const enviado = vi.mocked(d.enviar).mock.calls[0][0];
+    expect(enviado.htmlContent).toContain('etiqueta con un código QR');
+    expect(enviado.textContent).toContain('etiqueta con un código QR');
+  });
+
+  it('sin el módulo Kits, el email no habla de la etiqueta QR', async () => {
+    const d = deps();
+
+    await crearEnviarConfirmacionPedido(d)(ENTRADA);
+
+    const enviado = vi.mocked(d.enviar).mock.calls[0][0];
+    expect(enviado.htmlContent).not.toContain('código QR');
+  });
+
   it('sin email no reclama ni envía', async () => {
     const d = deps({ buscarPedido: vi.fn(async () => ({ success: true as const, data: pedido({ clientes: { nombre: 'Ana', email: '  ', telefono: '1' } }) })) });
     expect(await crearEnviarConfirmacionPedido(d)(ENTRADA)).toBe('sin_email');

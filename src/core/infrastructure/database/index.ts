@@ -1,4 +1,5 @@
 import { getSupabaseClient, getSupabaseAnonClient } from './supabase-client';
+import { kitsCaducidadHabilitadoParaEmpresa } from '@/lib/kit-caducidad/kits-habilitado';
 import { SupabaseProductRepository } from './SupabaseProductRepository';
 import { SupabaseCategoryRepository } from './SupabaseCategoryRepository';
 import { SupabaseAdminRepository } from './SupabaseAdminRepository';
@@ -372,6 +373,16 @@ export function getAuditLogRepository(): IAuditLogRepository {
 
 let _enviarConfirmacionPedido: ReturnType<typeof crearEnviarConfirmacionPedido> | undefined;
 /** Email "hemos recibido tu pedido" al cliente. Nunca lanza. */
+// El email de confirmación nunca debe fallar por el módulo «Kits»: si la
+// comprobación falla (lanza ante un error de BD), simplemente no se añade la línea.
+async function kitsHabilitadoSinFallar(empresaId: string): Promise<boolean> {
+  try {
+    return await kitsCaducidadHabilitadoParaEmpresa(empresaId);
+  } catch {
+    return false;
+  }
+}
+
 export function getEnviarConfirmacionPedido(): ReturnType<typeof crearEnviarConfirmacionPedido> {
   _enviarConfirmacionPedido ??= crearEnviarConfirmacionPedido({
     buscarPedido: (id, empresaId) => getPedidoRepository().findById(id, empresaId),
@@ -388,6 +399,7 @@ export function getEnviarConfirmacionPedido(): ReturnType<typeof crearEnviarConf
         primaryForeground: empresa.colores?.primaryForeground || '#FFFFFF',
         dominio: empresa.dominio ?? null,
         emailNotification: empresa.emailNotification ?? null,
+        kitsCaducidadHabilitado: await kitsHabilitadoSinFallar(empresaId),
       };
     },
     enviar: sendEmail,
