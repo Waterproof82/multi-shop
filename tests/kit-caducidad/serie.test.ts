@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generarSerie, normalizarSerie, esSerieValida } from '@/lib/kit-caducidad/serie';
+import { generarSerie, normalizarSerie, esSerieValida, crearFormatoCodigo } from '@/lib/kit-caducidad/serie';
 
 // sdd kit-expiry-reminders R3.1 (kitemergenciacanarias): KEC-XXXX-XXXX-C,
 // Crockford base32, 40 bits aleatorios y un carácter de control.
@@ -74,5 +74,56 @@ describe('normalizarSerie', () => {
   it('devuelve null si no tiene forma de serie', () => {
     expect(normalizarSerie('hola')).toBeNull();
     expect(normalizarSerie('x'.repeat(500))).toBeNull();
+  });
+});
+
+// sdd pet-id-qr-profile (docs/sdd/pet-id-qr-profile/, kitemergenciacanarias),
+// DD2: `crearFormatoCodigo(prefijo)` generaliza este fichero para que las
+// chapas de mascota (prefijo `M`) usen el mismo mecanismo que los kits
+// (prefijo `KEC`) sin que sus espacios de nombres puedan colisionar.
+describe('crearFormatoCodigo', () => {
+  it('genera, con otro prefijo, el mismo formato PREFIJO-XXXX-XXXX-C', () => {
+    const formatoM = crearFormatoCodigo('M');
+    const aleatorio = bytes(0x12, 0x34, 0x56, 0x78, 0x9a);
+
+    const codigo = formatoM.generar(aleatorio);
+
+    expect(codigo).toMatch(/^M-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]$/);
+    expect(formatoM.esValido(codigo)).toBe(true);
+  });
+
+  it('normaliza y valida con un prefijo de más de una letra, igual que KEC', () => {
+    const formatoAbc = crearFormatoCodigo('ABC');
+    const codigo = formatoAbc.generar(bytes(1, 2, 3, 4, 5));
+
+    expect(formatoAbc.esValido(codigo)).toBe(true);
+    expect(formatoAbc.normalizar(codigo.toLowerCase().replaceAll('-', ' '))).toBe(codigo);
+  });
+
+  it('detecta un carácter cambiado con cualquier prefijo (no solo KEC)', () => {
+    const formatoM = crearFormatoCodigo('M');
+    const valido = formatoM.generar(bytes(0xde, 0xad, 0xbe, 0xef, 0x42));
+    const cuerpo = valido.slice(2, 6);
+    const cambiado = cuerpo[0] === '0' ? '1' : '0';
+    const erroneo = `M-${cambiado}${cuerpo.slice(1)}${valido.slice(6)}`;
+
+    expect(formatoM.esValido(erroneo)).toBe(false);
+  });
+
+  it('no deja colisionar dos prefijos distintos entre sí', () => {
+    const formatoM = crearFormatoCodigo('M');
+    const codigoKec = generarSerie(bytes(1, 1, 1, 1, 1));
+    const codigoM = formatoM.generar(bytes(2, 2, 2, 2, 2));
+
+    expect(formatoM.esValido(codigoKec)).toBe(false);
+    expect(esSerieValida(codigoM)).toBe(false);
+  });
+
+  it('generarSerie/normalizarSerie/esSerieValida de KEC siguen sin regresión tras generalizar', () => {
+    const serie = generarSerie(bytes(9, 8, 7, 6, 5));
+
+    expect(serie).toMatch(/^KEC-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]$/);
+    expect(esSerieValida(serie)).toBe(true);
+    expect(normalizarSerie(serie.toLowerCase().replaceAll('-', ''))).toBe(serie);
   });
 });
