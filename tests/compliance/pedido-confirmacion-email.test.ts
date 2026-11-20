@@ -36,6 +36,25 @@ function datos(over: Partial<DatosEmailConfirmacion> = {}): DatosEmailConfirmaci
   };
 }
 
+describe('construirEmailConfirmacion — etiqueta QR del kit', () => {
+  it('con avisoEtiquetaKit, el HTML y el texto piden escanear la etiqueta, en cada idioma', () => {
+    const es = construirEmailConfirmacion(datos({ avisoEtiquetaKit: true }));
+    expect(es.html).toContain('Si tu pedido incluye un kit de emergencia');
+    expect(es.text).toContain('Si tu pedido incluye un kit de emergencia');
+    for (const lang of ['en', 'fr', 'it', 'de']) {
+      const otro = construirEmailConfirmacion(datos({ avisoEtiquetaKit: true, lang }));
+      expect(otro.html).toMatch(/QR/);
+      expect(otro.text).toMatch(/QR/);
+    }
+  });
+
+  it('sin avisoEtiquetaKit, no aparece', () => {
+    const { html, text } = construirEmailConfirmacion(datos());
+    expect(html).not.toContain('QR');
+    expect(text).not.toContain('QR');
+  });
+});
+
 describe('construirEmailConfirmacion — contenido', () => {
   it('el asunto lleva el número de pedido en cada idioma', () => {
     for (const lang of ['es', 'en', 'fr', 'it', 'de']) {

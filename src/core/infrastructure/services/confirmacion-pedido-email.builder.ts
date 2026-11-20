@@ -40,6 +40,8 @@ const TEXTOS: Record<string, {
   verPedido: string;
   verWeb: string;
   pie: (empresa: string) => string;
+  /** Kit expiry reminders: recordatorio de escanear la etiqueta QR del kit. */
+  etiquetaKit: string;
 }> = {
   es: {
     asunto: (e, n) => `${e}: hemos recibido tu pedido #${n}`,
@@ -63,6 +65,7 @@ const TEXTOS: Record<string, {
     verPedido: 'Ver el estado del pedido',
     verWeb: 'Ver nuestra web',
     pie: e => `Has recibido este correo porque hiciste un pedido en ${e}.`,
+    etiquetaKit: "Si tu pedido incluye un kit de emergencia, lleva una etiqueta con un código QR: escanéala para ver la caducidad de cada producto y activar los avisos antes de que caduque.",
   },
   en: {
     asunto: (e, n) => `${e}: we have received your order #${n}`,
@@ -86,6 +89,7 @@ const TEXTOS: Record<string, {
     verPedido: 'View order status',
     verWeb: 'Visit our website',
     pie: e => `You received this email because you placed an order at ${e}.`,
+    etiquetaKit: "If your order includes an emergency kit, it comes with a QR code label: scan it to check each product's expiry date and turn on reminders before anything expires.",
   },
   fr: {
     asunto: (e, n) => `${e} : nous avons reçu votre commande n°${n}`,
@@ -109,6 +113,7 @@ const TEXTOS: Record<string, {
     verPedido: 'Voir l’état de la commande',
     verWeb: 'Voir notre site',
     pie: e => `Vous recevez cet e-mail car vous avez passé une commande chez ${e}.`,
+    etiquetaKit: "Si votre commande comprend un kit d'urgence, il porte une étiquette avec un code QR : scannez-la pour voir la date de péremption de chaque produit et activer les rappels avant qu'il n'expire.",
   },
   it: {
     asunto: (e, n) => `${e}: abbiamo ricevuto il tuo ordine n. ${n}`,
@@ -132,6 +137,7 @@ const TEXTOS: Record<string, {
     verPedido: 'Vedi lo stato dell’ordine',
     verWeb: 'Visita il nostro sito',
     pie: e => `Ricevi questa email perché hai effettuato un ordine su ${e}.`,
+    etiquetaKit: "Se il tuo ordine include un kit di emergenza, ha un'etichetta con un codice QR: scansionala per vedere la scadenza di ogni prodotto e attivare gli avvisi prima che scada.",
   },
   de: {
     asunto: (e, n) => `${e}: Wir haben Ihre Bestellung Nr. ${n} erhalten`,
@@ -155,6 +161,7 @@ const TEXTOS: Record<string, {
     verPedido: 'Bestellstatus ansehen',
     verWeb: 'Zu unserer Website',
     pie: e => `Sie erhalten diese E-Mail, weil Sie bei ${e} bestellt haben.`,
+    etiquetaKit: "Wenn deine Bestellung ein Notfallset enthält, trägt es ein Etikett mit QR-Code: Scanne es, um das Ablaufdatum jedes Produkts zu sehen und Erinnerungen vor dem Ablauf zu aktivieren.",
   },
 };
 
@@ -180,6 +187,8 @@ export interface DatosEmailConfirmacion {
   items: ItemEmailSeguimiento[];
   gastosEnvioCents: number | null;
   total: number;
+  /** La tienda tiene el módulo «Kits»: recordar escanear la etiqueta QR del kit. */
+  avisoEtiquetaKit?: boolean;
 }
 
 function textoEntrega(d: DatosEmailConfirmacion, tx: Textos): string | null {
@@ -230,6 +239,8 @@ function textoPlano(d: DatosEmailConfirmacion, tx: Textos, fecha: string, precio
     ...lineasItems,
     gastos === null ? '' : `${tx.gastosEnvio}: ${precio(gastos)}`,
     `${tx.total}: ${precio(d.total)}`,
+    '',
+    d.avisoEtiquetaKit ? tx.etiquetaKit : '',
     '',
     d.trackingUrl ?? d.baseUrl,
   ].filter((l, i, arr) => l !== '' || arr[i - 1] !== '').join('\n').trim();
@@ -298,6 +309,7 @@ ${bloqueResumen(d, tx, fecha)}
         </tr>
       </table>
 
+      ${d.avisoEtiquetaKit ? `<p style="margin:0 0 20px;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:14px;color:#374151;">${escapeHtml(tx.etiquetaKit)}</p>` : ''}
       <a href="${escapeHtml(enlace)}" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:${color};color:${colorTexto};font-size:15px;font-weight:700;padding:14px 0;border-radius:10px;text-decoration:none;margin-bottom:20px;">
         ${textoEnlace}
       </a>
