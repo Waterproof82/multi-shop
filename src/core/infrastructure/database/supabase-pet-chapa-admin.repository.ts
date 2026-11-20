@@ -138,4 +138,47 @@ export class SupabasePetChapaAdminRepository implements IPetChapaAdminRepository
       return { success: false, error: mapPetChapaPgError(e as PgErrorLike, 'countPorEstado') };
     }
   }
+
+  // R-QR.1.3: calco de `SupabaseKitAvisosRepository.borrar` — una sola
+  // `update()` pone a NULL las 13 columnas de perfil (satisface el CHECK
+  // `pet_chapas_libre_sin_datos`, la chapa vuelve a "libre"). `.not('email',
+  // 'is', null)` limita el update a pendiente/activa: si ya estaba libre o
+  // el código no existe, 0 filas y `data: null`.
+  async borrarDatos(empresaId: string, codigo: string): Promise<Result<{ codigo: string } | null>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('pet_chapas')
+        .update({
+          email: null,
+          idioma: null,
+          gestion_token: null,
+          consiente_perfil_at: null,
+          texto_consentimiento_version: null,
+          confirmado_at: null,
+          nombre: null,
+          especie: null,
+          notas_salud: null,
+          foto_clave: null,
+          telefono: null,
+          telefono_consentido_at: null,
+          telefono_texto_version: null,
+        })
+        .eq('empresa_id', empresaId)
+        .eq('codigo', codigo)
+        .not('email', 'is', null)
+        .select('codigo');
+
+      if (error) {
+        return { success: false, error: mapPetChapaPgError(error, 'borrarDatos') };
+      }
+      const fila = ((data ?? []) as Record<string, unknown>[])[0];
+      if (!fila) {
+        return { success: true, data: null };
+      }
+      return { success: true, data: { codigo: fila.codigo as string } };
+    } catch (e) {
+      return { success: false, error: mapPetChapaPgError(e as PgErrorLike, 'borrarDatos') };
+    }
+  }
 }

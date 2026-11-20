@@ -21,4 +21,13 @@ export interface IPetChapaAdminRepository {
    * de Postgres, solo la cabecera `count`. Jamás un `select` con PII.
    */
   countPorEstado(empresaId: string, loteId: string): Promise<Result<RecuentoPorEstado>>;
+  /**
+   * R-QR.1.3/DD1: «Borrar datos» del admin — una sola `update()` pone a NULL
+   * las 13 columnas de perfil (email incluido), igual que
+   * `pet_chapas_libre_sin_datos` exige para volver a "libre". Solo afecta a
+   * una chapa pendiente o activa (`email IS NOT NULL`); `data: null` si el
+   * código no existe o ya estaba libre. Nunca devuelve un dato personal:
+   * solo el `codigo`, que no es PII (va impreso en la chapa física).
+   */
+  borrarDatos(empresaId: string, codigo: string): Promise<Result<{ codigo: string } | null>>;
 }
