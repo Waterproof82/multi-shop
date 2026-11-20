@@ -22,3 +22,14 @@ export const paginaLotesChapaSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type PaginaLotesChapaDTO = z.infer<typeof paginaLotesChapaSchema>;
+
+/**
+ * `?pagina=` de `GET /api/admin/mascotas/lotes/[id]/etiquetas` (Fase 8,
+ * R-QR.14.1): mismo rango que `etiquetasQuerySchema` de
+ * `kit-caducidad.dto.ts`. El tope real de páginas lo impone
+ * `generarEtiquetasLote.use-case.ts` según `POR_PDF` y el nº de códigos del lote.
+ */
+export const etiquetasChapaQuerySchema = z.object({
+  pagina: z.coerce.number().int().min(1).max(1000).default(1),
+});
+export type EtiquetasChapaQueryDTO = z.infer<typeof etiquetasChapaQuerySchema>;
