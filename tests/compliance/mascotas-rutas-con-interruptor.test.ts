@@ -3,12 +3,12 @@
  * `resolveMascotasAdminContext` (calco de `kits-rutas-con-interruptor.test.ts`,
  * DD12 de design.md).
  *
- * El flag y la puerta (`resolveMascotasAdminContext`) nacen en PR4, pero las
- * primeras rutas de `/api/admin/mascotas/**` no llegan hasta PR5/PR6. Este
- * test escanea el árbol de ficheros en vez de invocar cada handler, así que
- * YA vigila la carpeta ahora: en cuanto PR5/PR6 añadan la primera ruta,
- * `it.each` empieza a cubrirla sin que nadie tenga que acordarse de ampliar
- * una lista a mano — ni de crear este fichero de nuevo.
+ * El flag y la puerta (`resolveMascotasAdminContext`) nacieron en PR4; PR5
+ * añade las primeras rutas (`lotes`, `lotes/[id]/chapas`) y PR6 añadirá el
+ * borrado auditado. Este test escanea el árbol de ficheros en vez de invocar
+ * cada handler, así que sigue vigilando la carpeta completa: cualquier ruta
+ * nueva que PR6+ añada bajo `api/admin/mascotas/**` queda cubierta por
+ * `it.each` sin tocar este fichero.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -42,9 +42,10 @@ function* walkDir(dir: string): Generator<string> {
 const routeFiles = Array.from(walkDir(MASCOTAS_API_DIR));
 
 describe('toda ruta de /api/admin/mascotas/** usa resolveMascotasAdminContext (DD12)', () => {
-  it('la carpeta vigilada es la correcta (aunque aún no tenga rutas — llegan en PR5/PR6)', () => {
+  it('la carpeta vigilada es la correcta y ya tiene rutas (desde PR5)', () => {
     expect(MASCOTAS_API_DIR.replace(/\\/g, '/')).toMatch(/src\/app\/api\/admin\/mascotas$/);
-    expect(existsSync(MASCOTAS_API_DIR)).toBe(false);
+    expect(existsSync(MASCOTAS_API_DIR)).toBe(true);
+    expect(routeFiles.length).toBeGreaterThan(0);
   });
 
   it.each(routeFiles)('%s llama a resolveMascotasAdminContext', (file) => {
