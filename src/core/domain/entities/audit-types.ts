@@ -21,7 +21,16 @@ export type AuditAction =
   // payload SOLO lleva `{ serie, version }` o `{ serie }`, nunca email ni
   // token, aunque la baja borre la fila. `actorTipo: 'system'` (sin sesión).
   | 'kit.avisos.confirmado'
-  | 'kit.avisos.baja';
+  | 'kit.avisos.baja'
+  // Mascotas (sdd pet-id-qr-profile, contratos de design.md): el payload
+  // SOLO lleva `{ codigo, version? }`, nunca email, teléfono, nombre de la
+  // mascota ni token. `mascota.*` son del propio dueño (`actorTipo: 'system'`,
+  // sin sesión); `admin.mascotas.borrar_datos` lleva sesión de admin.
+  | 'mascota.chapa.confirmada'
+  | 'mascota.chapa.baja'
+  | 'mascota.telefono.autorizado'
+  | 'mascota.telefono.revocado'
+  | 'admin.mascotas.borrar_datos';
 
 export type ActorTipo = 'admin' | 'empleado_tpv' | 'waiter' | 'system';
 

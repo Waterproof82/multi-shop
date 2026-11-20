@@ -52,6 +52,8 @@ import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepo
 import { SupabaseComprasRepository } from './supabase-compras.repository';
 import type { IKitCaducidadRepository } from '@/core/domain/repositories/IKitCaducidadRepository';
 import { SupabaseKitCaducidadRepository } from './supabase-kit-caducidad.repository';
+import type { IPetChapaAdminRepository } from '@/core/domain/repositories/IPetChapaAdminRepository';
+import { SupabasePetChapaAdminRepository } from './supabase-pet-chapa-admin.repository';
 import type { IKitAvisosRepository } from '@/core/domain/repositories/IKitAvisosRepository';
 import { SupabaseKitAvisosRepository } from './supabase-kit-avisos.repository';
 import type { IKitAvisosEnvioRepository } from '@/core/domain/repositories/IKitAvisosEnvioRepository';
@@ -337,6 +339,14 @@ let _kitCaducidadRepository: IKitCaducidadRepository | undefined;
 export function getKitCaducidadRepository(): IKitCaducidadRepository {
   _kitCaducidadRepository ??= new SupabaseKitCaducidadRepository();
   return _kitCaducidadRepository;
+}
+
+// pet-id-qr-profile Fase 5 (DD1): repositorio nuevo, independiente del de
+// kits — el admin de mascotas nunca ve PII (DD7).
+let _petChapaAdminRepository: IPetChapaAdminRepository | undefined;
+export function getPetChapaAdminRepository(): IPetChapaAdminRepository {
+  _petChapaAdminRepository ??= new SupabasePetChapaAdminRepository();
+  return _petChapaAdminRepository;
 }
 
 // kit-expiry-m2b (M2b3), DD1: repositorio nuevo, independiente de IKitCaducidadRepository.
