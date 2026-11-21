@@ -5,6 +5,15 @@
 // — ningún tipo de este fichero lleva un campo de PII (email, teléfono,
 // nombre de la mascota, foto, token de gestión). Esos campos solo existen en
 // el dominio del perfil público (`IPetPerfilRepository`, Fase 9+).
+//
+// `AltaChapaInput`/`ContactoDueno` (Fase 10, DD5/DD17) viven aquí, NO en
+// `application/dtos/pet-chapa.dto.ts`, por la misma razón que
+// `AltaAvisosInput`/`ContactoAvisos` viven en `kit-avisos-types.ts` y no en
+// `kit-avisos.dto.ts` (M2b, DD1 de su design.md): `IPetPerfilRepository` es
+// dominio y no puede depender de un tipo de la capa de aplicación (Zod). El
+// Zod de la ruta (`altaChapaSchema`) sigue en `pet-chapa.dto.ts`; el caso de
+// uso traduce ese DTO a este `AltaChapaInput`.
+import type { Language } from '@/lib/language-context';
 
 /** R-QR.3.1: tres estados sin columnas extra — libre (sin email), pendiente
  * (con email, sin confirmar) y activa (confirmada). */
@@ -94,4 +103,40 @@ export interface PerfilPublico {
   fotoUrl: string | null;
   /** R-QR.7.1: `null` salvo que `telefono_consentido_at` esté marcado — lo decide el repositorio. */
   telefono: string | null;
+}
+
+// ---- Alta y doble opt-in (Fase 10) ----
+
+/**
+ * R-QR.4/DD5: entrada de `IPetPerfilRepository.reservarAlta`, ya validada
+ * por el DTO (`altaChapaSchema` en `pet-chapa.dto.ts`) y completada por el
+ * caso de uso (idioma resuelto, token, hora actual, versión del texto de
+ * consentimiento y el límite de caducidad de un pendiente) — calco de
+ * `AltaAvisosInput` (M2b).
+ */
+export interface AltaChapaInput {
+  codigo: string;
+  email: string;
+  nombre: string;
+  especie: 'perro' | 'gato';
+  notas: string | null;
+  idioma: Language;
+  version: string;
+  token: string;
+  ahora: string;
+  /** D-M2b-10 (reutilizado)/R-QR.12.4: un pendiente anterior a este ISO ya caducó y puede sobrescribirse. */
+  pendienteCaducaAntesDe: string;
+}
+
+/**
+ * R-QR.4.4/R-QR.10: contacto actual del DUEÑO de una chapa pendiente o
+ * activa — nunca sale de la capa de aplicación (ni al admin ni a una
+ * respuesta HTTP). `estado` reutiliza `EstadoChapa`; una chapa `libre` nunca
+ * produce un `ContactoDueno` (no tiene email).
+ */
+export interface ContactoDueno {
+  email: string;
+  idioma: Language;
+  nombre: string;
+  token: string;
 }

@@ -14,10 +14,17 @@ interface RegistroErrorTarea {
 
 type Tarea = () => Promise<void>;
 
+/**
+ * `codigoError` (sdd pet-id-qr-profile, Fase 10): opcional, por defecto
+ * `KIT_AVISOS_EMAIL_ERROR` — así las dos llamadas de `kit-avisos` no
+ * cambian, y `pet-id` (u otro módulo futuro) puede registrar su propio
+ * código sin necesitar un envoltorio propio.
+ */
 export function programarConRegistro(
   programar: (tarea: Tarea) => void,
   registrar: (error: RegistroErrorTarea) => void,
   metodo: string,
+  codigoError: string = 'KIT_AVISOS_EMAIL_ERROR',
 ): Programar {
   return (tarea) => {
     programar(async () => {
@@ -25,7 +32,7 @@ export function programarConRegistro(
         await tarea();
       } catch (e) {
         registrar({
-          codigo: 'KIT_AVISOS_EMAIL_ERROR',
+          codigo: codigoError,
           mensaje: e instanceof Error ? e.message : 'Error desconocido al enviar el email',
           modulo: 'api',
           metodo,

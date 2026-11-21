@@ -327,6 +327,79 @@ export async function kitAvisosEmailDentroDeLimite(serie: string): Promise<boole
 }
 
 /**
+ * sdd pet-id-qr-profile (docs/sdd/pet-id-qr-profile/, kitemergenciacanarias),
+ * Fase 10/DD5: 5 peticiones cada 10 min por IP para `POST /api/mascota/alta`
+ * — calco exacto de `kitAvisosLimiter` (M2b).
+ */
+let mascotaFormLimiter: Ratelimit | null = null;
+
+function getMascotaFormLimiter(): Ratelimit | null {
+  if (mascotaFormLimiter) return mascotaFormLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mascotaFormLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(5, "10 m"),
+    prefix: "ratelimit:mascota-form",
+  });
+  return mascotaFormLimiter;
+}
+
+/** DD5: fail-open, igual que `kitAvisosDentroDeLimite`. */
+export async function mascotaFormDentroDeLimite(ip: string): Promise<boolean> {
+  const limiter = getMascotaFormLimiter();
+  if (!limiter) return true;
+
+  try {
+    const { success } = await limiter.limit(ip);
+    return success;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Fase 10/DD5: tope de 3 emails cada 24 h, clavado por CÓDIGO de chapa (no
+ * por el email que llega en el cuerpo) — calco de `kitAvisosEmailLimiter`
+ * (keyed por serie, M2b). El email de «intento» (chapa ya activa) se envía
+ * al email YA REGISTRADO del dueño, no al que escribió quien reenvía el
+ * alta: si este límite se clavara por el email entrante, un atacante podría
+ * seguir bombardeando al dueño real variando el email que envía en cada
+ * intento. Clavarlo por código cierra esa vía, igual que el límite por
+ * serie de M2b.
+ */
+let mascotaAltaEmailLimiter: Ratelimit | null = null;
+
+function getMascotaAltaEmailLimiter(): Ratelimit | null {
+  if (mascotaAltaEmailLimiter) return mascotaAltaEmailLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mascotaAltaEmailLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(3, "24 h"),
+    prefix: "ratelimit:mascota-alta-email",
+  });
+  return mascotaAltaEmailLimiter;
+}
+
+/** DD5: fail-open, igual que `kitAvisosEmailDentroDeLimite`. */
+export async function mascotaAltaEmailDentroDeLimite(codigo: string): Promise<boolean> {
+  const limiter = getMascotaAltaEmailLimiter();
+  if (!limiter) return true;
+
+  try {
+    const { success } = await limiter.limit(codigo);
+    return success;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Apply rate limiting to login. Returns NextResponse 429 if exceeded, or null if passed.
  */
 export async function rateLimitLogin(request: Request): Promise<NextResponse | null> {

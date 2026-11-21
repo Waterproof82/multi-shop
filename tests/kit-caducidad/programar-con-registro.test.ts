@@ -46,4 +46,44 @@ describe('programarConRegistro', () => {
 
     expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ mensaje: 'Error desconocido al enviar el email' }));
   });
+
+  // sdd pet-id-qr-profile (Fase 10): el 4º parámetro opcional permite a otro
+  // módulo (p. ej. `pet-id`) registrar su propio código de error en vez del
+  // `KIT_AVISOS_EMAIL_ERROR` fijo — sin romper las dos llamadas existentes,
+  // que no lo pasan y siguen viendo el código de kit-avisos de siempre.
+  it('con un 4º parámetro, usa ESE código de error en vez de KIT_AVISOS_EMAIL_ERROR', async () => {
+    const tareas: Array<() => Promise<void>> = [];
+    const registrar = vi.fn();
+    const programar = programarConRegistro(
+      (t) => tareas.push(t),
+      registrar,
+      'POST /api/mascota/alta',
+      'PET_ALTA_EMAIL_ERROR',
+    );
+
+    programar(async () => {
+      throw new Error('Sender email not configured');
+    });
+    await tareas[0]();
+
+    expect(registrar).toHaveBeenCalledWith({
+      codigo: 'PET_ALTA_EMAIL_ERROR',
+      mensaje: 'Sender email not configured',
+      modulo: 'api',
+      metodo: 'POST /api/mascota/alta',
+    });
+  });
+
+  it('sin 4º parámetro, sigue usando KIT_AVISOS_EMAIL_ERROR (compatibilidad)', async () => {
+    const tareas: Array<() => Promise<void>> = [];
+    const registrar = vi.fn();
+    const programar = programarConRegistro((t) => tareas.push(t), registrar, 'POST /api/kit-avisos/alta');
+
+    programar(async () => {
+      throw new Error('boom');
+    });
+    await tareas[0]();
+
+    expect(registrar.mock.calls[0][0].codigo).toBe('KIT_AVISOS_EMAIL_ERROR');
+  });
 });
